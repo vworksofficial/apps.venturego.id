@@ -6,8 +6,10 @@ import {
   calculateInstallmentSchedule,
   coerceFinancingLines,
   deriveDepartureFinancials,
+  deriveDepartureFirstPaymentDate,
   getFinancingLineTotal,
   serializeStable,
+  withDraft1Defaults,
   type DepartureFinancials,
   type FinancingCostLine,
 } from '@/lib/departure-financing'
@@ -78,7 +80,6 @@ const validateDepartureApproval = (
     hppInvoice + hppPocketMoney !== derived.netAmount ||
     hppPocketMoney !== derived.pocketMoney ||
     Number(plan.qardhAmount) !== hppPocketMoney ||
-    (hppPocketMoney > 0 && plan.qardhDisbursed !== true) ||
     !Number.isSafeInteger(nafaqahTotal) ||
     nafaqahTotal !== hppInvoice ||
     !Number.isSafeInteger(ujrahTotal) ||
@@ -101,7 +102,7 @@ const validateDepartureApproval = (
     graceDays < 1 ||
     graceDays > 90
   ) {
-    return 'Lengkapi jangka waktu dan ketentuan Draft 1, lalu cocokkan penggunaan dana setelah potongan admin 5%: invoice LPK + uang saku harus sama dengan dana bersih, rincian Lampiran A harus sesuai turunan otomatis (Nafaqah = invoice, Ujrah = wakalah 2,4% × 12 + administrasi 5%, uang saku = qardh yang diserahkan).'
+    return 'Rincian Lampiran A harus sesuai turunan otomatis: invoice LPK + uang saku = dana bersih setelah potongan admin 5% (Nafaqah = invoice, Ujrah = wakalah 2,4% × 12 + administrasi 5%). Periksa kartu Rincian penggunaan dana.'
   }
   const installmentCount = Number(plan.installmentCount)
   const firstPaymentDate = String(plan.firstPaymentDate ?? '')
@@ -337,6 +338,12 @@ export async function saveFinancialPlan(
     }
     const applicationProduct = applicationData.product
     const existingFinancialPlan = applicationData.financialPlan ?? {}
+    const effectiveFirstPaymentDate =
+      applicationProduct === 'DEPARTURE_BRIDGING'
+        ? firstPaymentDate ||
+          String(existingFinancialPlan.firstPaymentDate ?? '') ||
+          deriveDepartureFirstPaymentDate(applicationData)
+        : firstPaymentDate
     const sharedNumbers = { ...financialNumbers }
     delete sharedNumbers.qardhAmount
     delete sharedNumbers.installmentCount
@@ -347,7 +354,7 @@ export async function saveFinancialPlan(
       wakalahMediator: financialValues.wakalahMediator.trim(),
       wakalahDisputeInstitution: financialValues.wakalahDisputeInstitution.trim(),
       akadDate,
-      firstPaymentDate,
+      firstPaymentDate: effectiveFirstPaymentDate,
       lpkWitnessName: financialValues.lpkWitnessName.trim(),
     }
     let updateValues: Record<string, unknown> = {}
@@ -381,6 +388,7 @@ export async function saveFinancialPlan(
         nafaqahTotal: derived.nafaqahTotal,
         ujrahTotal: derived.ujrahTotal,
       })
+      withDraft1Defaults(nextFinancialPlan)
       const nafaqahTotal = derived.nafaqahTotal
       const ujrahTotal = derived.ujrahTotal
       const qardhAmount = derived.qardhAmount
@@ -404,8 +412,12 @@ export async function saveFinancialPlan(
       }
       const installmentCount = financialNumbers.installmentCount ?? 0
       const schedule =
-        installmentCount > 0 && firstPaymentDate
-          ? calculateInstallmentSchedule(totalObligation, installmentCount, firstPaymentDate)
+        installmentCount > 0 && effectiveFirstPaymentDate
+          ? calculateInstallmentSchedule(
+              totalObligation,
+              installmentCount,
+              effectiveFirstPaymentDate,
+            )
           : null
       if (installmentCount > 0 && !schedule) {
         return { ok: false, message: 'Jadwal angsuran tidak valid.' }
@@ -433,7 +445,7 @@ export async function saveFinancialPlan(
         refundTotal,
         totalObligation,
         installmentCount,
-        firstPaymentDate,
+        firstPaymentDate: effectiveFirstPaymentDate,
         schedule,
         refundEvidenceReference,
       }
@@ -867,25 +879,12 @@ export async function approveApplicationPricing(
         rawInstallmentCount <= 36
           ? rawInstallmentCount
           : 12
-      let firstPaymentDate = String(plan.firstPaymentDate ?? '').trim()
-      if (!firstPaymentDate) {
-        const estimatedDeparture = applicationData.eligibility?.estimatedDeparture
-        if (
-          typeof estimatedDeparture === 'string' &&
-          /^\d{4}-\d{2}-\d{2}$/.test(estimatedDeparture)
-        ) {
-          const [depYear, depMonth] = estimatedDeparture.split('-').map(Number)
-          const nextYear = depMonth === 12 ? depYear + 1 : depYear
-          const nextMonth = depMonth === 12 ? 1 : depMonth + 1
-          firstPaymentDate = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
-        } else {
-          const now = new Date()
-          const nextDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 1))
-          firstPaymentDate = nextDate.toISOString().slice(0, 10)
-        }
-      }
+      const firstPaymentDate =
+        String(plan.firstPaymentDate ?? '').trim() ||
+        deriveDepartureFirstPaymentDate(applicationData)
       plan.installmentCount = installmentCount
       plan.firstPaymentDate = firstPaymentDate
+      withDraft1Defaults(plan)
       const approvalError = validateDepartureApproval(
         applicationData,
         plan,
@@ -1054,6 +1053,7 @@ export async function setApplicationPricingAgreed(documentId: string): Promise<A
     let offerSnapshot: Record<string, unknown>
 
     if (product === 'DEPARTURE_BRIDGING') {
+      withDraft1Defaults(plan)
       const nafaqahItems = coerceFinancingLines(plan.nafaqahItems) ?? []
       const ujrahItems = coerceFinancingLines(plan.ujrahItems) ?? []
       const approvalError = validateDepartureApproval(
@@ -1150,6 +1150,7 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
     }
     const product = String(applicationData.product ?? '')
     if (product === 'DEPARTURE_BRIDGING') {
+      withDraft1Defaults(plan)
       const nafaqahItems = coerceFinancingLines(plan.nafaqahItems) ?? []
       const ujrahItems = coerceFinancingLines(plan.ujrahItems) ?? []
       const nafaqahTotal = Number(plan.nafaqahTotal) || getFinancingLineTotal(nafaqahItems)
@@ -1246,6 +1247,7 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
         const latestData = latest.data()
         if (!latest.exists || latestData?.financialPlan?.akadDocument) return false
         const latestPlan = { ...(latestData?.financialPlan ?? {}) } as Record<string, unknown>
+        if (product === 'DEPARTURE_BRIDGING') withDraft1Defaults(latestPlan)
         transaction.update(applicationRef, {
           financialPlan: {
             ...latestPlan,

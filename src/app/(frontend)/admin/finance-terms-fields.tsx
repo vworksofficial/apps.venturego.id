@@ -67,13 +67,10 @@ export function FinanceTermsFields({
       ? derivedDeparture.pocketMoney
       : parseThousandsInput(hppPocketMoneyInput)
   const [fullCoverNafaqah, setFullCoverNafaqah] = useState(Number(financialPlan.nafaqahTotal) || 0)
-  const [qardhDisbursed, setQardhDisbursed] = useState(financialPlan.qardhDisbursed === true)
-  const [refundTotal, setRefundTotal] = useState(Number(financialPlan.refundTotal) || 0)
+  const [qardhDisbursed] = useState(financialPlan.qardhDisbursed === true)
+  const [refundTotal] = useState(Number(financialPlan.refundTotal) || 0)
   const [installmentCount, setInstallmentCount] = useState(
     String(financialPlan.installmentCount ?? ''),
-  )
-  const [firstPaymentDate, setFirstPaymentDate] = useState(
-    String(financialPlan.firstPaymentDate ?? ''),
   )
   const [akadDate, setAkadDate] = useState(() => {
     const saved = String(financialPlan.akadDate ?? '')
@@ -457,8 +454,7 @@ export function FinanceTermsFields({
   const monthlyEstimate =
     Number.isInteger(parsedCount) && parsedCount > 0 ? Math.floor(total / parsedCount) : null
   const lampiranSectionNo = {
-    ujrahStart: derivedDeparture.nafaqahItems.length + 1,
-    qardh: derivedDeparture.nafaqahItems.length + derivedDeparture.ujrahItems.length + 1,
+    ujrahStart: derivedDeparture.nafaqahItems.length + 2,
   }
 
   return (
@@ -493,60 +489,6 @@ export function FinanceTermsFields({
       </div>
       {hppEditor}
       {identityEditor}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-bold text-slate-900">Ketentuan pelengkap Draft 1</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-500">
-          Isian ini melengkapi jangka waktu program, pengembalian dokumen, dan prosedur peringatan
-          pada template Wakalah bil Ujrah.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(
-            [
-              ['wakalahLanguageMonths', 'Pendidikan bahasa (bulan)'],
-              ['wakalahSkillMonths', 'Pelatihan skill (bulan)'],
-              ['wakalahDocumentReturnBusinessDays', 'Pengembalian dokumen (hari kerja)'],
-              ['wakalahWrittenWarningCount', 'Jumlah peringatan tertulis'],
-              ['wakalahGraceDays', 'Tenggang waktu (hari)'],
-            ] as const
-          ).map(([name, label]) => (
-            <label className="space-y-1 text-xs font-semibold text-slate-600" key={name}>
-              <span>{label}</span>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                min={0}
-                name={name}
-                defaultValue={String(financialPlan[name] ?? '')}
-                step={1}
-                type="number"
-              />
-            </label>
-          ))}
-          {(
-            [
-              ['wakalahOtherUjrahService', 'Jasa lain PIHAK PERTAMA'],
-              ['wakalahMediator', 'Pihak mediator (opsional)'],
-              ['wakalahDisputeInstitution', 'Lembaga penyelesaian lain (opsional)'],
-            ] as const
-          ).map(([name, label]) => (
-            <label className="space-y-1 text-xs font-semibold text-slate-600" key={name}>
-              <span>{label}</span>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                maxLength={200}
-                name={name}
-                defaultValue={String(financialPlan[name] ?? '')}
-              />
-            </label>
-          ))}
-        </div>
-      </section>
-      {derivedDeparture.pocketMoney > 0 && !qardhDisbursed && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-          Uang saku qardh sebesar {amountLabel(derivedDeparture.pocketMoney)} belum ditandai
-          diserahkan ke pemohon — centang 'Qardh sudah diserahkan ke pemohon' sebelum status biaya
-          diverifikasi.
-        </p>
-      )}
       <input name="qardhDisbursed" type="hidden" value={String(qardhDisbursed)} />
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-xs">
@@ -597,13 +539,23 @@ export function FinanceTermsFields({
                   <td className="px-2 py-2 text-right text-slate-400">—</td>
                 </tr>
               ))}
+              <tr>
+                <td className="px-2 py-2 text-slate-500">
+                  {derivedDeparture.nafaqahItems.length + 1}
+                </td>
+                <td className="px-2 py-2 font-medium text-slate-800">{QARDH_LABEL}</td>
+                <td className="px-2 py-2 text-slate-600">Diterima pemohon</td>
+                <td className="px-2 py-2 text-right font-medium text-slate-800">
+                  {qardhAmount > 0 ? amountLabel(qardhAmount) : '—'}
+                </td>
+              </tr>
               <tr className="bg-blue-50/60">
                 <td className="px-2 py-2" />
                 <td className="px-2 py-2 font-semibold text-slate-800" colSpan={2}>
-                  Subtotal Nafaqah (mengikuti invoice LPK)
+                  Subtotal Nafaqah (termasuk uang saku)
                 </td>
                 <td className="px-2 py-2 text-right font-bold text-slate-900">
-                  {amountLabel(nafaqahTotal)}
+                  {amountLabel(nafaqahTotal + qardhAmount)}
                 </td>
               </tr>
               <tr>
@@ -635,22 +587,6 @@ export function FinanceTermsFields({
                   {amountLabel(ujrahTotal)}
                 </td>
               </tr>
-              <tr>
-                <td
-                  className="bg-slate-50 px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-700"
-                  colSpan={4}
-                >
-                  Uang saku
-                </td>
-              </tr>
-              <tr>
-                <td className="px-2 py-2 text-slate-500">{lampiranSectionNo.qardh}</td>
-                <td className="px-2 py-2 font-medium text-slate-800">{QARDH_LABEL}</td>
-                <td className="px-2 py-2 text-slate-600">Diterima pemohon</td>
-                <td className="px-2 py-2 text-right font-medium text-slate-800">
-                  {qardhAmount > 0 ? amountLabel(qardhAmount) : '—'}
-                </td>
-              </tr>
               <tr className="border-t-2 border-slate-300 bg-blue-50">
                 <td className="px-2 py-2.5" />
                 <td className="px-2 py-2.5 font-bold text-[#0b57d0]" colSpan={2}>
@@ -665,35 +601,24 @@ export function FinanceTermsFields({
           </table>
         </div>
         <p className="border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-[11px] leading-5 text-slate-500">
-          Total Nafaqah mengikuti invoice LPK; Ujrah dihitung otomatis (wakalah 2,4% × 12 bulan +
-          administrasi 5%); uang saku = dana bersih − invoice. Uang saku selalu ikut dihitung dalam
-          Total Kewajiban; penyerahannya tetap dicatat lewat centang 'Qardh sudah diserahkan ke
-          pemohon'.
+          Nafaqah mengikuti invoice LPK dan uang saku (dana bersih) menjadi baris ke-4 pada bagian
+          ini; Ujrah dihitung otomatis (wakalah 2,4% × 12 bulan + administrasi 5%); uang saku = dana
+          bersih − invoice dan selalu ikut dihitung dalam Total Kewajiban.
         </p>
       </section>
 
-      <div className="space-y-3">
-        <p className="text-xs text-slate-500">
-          Jadwal angsuran dimulai pada bulan setelah perkiraan keberangkatan.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="space-y-1 text-xs font-semibold text-slate-600">
-            <span>Uang saku qardh (Rp)</span>
-            <input
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-normal text-slate-700"
-              placeholder="Otomatis dari invoice LPK"
-              readOnly
-              value={qardhAmount > 0 ? qardhAmount.toLocaleString('id-ID') : ''}
-            />
-          </label>
-          <label className="flex items-center gap-2.5 self-end rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium text-slate-700">
-            <input
-              checked={qardhDisbursed}
-              onChange={(event) => setQardhDisbursed(event.target.checked)}
-              type="checkbox"
-            />
-            <span>Qardh sudah diserahkan ke pemohon</span>
-          </label>
+      <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/60 p-5 shadow-sm">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#0b57d0]">
+            Angsuran
+          </span>
+          <h3 className="mt-1 text-base font-bold text-slate-900">Jadwal angsuran</h3>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">
+            Jadwal angsuran dimulai pada bulan setelah perkiraan keberangkatan — tanggal angsuran
+            pertama disusun otomatis, tinggal tentukan jumlah angsurannya.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-xs font-semibold text-slate-600">
             <span>Jumlah angsuran (1–36 bulan)</span>
             <input
@@ -708,60 +633,21 @@ export function FinanceTermsFields({
               value={installmentCount}
             />
           </label>
-          <label className="space-y-1 text-xs font-semibold text-slate-600">
-            <span>Tanggal angsuran pertama</span>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-              onChange={(event) => setFirstPaymentDate(event.target.value)}
-              name="firstPaymentDate"
-              type="date"
-              value={firstPaymentDate}
-            />
-          </label>
-          <label className="space-y-1 text-xs font-semibold text-slate-600">
-            <span>Refund / potongan disetujui (Rp)</span>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-              min={0}
-              name="refundTotal"
-              onChange={(event) => setRefundTotal(Number(event.target.value) || 0)}
-              step={1}
-              type="number"
-              value={refundTotal}
-            />
-          </label>
-          <label className="space-y-1 text-xs font-semibold text-slate-600 sm:col-span-3">
-            <span>Referensi bukti refund / potongan</span>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-              defaultValue={String(financialPlan.refundEvidenceReference ?? '')}
-              maxLength={300}
-              name="refundEvidenceReference"
-              placeholder="Wajib diisi bila terdapat nominal refund/potongan"
-            />
-          </label>
-          <label className="space-y-1 text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-4">
-            <span>Referensi akad final yang sudah ditandatangani</span>
-            <input
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-              defaultValue={String(financialPlan.finalAgreementReference ?? '')}
-              maxLength={300}
-              name="finalAgreementReference"
-              placeholder="Nomor dokumen akad final / tautan arsip (wajib untuk mengunci status biaya Disepakati)"
-            />
-          </label>
-          <label className="space-y-1 text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-4">
-            <span>Catatan penyelesaian, refund, atau keringanan</span>
-            <textarea
-              className="min-h-20 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-              defaultValue={String(financialPlan.settlementNotes ?? '')}
-              maxLength={1000}
-              name="settlementNotes"
-              placeholder="Catatan tambahan terkait penyelesaian, perhitungan pembatalan, atau penyesuaian"
-            />
-          </label>
+          <div className="space-y-1">
+            <span className="text-xs font-semibold text-slate-600">
+              Nominal angsuran / bulan (otomatis)
+            </span>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <strong className="text-sm font-bold text-slate-900">
+                {monthlyEstimate !== null ? amountLabel(monthlyEstimate) : '—'}
+              </strong>
+              <span className="text-[11px] text-slate-500">
+                {monthlyEstimate !== null ? `× ${parsedCount} bulan` : 'Isi jumlah angsuran'}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

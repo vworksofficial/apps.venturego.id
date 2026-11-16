@@ -196,6 +196,49 @@ export function deriveDepartureFinancials(options: {
   }
 }
 
+export const DRAFT1_DEFAULTS = {
+  wakalahLanguageMonths: 6,
+  wakalahSkillMonths: 6,
+  wakalahDocumentReturnBusinessDays: 30,
+  wakalahWrittenWarningCount: 3,
+  wakalahGraceDays: 7,
+} as const
+
+const DRAFT1_RANGES: Record<keyof typeof DRAFT1_DEFAULTS, [number, number]> = {
+  wakalahLanguageMonths: [1, 60],
+  wakalahSkillMonths: [1, 60],
+  wakalahDocumentReturnBusinessDays: [1, 90],
+  wakalahWrittenWarningCount: [1, 10],
+  wakalahGraceDays: [1, 90],
+}
+
+export function withDraft1Defaults<T extends Record<string, unknown>>(plan: T): T {
+  const target = plan as Record<string, unknown>
+  for (const key of Object.keys(DRAFT1_DEFAULTS) as (keyof typeof DRAFT1_DEFAULTS)[]) {
+    const fallback = DRAFT1_DEFAULTS[key]
+    const range = DRAFT1_RANGES[key]
+    const value = Number(target[key])
+    if (!Number.isInteger(value) || value < range[0] || value > range[1]) {
+      target[key] = fallback
+    }
+  }
+  return plan
+}
+
+export function deriveDepartureFirstPaymentDate(applicationData: Record<string, unknown>): string {
+  const estimatedDeparture = (applicationData.eligibility as Record<string, unknown> | undefined)
+    ?.estimatedDeparture
+  if (typeof estimatedDeparture === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(estimatedDeparture)) {
+    const [departureYear, departureMonth] = estimatedDeparture.split('-').map(Number)
+    const nextYear = departureMonth === 12 ? departureYear + 1 : departureYear
+    const nextMonth = departureMonth === 12 ? 1 : departureMonth + 1
+    return `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+  }
+  const now = new Date()
+  const nextDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 1))
+  return nextDate.toISOString().slice(0, 10)
+}
+
 export function serializeStable(value: unknown): string {
   const normalize = (item: unknown): unknown => {
     if (Array.isArray(item)) return item.map(normalize)

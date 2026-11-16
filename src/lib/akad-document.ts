@@ -8,6 +8,7 @@ import {
   coerceFinancingLines,
   deriveDepartureFinancials,
   getFinancingLineTotal,
+  withDraft1Defaults,
   type FinancingCostLine,
 } from './departure-financing'
 import { terbilang } from './terbilang'
@@ -705,10 +706,11 @@ const deriveFirstPaymentDate = (application: ApplicationData): string => {
 }
 
 const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedValues => {
-  const plan = (application.financialPlan ?? {}) as Record<string, unknown>
+  const product = readText(application.product)
+  const storedPlan = (application.financialPlan ?? {}) as Record<string, unknown>
+  const plan = product === 'FULL_COVER' ? storedPlan : withDraft1Defaults({ ...storedPlan })
   const personal = (application.personalDetails ?? {}) as Record<string, unknown>
   const fullCover = (application.fullCoverDetails ?? {}) as Record<string, unknown>
-  const product = readText(application.product)
 
   const name = readText(application.applicantName)
   const phone = readText(application.phone)

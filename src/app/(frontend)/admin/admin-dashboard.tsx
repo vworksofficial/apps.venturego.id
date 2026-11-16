@@ -1351,20 +1351,53 @@ function ApplicationDrawerForm({
             </section>
           )}
 
-          <section aria-labelledby="pricing-approval-title" className="space-y-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900" id="pricing-approval-title">
-                Persetujuan Biaya
-              </h3>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                {pricingStatus === 'ESTIMATED'
-                  ? 'Setujui rincian untuk mengunci status biaya menjadi Terverifikasi. Dengan nominal baru, principal, invoice LPK, uang saku, Nafaqah, dan Ujrah dihitung ulang otomatis dari nominal tersebut, lalu jadwal angsuran disusun ulang.'
-                  : pricingStatus === 'VERIFIED'
-                    ? 'Rincian telah terverifikasi. Tandai Disepakati setelah pemohon menyetujui penawaran terbaru dan referensi akad final terisi pada tab Draft Akad.'
-                    : 'Rincian biaya sudah disepakati dan siap diproses ke tahap akad.'}
-              </p>
+          <section
+            aria-labelledby="pricing-approval-title"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/60 shadow-sm"
+          >
+            <div className="border-b border-blue-100/70 bg-white/70 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0b57d0]">
+                  <svg
+                    aria-hidden="true"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path
+                      d="M8.5 12.5l2.5 2.5 4.5-5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900" id="pricing-approval-title">
+                      Persetujuan Biaya
+                    </h3>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${
+                        PRICING_BADGE_STYLES[pricingStatus] ?? 'bg-slate-100 text-slate-700'
+                      } ring-slate-200`}
+                    >
+                      {pricingStatusLabel}
+                    </span>
+                  </div>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                    {pricingStatus === 'ESTIMATED'
+                      ? 'Setujui rincian untuk mengunci status biaya menjadi Terverifikasi. Dengan nominal baru, principal, invoice LPK, uang saku, Nafaqah, dan Ujrah dihitung ulang otomatis dari nominal tersebut, lalu jadwal angsuran disusun ulang.'
+                      : pricingStatus === 'VERIFIED'
+                        ? 'Rincian telah terverifikasi. Tandai Disepakati setelah pemohon menyetujui penawaran terbaru dan referensi akad final terisi pada kartu Dokumen Akad.'
+                        : 'Rincian biaya sudah disepakati dan siap diproses ke tahap akad.'}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5 px-5 py-4">
               {pricingStatus === 'ESTIMATED' && (
                 <>
                   <DrawerAction
@@ -1614,89 +1647,122 @@ function ApplicationDrawerForm({
             />
           </fieldset>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Dokumen Akad</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  {akadIssued
-                    ? 'Dokumen akad final tersimpan di penyimpanan berkas dan tidak dapat diubah lagi.'
-                    : 'Susun dokumen akad dari template resmi VSV dengan data pengajuan ini.'}
-                </p>
-              </div>
-              {akadIssued && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                  Dokumen akad telah terbit
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/60 shadow-sm">
+            <div className="border-b border-blue-100/70 bg-white/70 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0b57d0]">
+                  <svg
+                    aria-hidden="true"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+                    <path d="M14 3v5h5" />
+                    <path d="M9 13h6M9 17h4" strokeLinecap="round" />
+                  </svg>
                 </span>
-              )}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">Dokumen Akad</h3>
+                    {akadIssued && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                        Dokumen akad telah terbit
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                    {akadIssued
+                      ? 'Dokumen akad final tersimpan di penyimpanan berkas dan tidak dapat diubah lagi.'
+                      : 'Susun dokumen akad dari template resmi VSV dengan data pengajuan ini.'}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {akadIssued && akadMeta ? (
-              <div className="mt-3 grid gap-3 rounded-xl bg-emerald-50/70 p-4 ring-1 ring-inset ring-emerald-200 sm:grid-cols-3">
-                <div>
-                  <dt className="text-[11px] font-semibold text-emerald-700">Nomor Dokumen</dt>
-                  <dd className="mt-0.5 text-sm font-bold text-emerald-950">
-                    {akadMeta.documentNumber || '-'}
-                  </dd>
+            <div className="space-y-3 px-5 py-4">
+              {akadIssued && akadMeta ? (
+                <div className="grid gap-3 rounded-xl bg-emerald-50/70 p-4 ring-1 ring-inset ring-emerald-200 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-[11px] font-semibold text-emerald-700">Nomor Dokumen</dt>
+                    <dd className="mt-0.5 text-sm font-bold text-emerald-950">
+                      {akadMeta.documentNumber || '-'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold text-emerald-700">NIS Pemohon</dt>
+                    <dd className="mt-0.5 text-sm font-bold text-emerald-950">
+                      {akadMeta.studentNumber || '-'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[11px] font-semibold text-emerald-700">Diterbitkan</dt>
+                    <dd className="mt-0.5 text-sm font-bold text-emerald-950">
+                      {formatDateTime(akadMeta.issuedAt)}
+                    </dd>
+                  </div>
                 </div>
-                <div>
-                  <dt className="text-[11px] font-semibold text-emerald-700">NIS Pemohon</dt>
-                  <dd className="mt-0.5 text-sm font-bold text-emerald-950">
-                    {akadMeta.studentNumber || '-'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[11px] font-semibold text-emerald-700">Diterbitkan</dt>
-                  <dd className="mt-0.5 text-sm font-bold text-emerald-950">
-                    {formatDateTime(akadMeta.issuedAt)}
-                  </dd>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-                Nomor dokumen mengikuti urutan NIS pemohon. Status biaya harus Terverifikasi sebelum
-                dokumen dapat diterbitkan.
-              </p>
-            )}
-
-            {akadIssueError && (
-              <p className="mt-2 text-xs text-red-700" role="alert">
-                {akadIssueError}
-              </p>
-            )}
-
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
-                disabled={akadPreviewLoading}
-                onClick={openAkadPreview}
-                type="button"
-              >
-                Preview Dokumen
-              </button>
-              {akadIssued ? (
-                <a
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
-                  href={`/api/admin/applications/${application.id}/akad?mode=docx`}
-                >
-                  Unduh .docx
-                </a>
               ) : (
+                <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                  Nomor dokumen mengikuti urutan NIS pemohon. Status biaya harus Terverifikasi
+                  sebelum dokumen dapat diterbitkan.
+                </p>
+              )}
+
+              {!akadIssued && application.product === 'DEPARTURE_BRIDGING' && (
+                <label className="block space-y-1 text-xs font-semibold text-slate-600">
+                  <span>Referensi akad final yang sudah ditandatangani</span>
+                  <input
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                    defaultValue={String(application.financialPlan?.finalAgreementReference ?? '')}
+                    maxLength={300}
+                    name="finalAgreementReference"
+                    placeholder="Nomor dokumen akad final / tautan arsip (wajib untuk mengunci status biaya Disepakati)"
+                  />
+                </label>
+              )}
+
+              {akadIssueError && (
+                <p className="text-xs text-red-700" role="alert">
+                  {akadIssueError}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  className="rounded-lg bg-[#0b57d0] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-60"
-                  disabled={!akadGateOpen || pending || akadIssuing}
-                  onClick={issueAkad}
+                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                  disabled={akadPreviewLoading}
+                  onClick={openAkadPreview}
                   type="button"
                 >
-                  {akadIssuing ? 'Menerbitkan…' : 'Terbitkan Dokumen Akad'}
+                  Preview Dokumen
                 </button>
+                {akadIssued ? (
+                  <a
+                    className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                    href={`/api/admin/applications/${application.id}/akad?mode=docx`}
+                  >
+                    Unduh .docx
+                  </a>
+                ) : (
+                  <button
+                    className="rounded-lg bg-[#0b57d0] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-60"
+                    disabled={!akadGateOpen || pending || akadIssuing}
+                    onClick={issueAkad}
+                    type="button"
+                  >
+                    {akadIssuing ? 'Menerbitkan…' : 'Terbitkan Dokumen Akad'}
+                  </button>
+                )}
+              </div>
+              {!akadIssued && !akadGateOpen && (
+                <p className="text-[11px] text-amber-700">
+                  Status biaya harus Terverifikasi sebelum dokumen dapat diterbitkan.
+                </p>
               )}
             </div>
-            {!akadIssued && !akadGateOpen && (
-              <p className="mt-2 text-[11px] text-amber-700">
-                Status biaya harus Terverifikasi sebelum dokumen dapat diterbitkan.
-              </p>
-            )}
           </section>
 
           {!akadIssued && (
@@ -2528,11 +2594,25 @@ export function AdminDashboard({
         qardhDisbursed: String(formData.get('qardhDisbursed') ?? 'false'),
         akadDate: String(formData.get('akadDate') ?? ''),
         installmentCount: String(formData.get('installmentCount') ?? ''),
-        firstPaymentDate: String(formData.get('firstPaymentDate') ?? ''),
-        refundTotal: String(formData.get('refundTotal') ?? '0'),
-        refundEvidenceReference: String(formData.get('refundEvidenceReference') ?? ''),
-        finalAgreementReference: String(formData.get('finalAgreementReference') ?? ''),
-        settlementNotes: String(formData.get('settlementNotes') ?? ''),
+        firstPaymentDate: String(
+          formData.get('firstPaymentDate') ?? application.financialPlan?.firstPaymentDate ?? '',
+        ),
+        refundTotal: String(
+          formData.get('refundTotal') ?? application.financialPlan?.refundTotal ?? '0',
+        ),
+        refundEvidenceReference: String(
+          formData.get('refundEvidenceReference') ??
+            application.financialPlan?.refundEvidenceReference ??
+            '',
+        ),
+        finalAgreementReference: String(
+          formData.get('finalAgreementReference') ??
+            application.financialPlan?.finalAgreementReference ??
+            '',
+        ),
+        settlementNotes: String(
+          formData.get('settlementNotes') ?? application.financialPlan?.settlementNotes ?? '',
+        ),
         hppLpkInvoiceAmount: String(formData.get('hppLpkInvoiceAmount') ?? ''),
         hppPocketMoneyAmount: String(formData.get('hppPocketMoneyAmount') ?? ''),
         wakalahLanguageMonths: String(formData.get('wakalahLanguageMonths') ?? ''),
@@ -2547,9 +2627,19 @@ export function AdminDashboard({
         departureAllowanceAmount: String(formData.get('departureAllowanceAmount') ?? ''),
         commitmentCompensationAmount: String(formData.get('commitmentCompensationAmount') ?? ''),
         commitmentSettlementDays: String(formData.get('commitmentSettlementDays') ?? ''),
-        wakalahOtherUjrahService: String(formData.get('wakalahOtherUjrahService') ?? ''),
-        wakalahMediator: String(formData.get('wakalahMediator') ?? ''),
-        wakalahDisputeInstitution: String(formData.get('wakalahDisputeInstitution') ?? ''),
+        wakalahOtherUjrahService: String(
+          formData.get('wakalahOtherUjrahService') ??
+            application.financialPlan?.wakalahOtherUjrahService ??
+            '',
+        ),
+        wakalahMediator: String(
+          formData.get('wakalahMediator') ?? application.financialPlan?.wakalahMediator ?? '',
+        ),
+        wakalahDisputeInstitution: String(
+          formData.get('wakalahDisputeInstitution') ??
+            application.financialPlan?.wakalahDisputeInstitution ??
+            '',
+        ),
         lpkWitnessName: String(formData.get('lpkWitnessName') ?? ''),
       })
       if (!result.ok) {

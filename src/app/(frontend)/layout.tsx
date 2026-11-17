@@ -62,12 +62,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const customScripts = makeSiteSettings.customScripts
 
   return (
-    <html className={`${plusJakartaSans.variable} ${googleSans.variable}`} lang={language}>
+    <html
+      className={`${plusJakartaSans.variable} ${googleSans.variable}`}
+      lang={language}
+      suppressHydrationWarning
+    >
       <head>
         {renderHeadCustomCode(customScripts?.headStart, 'head-start')}
         {renderHeadCustomCode(customScripts?.headEnd, 'head-end')}
       </head>
-      <body className="min-h-screen bg-white text-slate-950 antialiased">
+      <body className="min-h-screen bg-white text-slate-950 antialiased" suppressHydrationWarning>
         <BodyCustomCode html={customScripts?.bodyStart} />
         {addBypassLinks && (
           <a className="figma-bypass-link" href="#root">

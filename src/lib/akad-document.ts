@@ -7,6 +7,7 @@ import {
   calculateInstallmentSchedule,
   coerceFinancingLines,
   deriveDepartureFinancials,
+  FIXED_NAFAQAH_LABELS,
   getFinancingLineTotal,
   withDraft1Defaults,
   type FinancingCostLine,
@@ -35,6 +36,30 @@ const RELIGION_LABELS: Record<string, string> = {
 const ROMAN_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
 const TEMPLATE_ERROR = 'Template dokumen akad tidak sesuai versi aplikasi.'
+
+const DRAFT_WATERMARK_VML =
+  '<w:p><w:pPr><w:spacing w:line="20" w:lineRule="exact"/></w:pPr><w:r><w:pict>' +
+  '<v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">' +
+  '<v:formulas>' +
+  '<v:f eqn="sum #0 0 10800"/><v:f eqn="prod #0 2 1"/><v:f eqn="sum 21600 0 @1"/>' +
+  '<v:f eqn="sum 0 0 @2"/><v:f eqn="sum 21600 0 @3"/><v:f eqn="if @0 @3 0"/>' +
+  '<v:f eqn="if @0 21600 @1"/><v:f eqn="if @0 0 @2"/><v:f eqn="if @0 @4 21600"/>' +
+  '<v:f eqn="mid @5 @6"/><v:f eqn="mid @8 @5"/><v:f eqn="mid @7 @8"/>' +
+  '<v:f eqn="mid @6 @7"/><v:f eqn="sum @6 0 @5"/>' +
+  '</v:formulas>' +
+  '<v:path textpathok="t" o:connecttype="custom"/><v:textpath on="t" fitshape="t"/>' +
+  '<v:handles><v:h position="#0,bottomRight" xrange="6629,14971"/></v:handles>' +
+  '<o:lock v:ext="edit" text="t" shapetype="t"/>' +
+  '</v:shapetype>' +
+  '<v:shape id="DraftWatermarkObject" type="#_x0000_t136" ' +
+  'style="position:absolute;margin-left:0;margin-top:0;width:468pt;height:117pt;rotation:315;' +
+  'z-index:-251654144;mso-position-horizontal:center;mso-position-horizontal-relative:margin;' +
+  'mso-position-vertical:center;mso-position-vertical-relative:margin" ' +
+  'o:allowincell="f" fillcolor="#b7c3d4" stroked="f">' +
+  '<v:fill opacity=".18"/>' +
+  '<v:textpath style="font-family:Calibri;font-size:1pt" string="DRAFT"/>' +
+  '<w10:wrap anchorx="margin" anchory="margin"/>' +
+  '</v:shape></w:pict></w:r></w:p>'
 
 const escapeXml = (value: string) =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -128,6 +153,19 @@ const updateParagraphContaining = (
     return `<w:p>${paragraphProperties}<w:r>${runProperties}<w:t xml:space="preserve">${escapeXml(replacement)}</w:t></w:r></w:p>`
   })
 
+const WAKALAH_GUARDIAN_HEADING =
+  '<w:p><w:pPr><w:keepNext/><w:spacing w:after="0" w:before="240"/><w:jc w:val="center"/></w:pPr>' +
+  '<w:r><w:rPr><w:b w:val="false"/><w:bCs w:val="false"/><w:i w:val="false"/><w:iCs w:val="false"/></w:rPr>' +
+  '<w:t xml:space="preserve">Wali/Orang Tua Siswa</w:t></w:r></w:p>'
+
+const insertParagraphAfterContaining = (xml: string, marker: string, paragraph: string): string =>
+  xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (match) => {
+    const text = Array.from(match.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g), (m) =>
+      unescapeXml(m[1]),
+    ).join('')
+    return text.includes(marker) ? `${match}${paragraph}` : match
+  })
+
 const removeParagraphSection = (xml: string, startLabel: string, endLabel: string): string => {
   const paragraphs = Array.from(xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g))
   const paragraphText = (paragraph: string) =>
@@ -185,6 +223,104 @@ const replaceTableRowCells = (row: string, values: (string | null)[]): string =>
     return value === null || value === undefined ? cell : setCellText(cell, value)
   })
 }
+
+const setCellTextByMarker = (row: string, marker: string, value: string): string => {
+  for (const cell of splitCells(row)) {
+    if (cellText(cell).includes(marker)) {
+      return row.replace(cell, setCellText(cell, value))
+    }
+  }
+  return row
+}
+
+const setCellVMerge = (cell: string, mode: 'restart' | 'continue'): string => {
+  const tag = mode === 'restart' ? '<w:vMerge w:val="restart"/>' : '<w:vMerge/>'
+  const existing = cell.match(/<w:vMerge(?: w:val="[^"]*")?\/>/)
+  if (existing) return cell.replace(existing[0], tag)
+  const tcPr = cell.match(/<w:tcPr(?:\s[^>]*)?>/)
+  if (!tcPr || tcPr.index === undefined) {
+    return cell.replace(/^(<w:tc(?:\s[^>]*)?>)/, `$1<w:tcPr>${tag}</w:tcPr>`)
+  }
+  const openEnd = tcPr.index + tcPr[0].length
+  const lead =
+    /^(?:\s*<(?:w:tcW|w:gridSpan|w:hMerge)\b[^>]*\/>)*/.exec(cell.slice(openEnd))?.[0] ?? ''
+  const insertAt = openEnd + lead.length
+  return cell.slice(0, insertAt) + tag + cell.slice(insertAt)
+}
+
+const rebuildRowCells = (row: string, cells: string[]): string => {
+  let index = 0
+  return row.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, () => {
+    const next = cells[index] ?? ''
+    index += 1
+    return next
+  })
+}
+
+const mergeNafaqahServiceRows = (rows: string[], amount: number): string[] => {
+  const targets = new Set<string>(FIXED_NAFAQAH_LABELS)
+  const indices: number[] = []
+  rows.forEach((row, index) => {
+    const cells = splitCells(row)
+    if (cells.length < 5) return
+    if (targets.has(cellText(cells[1]))) indices.push(index)
+  })
+  if (indices.length !== FIXED_NAFAQAH_LABELS.length) return rows
+  if (!indices.every((value, position) => position === 0 || value === indices[position - 1] + 1)) {
+    return rows
+  }
+  return rows.map((row, index) => {
+    const position = indices.indexOf(index)
+    if (position < 0) return row
+    const cells = splitCells(row)
+    if (cells.length < 5) return row
+    const mode = position === 0 ? 'restart' : 'continue'
+    const recipient = setCellVMerge(
+      setCellText(cells[2], position === 0 ? 'LPK Mitra Venturego' : ''),
+      mode,
+    )
+    const nominal = setCellVMerge(
+      setCellText(cells[3], position === 0 ? `Rp${rp(amount)}` : ''),
+      mode,
+    )
+    const nextCells = cells.map((cell, cellIndex) => {
+      if (cellIndex === 2) return recipient
+      if (cellIndex === 3) return nominal
+      return cell
+    })
+    return rebuildRowCells(row, nextCells)
+  })
+}
+
+const addAppendixReceiptSignatureSpace = (xml: string): string => {
+  const location = findTableByMarker(xml, 'Penyerah')
+  if (!location) return xml
+  const table = xml.slice(location.start, location.end)
+  const rows = splitRows(table)
+  if (rows.length < 3) return xml
+  const spacer = '<w:p/>'.repeat(5)
+  const nextRows = rows.map((row, index) =>
+    index === 1 ? row.replace(/<\/w:tc>/g, `${spacer}</w:tc>`) : row,
+  )
+  const nextTable = reassembleTable(table, nextRows)
+  return xml.slice(0, location.start) + nextTable + xml.slice(location.end)
+}
+
+const emphasizeRow = (row: string): string =>
+  row.replace(/<w:r>[\s\S]*?<\/w:r>/g, (run) => {
+    const rPr = run.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)?.[0]
+    if (!rPr) {
+      if (run.includes('<w:rPr/>')) {
+        return run.replace('<w:rPr/>', '<w:rPr><w:b/><w:bCs/></w:rPr>')
+      }
+      return run.replace(/^<w:r(?:\s[^>]*)?>/, (open) => `${open}<w:rPr><w:b/><w:bCs/></w:rPr>`)
+    }
+    const stripped = rPr.replace(/<w:b(?:\s[^>]*?)?\/>/g, '').replace(/<w:bCs(?:\s[^>]*?)?\/>/g, '')
+    const lead = stripped.slice(7).match(/^((?:<w:rStyle[^>]*\/>)?(?:<w:rFonts[^>]*\/>)?)/)
+    const offset = 7 + (lead?.[0].length ?? 0)
+    const bolded = `${stripped.slice(0, offset)}<w:b/><w:bCs/>${stripped.slice(offset)}`
+    return run.replace(rPr, bolded)
+  })
 
 type WakaiahTableParts = {
   header: string
@@ -259,7 +395,7 @@ const buildSectionRows = (
       replaceTableRowCells(base, [
         String(index + 1),
         item.label,
-        item.recipient,
+        item.amount > 0 ? item.recipient : '',
         item.amount > 0 ? `Rp${rp(item.amount)}` : '',
         keterangan,
       ]),
@@ -287,49 +423,41 @@ const applyCostTable = (
   qardhAmount: number,
   total: number,
 ): string => {
-  const sectionModel =
-    parts.nafaqahRows[0] ?? parts.ujrahRows[0] ?? parts.others[0] ?? parts.qardhRow
-  const sectionRow = (label: string): string | null =>
-    sectionModel ? replaceTableRowCells(sectionModel, ['', label, '', '', '']) : null
   const nafaqah = buildSectionRows(parts.nafaqahRows, nafaqahItems, 'Nafaqah')
   const ujrah = buildSectionRows(parts.ujrahRows, ujrahItems, 'Ujrah')
   const rows: string[] = []
   if (parts.header) rows.push(parts.header)
-  if (nafaqah.length > 0) {
-    const header = sectionRow('NAFAQAH')
-    if (header) rows.push(header)
-    rows.push(...nafaqah)
-  }
+  rows.push(...nafaqah)
   if (parts.subtotalNafaqah) {
-    rows.push(fillAmountCell(parts.subtotalNafaqah, nafaqahTotal) ?? parts.subtotalNafaqah)
+    const subtotal =
+      fillAmountCell(parts.subtotalNafaqah, nafaqahTotal + qardhAmount) ?? parts.subtotalNafaqah
+    rows.push(
+      emphasizeRow(
+        setCellTextByMarker(subtotal, 'Subtotal Nafaqah', 'Subtotal Nafaqah (termasuk uang saku)'),
+      ),
+    )
   }
-  if (ujrah.length > 0) {
-    const header = sectionRow('UJRAH')
-    if (header) rows.push(header)
-    rows.push(...ujrah)
-  }
+  rows.push(...ujrah)
   if (parts.subtotalUjrah) {
-    rows.push(fillAmountCell(parts.subtotalUjrah, ujrahTotal) ?? parts.subtotalUjrah)
+    rows.push(emphasizeRow(fillAmountCell(parts.subtotalUjrah, ujrahTotal) ?? parts.subtotalUjrah))
   }
-  if (parts.qardhRow && qardhAmount > 0) {
-    const header = sectionRow('UANG SAKU')
-    if (header) rows.push(header)
-    rows.push(fillAmountCell(parts.qardhRow, qardhAmount) ?? parts.qardhRow)
+  if (parts.totalRow) {
+    rows.push(emphasizeRow(fillAmountCell(parts.totalRow, total) ?? parts.totalRow))
   }
-  if (parts.totalRow) rows.push(fillAmountCell(parts.totalRow, total) ?? parts.totalRow)
   rows.push(...parts.others)
 
   let nextNumber = 1
-  const finalRows = rows.map((row) => {
+  const numberedRows = rows.map((row) => {
     const cells = splitCells(row)
     const keterangan = cells.length > 0 ? cellText(cells[cells.length - 1]) : ''
-    if (keterangan === 'Nafaqah' || keterangan === 'Ujrah' || keterangan === 'Qardh hasan') {
+    if (keterangan === 'Nafaqah' || keterangan === 'Ujrah') {
       const updated = replaceTableRowCells(row, [String(nextNumber)])
       nextNumber += 1
       return updated
     }
     return row
   })
+  const finalRows = mergeNafaqahServiceRows(numberedRows, nafaqahTotal)
 
   const tableStart = findTableByMarker(xml, 'Penerima pembayaran')
   if (!tableStart) return xml
@@ -536,8 +664,8 @@ const resolveWakalah = (
     }
     case '[tanggal]': {
       const list = scheduleRebuilt
-        ? [issueLong, null, issueLong, null]
-        : [issueLong, null, issueLong, null, null, null]
+        ? [issueLong, issueLong, null]
+        : [issueLong, issueLong, null, null, null]
       return at(list, index)
     }
     case '[jumlah]':
@@ -560,14 +688,22 @@ const resolveWakalah = (
       return values.wakalahDisputeInstitution ?? ''
     case '[nominal]':
       return at(
-        [
-          rp(values.ujrahTotal),
-          values.qardhAmount > 0 ? rp(values.qardhAmount) : null,
-          rp(values.nafaqahTotal),
-          rp(values.ujrahTotal),
-          rp(values.qardhAmount),
-          rp(values.monthlyInstallment),
-        ],
+        values.qardhAmount > 0
+          ? [
+              rp(values.qardhAmount),
+              rp(values.ujrahTotal),
+              rp(values.nafaqahTotal),
+              rp(values.ujrahTotal),
+              rp(values.qardhAmount),
+              rp(values.monthlyInstallment),
+            ]
+          : [
+              rp(values.ujrahTotal),
+              rp(values.nafaqahTotal),
+              rp(values.ujrahTotal),
+              rp(0),
+              rp(values.monthlyInstallment),
+            ],
         index,
       )
     case '[terbilang]':
@@ -605,7 +741,7 @@ const resolveJualah = (token: string, index: number, values: ResolvedValues): st
     case '[mitra]':
       return at([values.lpkMitra, values.lpkMitra], index)
     case '[tanggal]':
-      return at([issueLong, null, issueLong, issueLong], index)
+      return at([issueLong, issueLong, issueLong], index)
     case '[ujrah]':
       return at(
         Array.from({ length: 5 }, () => rp(values.ujrahTotal)),
@@ -882,8 +1018,10 @@ export const buildAkadDocument = async (options: {
   application: ApplicationData
   studentSequence: string
   issuedAt: Date
+  draft?: boolean
 }): Promise<BuiltAkadDocument> => {
   const { application, studentSequence, issuedAt } = options
+  const draft = options.draft === true
   const product = readText(application.product)
   const template: AkadTemplateKind = product === 'FULL_COVER' ? 'JUALAH' : 'WAKALAH'
   const financialPlan = (application.financialPlan ?? {}) as Record<string, unknown>
@@ -903,17 +1041,38 @@ export const buildAkadDocument = async (options: {
   const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
   const documentFile = zip.file('word/document.xml')
   if (!documentFile) throw new Error(TEMPLATE_ERROR)
-  let xml = removeDraftTemplateNotice(await documentFile.async('string'))
+  let xml = await documentFile.async('string')
+  if (draft) {
+    xml = updateParagraphContaining(
+      xml,
+      'Draft template.',
+      'DRAFT — Dokumen pratinjau. Isi semua bagian dalam tanda [ ] sebelum ditandatangani.',
+    )
+    xml = updateParagraphContaining(
+      xml,
+      'No. [nomor kontrak]',
+      template === 'JUALAH'
+        ? 'DRAFT — [nomor kontrak]/WKL-JAL-JPN/VSV-WSB/[bulan romawi]/[tahun]'
+        : 'DRAFT — [nomor kontrak]/WKL-JPN/VSV-WSB/[bulan romawi]/[tahun]',
+    )
+  } else {
+    xml = removeDraftTemplateNotice(xml)
+  }
 
   const values = resolveValues(application, documentDate)
   values.studentSequence = studentSequence
-  if (values.lpkWitnessName) {
-    xml = updateParagraphContaining(
-      xml,
-      'LPK Cahaya Indonesia Langgeng',
-      `LPK ${values.lpkMitra ?? 'mitra'} — ${values.lpkWitnessName}`,
-    )
-  }
+  xml = updateParagraphContaining(
+    xml,
+    'LPK Cahaya Indonesia Langgeng',
+    values.lpkWitnessName
+      ? `LPK ${values.lpkMitra ?? 'mitra'} — ${values.lpkWitnessName}`
+      : 'Mitra Venturego (LPK)',
+  )
+  xml = updateParagraphContaining(
+    xml,
+    'bulan pertama setelah keberangkatan ke Jepang',
+    'mulai dibayar ketika siswa sudah menerima gaji kedua di negara tujuan',
+  )
 
   assertTokenCount(xml, '[nomor kontrak]', 1)
 
@@ -923,8 +1082,11 @@ export const buildAkadDocument = async (options: {
       'Wali/Orang tua ',
       values.guardianName ? `Wali/Orang tua PIHAK KEDUA: ${values.guardianName}` : null,
     )
-    assertTokenCount(xml, '[nominal]', 6)
-    assertTokenCount(xml, '[jumlah]', 6)
+    xml = insertParagraphAfterContaining(
+      xml,
+      'Mengetahui dan menyetujui:',
+      WAKALAH_GUARDIAN_HEADING,
+    )
 
     const nafaqahItems = values.nafaqahItems
     const ujrahItems = values.ujrahItems
@@ -932,9 +1094,20 @@ export const buildAkadDocument = async (options: {
     if (!ticketIncluded) {
       xml = updateParagraphContaining(xml, 'Biaya tiket dan keperluan keberangkatan', null)
     }
-    if (values.qardhAmount <= 0) {
-      xml = removeParagraphSection(xml, 'Pasal 4', 'Pasal 5')
+    xml = removeParagraphSection(xml, 'Pasal 4', 'Pasal 5')
+    for (let pasal = 5; pasal <= 13; pasal += 1) {
+      xml = xml.replace(new RegExp(`Pasal ${pasal}(?!\\d)`, 'g'), `Pasal ${pasal - 1}`)
     }
+    if (values.qardhAmount > 0) {
+      xml = updateParagraphContaining(
+        xml,
+        'Ruang lingkup pembayaran PIHAK PERTAMA',
+        'Ruang lingkup pembayaran PIHAK PERTAMA kepada pihak ketiga atas nama PIHAK KEDUA, termasuk uang saku tunai sebesar Rp[nominal] yang diserahkan langsung kepada PIHAK KEDUA, adalah sebagai berikut:',
+      )
+    }
+    assertTokenCount(xml, '[nominal]', values.qardhAmount > 0 ? 6 : 5)
+    assertTokenCount(xml, '[jumlah]', 6)
+
     xml = updateParagraphContaining(
       xml,
       '[jasa lain yang dikerjakan PIHAK PERTAMA sendiri, jelaskan]',
@@ -964,10 +1137,18 @@ export const buildAkadDocument = async (options: {
       scheduleRowModel = null
     }
 
-    const expectedTanggal = scheduleRebuilt ? 4 : 6
+    const expectedTanggal = scheduleRebuilt ? 3 : 5
     assertTokenCount(xml, '[tanggal]', expectedTanggal)
 
-    if (nafaqahItems.length > 0 || ujrahItems.length > 0) {
+    const lampiranNafaqahItems = [
+      ...nafaqahItems,
+      {
+        label: 'Uang saku',
+        recipient: 'PIHAK KEDUA (diterima tunai)',
+        amount: values.qardhAmount,
+      },
+    ]
+    if (lampiranNafaqahItems.length > 0 || ujrahItems.length > 0) {
       const location = findTableByMarker(xml, 'Penerima pembayaran')
       if (location) {
         const table = xml.slice(location.start, location.end)
@@ -975,7 +1156,7 @@ export const buildAkadDocument = async (options: {
         xml = applyCostTable(
           xml,
           parts,
-          nafaqahItems,
+          lampiranNafaqahItems,
           ujrahItems,
           values.nafaqahTotal,
           values.ujrahTotal,
@@ -994,13 +1175,25 @@ export const buildAkadDocument = async (options: {
       'Wali ',
       values.guardianName ? `Wali: ${values.guardianName}` : null,
     )
-    assertTokenCount(xml, '[tanggal]', 4)
+    assertTokenCount(xml, '[tanggal]', 3)
     xml = applyFullCoverCostTable(xml, values)
     xml = applyAppendixDocumentsTable(xml)
     xml = fillTokens(xml, (token, index) => resolveJualah(token, index, values))
   }
 
+  xml = addAppendixReceiptSignatureSpace(xml)
   zip.file('word/document.xml', xml)
+  if (draft) {
+    const headerFile = zip.file('word/header1.xml')
+    if (!headerFile) throw new Error(TEMPLATE_ERROR)
+    const headerXml = await headerFile.async('string')
+    const closeIndex = headerXml.lastIndexOf('</w:hdr>')
+    if (closeIndex < 0) throw new Error(TEMPLATE_ERROR)
+    zip.file(
+      'word/header1.xml',
+      `${headerXml.slice(0, closeIndex)}${DRAFT_WATERMARK_VML}${headerXml.slice(closeIndex)}`,
+    )
+  }
   const bytes = await zip.generateAsync({
     type: 'uint8array',
     compression: 'DEFLATE',

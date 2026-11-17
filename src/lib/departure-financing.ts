@@ -119,7 +119,7 @@ export const FIXED_NAFAQAH_LABELS = [
 export const UJRAH_WAKALAH_LABEL =
   'Ujrah jasa wakalah bil ujrah (imbalan kuasa pengurusan pembiayaan)'
 export const UJRAH_ADMIN_LABEL = 'Ujrah biaya administrasi pencairan'
-export const QARDH_LABEL = 'Uang saku (qardh hasan)'
+export const QARDH_LABEL = 'Uang saku'
 
 export type DepartureFinancials = {
   valid: boolean

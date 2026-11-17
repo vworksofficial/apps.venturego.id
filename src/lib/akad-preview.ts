@@ -965,7 +965,7 @@ const renderHeaderFooterPart = async (
     }
     if (localName(node.name) !== 'p') continue
 
-    let rendered = false
+    const images: { src: string; cx: number; cy: number }[] = []
     for (const run of node.children.filter((child) => localName(child.name) === 'r')) {
       const drawing = kidOf(run, 'drawing')
       if (!drawing) continue
@@ -979,15 +979,36 @@ const renderHeaderFooterPart = async (
       const cy = numAttr(extent, 'cy')
       const src = await resolveImage(embed)
       if (!src || cx === undefined || cy === undefined) continue
-      rendered = true
-      const direct = parseParaFmt(kidOf(node, 'pPr'))
-      const style: string[] = [`line-height:${paragraphLineHeightPt(direct, 10)}pt`, 'margin:0']
-      if (direct.ind?.left !== undefined) style.push(`margin-left:${pt(direct.ind.left)}`)
-      blocks.push(
-        `<p style="${style.join(';')}"><img src="${src}" alt="" style="display:block;width:${emuPt(cx)};height:${emuPt(cy)}" /></p>`,
-      )
+      images.push({ src, cx, cy })
     }
-    if (rendered) continue
+    if (images.length > 0) {
+      const direct = parseParaFmt(kidOf(node, 'pPr'))
+      const runs = renderRuns(ctx, node, ctx.docRP, (ctx.docRP.size ?? 20) / 2)
+      const textHtml = runs.html.replace(/<span class="tab"><\/span>/g, '').trim()
+      const style: string[] = [
+        `line-height:${paragraphLineHeightPt(direct, textHtml ? runs.maxFontPt : 10)}pt`,
+        'margin:0',
+      ]
+      if (direct.ind?.left !== undefined) style.push(`margin-left:${pt(direct.ind.left)}`)
+      if (textHtml) {
+        const imgs = images
+          .map(
+            (img) =>
+              `<img src="${img.src}" alt="" style="width:${emuPt(img.cx)};height:${emuPt(img.cy)}" />`,
+          )
+          .join('')
+        blocks.push(
+          `<p style="display:flex;align-items:center;gap:18pt;${style.join(';')}">${imgs}${textHtml}</p>`,
+        )
+      } else {
+        for (const img of images) {
+          blocks.push(
+            `<p style="${style.join(';')}"><img src="${img.src}" alt="" style="display:block;width:${emuPt(img.cx)};height:${emuPt(img.cy)}" /></p>`,
+          )
+        }
+      }
+      continue
+    }
     if (findDescendant(node, 'anchor')) continue
 
     blocks.push(renderParagraph(ctx, node))
@@ -1591,6 +1612,24 @@ th { font-weight: 700; }
   line-height: 0;
 }
 .doc-watermark img { display: block; }
+.doc-draft-mark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+.doc-draft-mark span {
+  font-size: 104px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: rgba(11, 87, 208, 0.10);
+  transform: rotate(-31.5deg);
+  line-height: 1;
+  user-select: none;
+}
 @media print {
   html, body { background: transparent; }
   .viewer { padding: 0; gap: 0; }
@@ -1603,7 +1642,11 @@ th { font-weight: 700; }
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
-export async function renderAkadPreviewHtml(bytes: Uint8Array): Promise<string> {
+export async function renderAkadPreviewHtml(
+  bytes: Uint8Array,
+  options: { draft?: boolean } = {},
+): Promise<string> {
+  const draft = options.draft === true
   const zip = await JSZip.loadAsync(bytes)
 
   const readPart = async (path: string): Promise<string> => {
@@ -1681,6 +1724,7 @@ export async function renderAkadPreviewHtml(bytes: Uint8Array): Promise<string> 
     <div class="a4-page">
       <div class="doc-header">${header.blocks}</div>
       ${header.watermark ? `<div class="doc-watermark">${header.watermark}</div>` : ''}
+      ${draft ? '<div class="doc-draft-mark"><span>DRAFT</span></div>' : ''}
       <div class="a4-body"></div>
       <div class="doc-footer">${footer.blocks}</div>
     </div>

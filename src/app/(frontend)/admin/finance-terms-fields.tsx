@@ -523,20 +523,26 @@ export function FinanceTermsFields({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              <tr>
-                <td
-                  className="bg-slate-50 px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-700"
-                  colSpan={4}
-                >
-                  Nafaqah
-                </td>
-              </tr>
               {derivedDeparture.nafaqahItems.map((line, index) => (
                 <tr key={`nafaqah-${index}`}>
                   <td className="px-2 py-2 text-slate-500">{index + 1}</td>
                   <td className="px-2 py-2 font-medium text-slate-800">{line.label}</td>
-                  <td className="px-2 py-2 text-slate-600">{line.recipient}</td>
-                  <td className="px-2 py-2 text-right text-slate-400">—</td>
+                  {index === 0 ? (
+                    <>
+                      <td
+                        className="px-2 py-2 text-slate-600"
+                        rowSpan={derivedDeparture.nafaqahItems.length}
+                      >
+                        LPK Mitra Venturego
+                      </td>
+                      <td
+                        className="px-2 py-2 text-right font-medium text-slate-800"
+                        rowSpan={derivedDeparture.nafaqahItems.length}
+                      >
+                        {amountLabel(nafaqahTotal)}
+                      </td>
+                    </>
+                  ) : null}
                 </tr>
               ))}
               <tr>
@@ -544,7 +550,9 @@ export function FinanceTermsFields({
                   {derivedDeparture.nafaqahItems.length + 1}
                 </td>
                 <td className="px-2 py-2 font-medium text-slate-800">{QARDH_LABEL}</td>
-                <td className="px-2 py-2 text-slate-600">Diterima pemohon</td>
+                <td className="px-2 py-2 text-slate-600">
+                  {qardhAmount > 0 ? 'Diterima pemohon' : ''}
+                </td>
                 <td className="px-2 py-2 text-right font-medium text-slate-800">
                   {qardhAmount > 0 ? amountLabel(qardhAmount) : '—'}
                 </td>
@@ -556,14 +564,6 @@ export function FinanceTermsFields({
                 </td>
                 <td className="px-2 py-2 text-right font-bold text-slate-900">
                   {amountLabel(nafaqahTotal + qardhAmount)}
-                </td>
-              </tr>
-              <tr>
-                <td
-                  className="bg-slate-50 px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-700"
-                  colSpan={4}
-                >
-                  Ujrah
                 </td>
               </tr>
               {derivedDeparture.ujrahItems.map((line, index) => (
@@ -601,9 +601,10 @@ export function FinanceTermsFields({
           </table>
         </div>
         <p className="border-t border-slate-100 bg-slate-50/70 px-5 py-3 text-[11px] leading-5 text-slate-500">
-          Nafaqah mengikuti invoice LPK dan uang saku (dana bersih) menjadi baris ke-4 pada bagian
-          ini; Ujrah dihitung otomatis (wakalah 2,4% × 12 bulan + administrasi 5%); uang saku = dana
-          bersih − invoice dan selalu ikut dihitung dalam Total Kewajiban.
+          Tiga komponen Nafaqah digabung menjadi satu nominal beban invoice LPK dengan penerima LPK
+          Mitra Venturego, dan uang saku (dana bersih) menjadi baris ke-4 pada bagian ini; Ujrah
+          dihitung otomatis (wakalah 2,4% × 12 bulan + administrasi 5%); uang saku = dana bersih −
+          invoice dan selalu ikut dihitung dalam Total Kewajiban.
         </p>
       </section>
 

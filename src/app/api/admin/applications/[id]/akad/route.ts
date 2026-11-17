@@ -41,6 +41,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     let bytes: Uint8Array
     let fileName: string
+    let draftBuild = false
 
     if (akadDocument && typeof akadDocument.driveFileId === 'string') {
       bytes = await downloadDriveFile(akadDocument.driveFileId)
@@ -58,9 +59,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         application: applicationData,
         studentSequence: sequence,
         issuedAt: new Date(),
+        draft: true,
       })
       bytes = built.bytes
       fileName = `${id}-draft-akad.docx`
+      draftBuild = true
     }
 
     if (mode === 'docx') {
@@ -74,7 +77,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       })
     }
 
-    const previewHtml = await renderAkadPreviewHtml(bytes)
+    const previewHtml = await renderAkadPreviewHtml(bytes, { draft: draftBuild })
     return new Response(previewHtml, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',

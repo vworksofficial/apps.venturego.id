@@ -786,6 +786,10 @@ const isAlumnus = (app: FinancingApplicationRecord, summary: InstallmentSummary)
     summary.remaining === 0 &&
     summary.paidCount >= summary.schedule.length)
 
+const isLegacyApplication = (app: FinancingApplicationRecord) =>
+  Boolean(app.legacy) ||
+  (typeof app.contractScheme === 'string' && app.contractScheme.startsWith('LEGACY_'))
+
 const hasActiveInstallment = (app: FinancingApplicationRecord, summary: InstallmentSummary) =>
   !isAlumnus(app, summary) && summary.remaining > 0
 
@@ -4288,6 +4292,7 @@ export function AdminDashboard({
   const contractPrepApplications = useMemo(
     () =>
       filteredApplications.filter((app) => {
+        if (isLegacyApplication(app)) return false
         const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
         return pricing === 'VERIFIED' || pricing === 'AGREED'
       }),
@@ -4298,11 +4303,12 @@ export function AdminDashboard({
     () =>
       filteredApplications.filter(
         (app) =>
-          Boolean(app.financialPlan?.akadDocument) ||
-          Boolean(app.agreementPdf) ||
-          (Array.isArray(app.akadPhotos) && app.akadPhotos.length > 0) ||
-          app.financialPlan?.pricingStatus === 'VERIFIED' ||
-          app.financialPlan?.pricingStatus === 'AGREED',
+          !isLegacyApplication(app) &&
+          (Boolean(app.financialPlan?.akadDocument) ||
+            Boolean(app.agreementPdf) ||
+            (Array.isArray(app.akadPhotos) && app.akadPhotos.length > 0) ||
+            app.financialPlan?.pricingStatus === 'VERIFIED' ||
+            app.financialPlan?.pricingStatus === 'AGREED'),
       ),
     [filteredApplications],
   )
@@ -4866,20 +4872,9 @@ export function AdminDashboard({
       case 'students':
         return applications.length
       case 'contracts':
-        return applications.filter(
-          (a) =>
-            a.financialPlan?.pricingStatus === 'VERIFIED' ||
-            a.financialPlan?.pricingStatus === 'AGREED',
-        ).length
+        return contractPrepApplications.length
       case 'archiving':
-        return applications.filter(
-          (a) =>
-            Boolean(a.financialPlan?.akadDocument) ||
-            Boolean(a.agreementPdf) ||
-            (Array.isArray(a.akadPhotos) && a.akadPhotos.length > 0) ||
-            a.financialPlan?.pricingStatus === 'VERIFIED' ||
-            a.financialPlan?.pricingStatus === 'AGREED',
-        ).length
+        return archivingApplications.length
       case 'activeInstallments':
         return activeInstallmentMetrics.count
       case 'alumni':
@@ -5422,28 +5417,6 @@ export function AdminDashboard({
           {/* 1. MENU: DASHBOARD */}
           {activeMenu === 'dashboard' && (
             <div className="space-y-5">
-              <section className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/50 to-emerald-50/30 p-5 shadow-xs sm:p-6">
-                <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-blue-100/50 blur-3xl" />
-                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0b57d0]">
-                      Pusat kendali operasional
-                    </p>
-                    <h2 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
-                      Ringkasan VentureGo
-                    </h2>
-                    <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600">
-                      Pantau alur pengajuan, portofolio, pembayaran, dan tindak lanjut siswa dari
-                      satu halaman.
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-blue-100 bg-white/80 px-3 py-2 text-[10px] leading-relaxed text-slate-500 shadow-2xs">
-                    Memuat hingga 500 pengajuan dan 500 pembayaran terbaru. Grafik pembayaran
-                    bulanan hanya memasukkan transaksi PAID yang memiliki tanggal pembayaran.
-                  </div>
-                </div>
-              </section>
-
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
                   <span className="text-xs font-medium text-slate-500">

@@ -422,16 +422,10 @@ export async function saveFinancialPlan(
       if (installmentCount > 0 && !schedule) {
         return { ok: false, message: 'Jadwal angsuran tidak valid.' }
       }
-      if (
-        currentPricingStatus === 'AGREED' &&
-        (!applicationData.userFinancingAcceptance ||
-          typeof applicationData.userFinancingAcceptance.acceptedAt !== 'string' ||
-          !finalAgreementReference)
-      ) {
+      if (currentPricingStatus === 'AGREED' && !finalAgreementReference) {
         return {
           ok: false,
-          message:
-            'Status Disepakati memerlukan persetujuan pemohon dan referensi akad final yang telah ditandatangani.',
+          message: 'Status Disepakati memerlukan referensi akad final yang telah ditandatangani.',
         }
       }
       const offerSnapshot = {
@@ -453,20 +447,10 @@ export async function saveFinancialPlan(
       const offerChanged = serializeStable(previousOffer ?? null) !== serializeStable(offerSnapshot)
       const effectiveAgreementReference =
         offerChanged || currentPricingStatus === 'ESTIMATED' ? '' : finalAgreementReference
-      const currentAcceptance = applicationData.userFinancingAcceptance as
-        | { acceptedAt?: unknown; offerSnapshot?: unknown }
-        | undefined
-      if (
-        currentPricingStatus === 'AGREED' &&
-        (offerChanged ||
-          typeof currentAcceptance?.acceptedAt !== 'string' ||
-          serializeStable(currentAcceptance.offerSnapshot) !== serializeStable(offerSnapshot) ||
-          !finalAgreementReference)
-      ) {
+      if (currentPricingStatus === 'AGREED' && !finalAgreementReference) {
         return {
           ok: false,
-          message:
-            'Status Disepakati memerlukan persetujuan pemohon atas rincian terbaru dan referensi akad final yang telah ditandatangani.',
+          message: 'Status Disepakati memerlukan referensi akad final yang telah ditandatangani.',
         }
       }
       Object.assign(nextFinancialPlan, offerSnapshot, {
@@ -570,6 +554,7 @@ export async function updateApplicationWorkflow(
   documentId: string,
   status: string,
   internalNotes: string,
+  departureDate?: string,
 ): Promise<ActionResult> {
   const { staff, error } = await assertStaffDocumentId(documentId)
   if (error) return error
@@ -578,6 +563,13 @@ export async function updateApplicationWorkflow(
   }
   if (typeof internalNotes !== 'string' || internalNotes.length > 2_000) {
     return { ok: false, message: 'Catatan internal maksimal 2.000 karakter.' }
+  }
+  if (
+    departureDate !== undefined &&
+    typeof departureDate === 'string' &&
+    departureDate.trim().length > 30
+  ) {
+    return { ok: false, message: 'Format tanggal penerbangan tidak valid.' }
   }
   try {
     const applicationRef = getFirebaseFirestore().collection('applications').doc(documentId)
@@ -595,12 +587,16 @@ export async function updateApplicationWorkflow(
           'Catat perhitungan Nafaqah yang tidak dapat dipulihkan, jasa yang telah terlaksana, dan refund sebelum menyelesaikan pembatalan.',
       }
     }
-    await applicationRef.update({
+    const updatePayload: Record<string, unknown> = {
       status,
       internalNotes: internalNotes.trim(),
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: staff?.email ?? staff?.uid,
-    })
+    }
+    if (departureDate !== undefined) {
+      updatePayload.departureDate = departureDate.trim() || null
+    }
+    await applicationRef.update(updatePayload)
     if (status === 'ACTIVE' && applicationData.status !== 'ACTIVE') {
       const ownerUid =
         typeof applicationData.ownerFirebaseUid === 'string' ? applicationData.ownerFirebaseUid : ''
@@ -1072,24 +1068,6 @@ export async function setApplicationPricingAgreed(documentId: string): Promise<A
             'Isi referensi akad final yang sudah ditandatangani pada tab Draft Akad sebelum menyetujui.',
         }
       }
-      const acceptance = applicationData.userFinancingAcceptance as
-        | { acceptedAt?: unknown; offerSnapshot?: unknown }
-        | undefined
-      if (!acceptance || typeof acceptance.acceptedAt !== 'string') {
-        return {
-          ok: false,
-          message: 'Status Disepakati memerlukan persetujuan pemohon atas penawaran terbaru.',
-        }
-      }
-      if (
-        serializeStable(acceptance.offerSnapshot) !== serializeStable(plan.offerSnapshot ?? null)
-      ) {
-        return {
-          ok: false,
-          message:
-            'Persetujuan pemohon berlaku untuk rincian terbaru. Mintakan persetujuan ulang setelah rincian berubah.',
-        }
-      }
       offerSnapshot = (plan.offerSnapshot as Record<string, unknown>) ?? {}
     } else if (product === 'FULL_COVER') {
       const approvalError = validateFullCoverApproval(applicationData, plan)
@@ -1115,6 +1093,86 @@ export async function setApplicationPricingAgreed(documentId: string): Promise<A
     return { ok: true }
   } catch {
     return { ok: false, message: 'Status biaya belum dapat disimpan. Coba lagi.' }
+  }
+}
+
+export async function revertApplicationPricingToEstimated(
+  documentId: string,
+): Promise<ActionResult> {
+  const { staff, error } = await assertStaffDocumentId(documentId)
+  if (error) return error
+  try {
+    const applicationRef = getFirebaseFirestore().collection('applications').doc(documentId)
+    const application = await applicationRef.get()
+    if (!application.exists) return { ok: false, message: 'Pengajuan tidak ditemukan.' }
+    const applicationData = application.data() ?? {}
+    const plan = { ...(applicationData.financialPlan ?? {}) } as Record<string, unknown>
+    if (plan.akadDocument) {
+      return {
+        ok: false,
+        message:
+          'Dokumen akad telah terbit. Batalkan penerbitan akad terlebih dahulu jika ingin mengembalikan pengajuan.',
+      }
+    }
+    const nextPlan = {
+      ...plan,
+      pricingStatus: 'ESTIMATED',
+      finalAgreementReference: '',
+    }
+    await applicationRef.update({
+      financialPlan: nextPlan,
+      financialPlanHistory: appendFinancialHistory(applicationData, {
+        changedAt: new Date().toISOString(),
+        changedBy: staff?.email ?? staff?.uid,
+        financialPlan: (plan.offerSnapshot as Record<string, unknown>) ?? {},
+        pricingStatus: 'ESTIMATED',
+        finalAgreementReference: '',
+        settlementNotes:
+          'Persetujuan nominal dibatalkan oleh staf. Pengajuan dikembalikan ke menu Pengajuan untuk ditinjau ulang.',
+      }),
+      userFinancingAcceptance: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: staff?.email ?? staff?.uid,
+    })
+    return { ok: true }
+  } catch {
+    return {
+      ok: false,
+      message: 'Gagal mengembalikan pengajuan ke menu Pengajuan. Coba lagi.',
+    }
+  }
+}
+
+export async function deleteApplicationAkadPhoto(
+  documentId: string,
+  fileId: string,
+): Promise<ActionResult> {
+  const { staff, error } = await assertStaffDocumentId(documentId)
+  if (error) return error
+
+  try {
+    const firestore = getFirebaseFirestore()
+    const applicationRef = firestore.collection('applications').doc(documentId)
+    const application = await applicationRef.get()
+    if (!application.exists) return { ok: false, message: 'Pengajuan tidak ditemukan.' }
+
+    const applicationData = application.data() ?? {}
+    const photos = Array.isArray(applicationData.akadPhotos) ? applicationData.akadPhotos : []
+    const updatedPhotos = photos.filter(
+      (p) => p && typeof p === 'object' && (p as { fileId?: unknown }).fileId !== fileId,
+    )
+
+    await deleteDriveFile(fileId).catch(() => {})
+
+    await applicationRef.update({
+      akadPhotos: updatedPhotos,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: staff?.email ?? staff?.uid,
+    })
+
+    return { ok: true }
+  } catch {
+    return { ok: false, message: 'Gagal menghapus foto dokumentasi akad.' }
   }
 }
 

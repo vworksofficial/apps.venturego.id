@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
@@ -17,12 +17,13 @@ import {
   approveApplicationDocument,
   approveApplicationPricing,
   deleteApplicationDocument,
+  deleteApplicationAkadPhoto,
   issueAkadDocument,
   rejectAndDeleteApplication,
+  revertApplicationPricingToEstimated,
   saveFinancialPlan,
   setApplicationPricingAgreed,
   updateApplicationWorkflow,
-  updateSupportRequest,
 } from './actions'
 import { AdminVipPanel } from './vip-panel'
 import { FinanceTermsFields } from './finance-terms-fields'
@@ -55,6 +56,25 @@ const STATUS_BADGE_STYLES: Record<string, string> = {
   CANCELLED: 'bg-rose-50 text-rose-700 ring-rose-200',
 }
 
+const STATUS_WORKFLOW_GROUPS = [
+  {
+    label: 'Tahap Verifikasi Awal',
+    statuses: ['SUBMITTED', 'ELIGIBILITY_REVIEW', 'DOCUMENT_REVIEW', 'REVISION_REQUIRED'] as const,
+  },
+  {
+    label: 'Tahap Persetujuan & Akad',
+    statuses: ['COST_VERIFICATION', 'APPROVED', 'CONTRACT_PREPARATION'] as const,
+  },
+  {
+    label: 'Tahap Realisasi & Selesai',
+    statuses: ['ACTIVE', 'COMPLETED'] as const,
+  },
+  {
+    label: 'Tahap Pembatalan & Penolakan',
+    statuses: ['REJECTED', 'CANCELLED'] as const,
+  },
+]
+
 const DOCUMENT_STATUS_LABELS: Record<ApplicationDocumentStatus, string> = {
   NOT_UPLOADED: 'Belum diunggah',
   UPLOADED: 'Menunggu tinjauan',
@@ -70,15 +90,15 @@ const DOCUMENT_BADGE_STYLES: Record<ApplicationDocumentStatus, string> = {
 }
 
 const PRICING_STATUS_LABELS: Record<(typeof PRICING_STATUSES)[number], string> = {
-  ESTIMATED: 'Estimasi',
-  VERIFIED: 'Terverifikasi',
-  AGREED: 'Disepakati',
+  ESTIMATED: 'Belum Disetujui',
+  VERIFIED: 'Disetujui',
+  AGREED: 'Disetujui',
 }
 
 const PRICING_BADGE_STYLES: Record<string, string> = {
   ESTIMATED: 'bg-slate-100 text-slate-700',
-  VERIFIED: 'bg-amber-50 text-amber-800',
-  AGREED: 'bg-emerald-50 text-emerald-800',
+  VERIFIED: 'bg-emerald-50 text-emerald-800 ring-emerald-200/60',
+  AGREED: 'bg-emerald-50 text-emerald-800 ring-emerald-200/60',
 }
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
@@ -145,17 +165,23 @@ const NEED_LABELS: Record<string, string> = {
 type MenuId =
   | 'dashboard'
   | 'applications'
-  | 'students'
   | 'contracts'
-  | 'installments'
+  | 'archiving'
+  | 'students'
   | 'activeInstallments'
+  | 'alumni'
   | 'schedule'
-  | 'relief'
   | 'vip'
-  | 'statistics'
   | 'audit'
 
-type DetailTabId = 'profile' | 'nominal' | 'documents' | 'pricing' | 'contract'
+type DetailTabId =
+  | 'profile'
+  | 'nominal'
+  | 'documents'
+  | 'pricing'
+  | 'contract'
+  | 'installment-history'
+  | 'program-history'
 
 const SIDEBAR_GROUPS: {
   group: string
@@ -182,39 +208,40 @@ const SIDEBAR_GROUPS: {
         defaultTab: 'profile',
       },
       {
+        id: 'contracts',
+        label: 'Persiapan Akad',
+        subtitle: 'Penyusunan rincian Nafaqah, Ujrah, simulasi, dan penguncian akad final',
+        defaultTab: 'pricing',
+      },
+      {
+        id: 'archiving',
+        label: 'Pengarsipan',
+        subtitle: 'Pengarsipan naskah akad resmi, salinan PDF basah, dan foto dokumentasi akad',
+        defaultTab: 'contract',
+      },
+      {
+        id: 'activeInstallments',
+        label: 'Siswa Aktif',
+        subtitle: 'Siswa aktif yang sedang berjalan dan dalam masa angsuran',
+        defaultTab: 'profile',
+      },
+      {
+        id: 'alumni',
+        label: 'Alumnus',
+        subtitle:
+          'Siswa alumni yang telah menyelesaikan seluruh kewajiban angsuran secara lunas tuntas',
+        defaultTab: 'installment-history',
+      },
+      {
         id: 'students',
         label: 'Data Siswa',
         subtitle: 'Direktori biodata siswa, LPK mitra, kesiapan keberangkatan, & berkas',
         defaultTab: 'documents',
       },
       {
-        id: 'contracts',
-        label: 'Draft & Akad',
-        subtitle: 'Penyusunan rincian Nafaqah, Ujrah, simulasi, dan penguncian akad final',
-        defaultTab: 'pricing',
-      },
-      {
-        id: 'installments',
-        label: 'Angsuran & Kas',
-        subtitle: 'Pemantauan jadwal cicilan siswa, pembayaran Xendit, & permohonan keringanan',
-        defaultTab: 'profile',
-      },
-      {
-        id: 'activeInstallments',
-        label: 'Angsuran Aktif',
-        subtitle: 'Siswa yang sedang mengangsur atau masih memiliki tanggungan',
-        defaultTab: 'profile',
-      },
-      {
         id: 'schedule',
         label: 'Jadwal Angsuran',
         subtitle: 'Detail jadwal cicilan, progres bayar, dan transaksi Xendit per siswa',
-        defaultTab: 'profile',
-      },
-      {
-        id: 'relief',
-        label: 'Keringanan',
-        subtitle: 'Permohonan keringanan pemohon: status tinjauan dan tanggapan staf',
         defaultTab: 'profile',
       },
     ],
@@ -234,12 +261,6 @@ const SIDEBAR_GROUPS: {
     group: 'Laporan & Audit',
     items: [
       {
-        id: 'statistics',
-        label: 'Statistik',
-        subtitle: 'Analitik portofolio pembiayaan, performa LPK mitra, & kolektibilitas',
-        defaultTab: 'profile',
-      },
-      {
         id: 'audit',
         label: 'Log Audit',
         subtitle: 'Riwayat perubahan rincian biaya dan jejak verifikasi staf',
@@ -249,12 +270,22 @@ const SIDEBAR_GROUPS: {
   },
 ]
 
+const SIDEBAR_WORKFLOW_STEPS: Partial<Record<MenuId, number>> = {
+  applications: 1,
+  contracts: 2,
+  archiving: 3,
+  activeInstallments: 4,
+  alumni: 5,
+}
+
 const DETAIL_TABS: { id: DetailTabId; label: string }[] = [
   { id: 'profile', label: 'Profil' },
   { id: 'documents', label: 'Berkas' },
   { id: 'nominal', label: 'Nominal Pengajuan' },
   { id: 'pricing', label: 'Draft Akad' },
   { id: 'contract', label: 'Status Persetujuan' },
+  { id: 'installment-history', label: 'Riwayat Angsuran' },
+  { id: 'program-history', label: 'Riwayat Program' },
 ]
 
 function TabIcon({ id }: { id: DetailTabId }) {
@@ -330,7 +361,55 @@ function TabIcon({ id }: { id: DetailTabId }) {
           <circle cx="12" cy="12" r="9" />
         </svg>
       )
+    case 'installment-history':
+      return (
+        <svg
+          aria-hidden="true"
+          className="size-3 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          viewBox="0 0 24 24"
+        >
+          <path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+      )
+    case 'program-history':
+      return (
+        <svg
+          aria-hidden="true"
+          className="size-3 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          viewBox="0 0 24 24"
+        >
+          <rect height="16" rx="2" width="18" x="3" y="4" />
+          <path d="M3 10h18M8 4v16M3 14h18" strokeLinecap="round" />
+        </svg>
+      )
   }
+}
+
+function formatDisplayApplicationId(id: string): string {
+  if (!id) return ''
+  if (id.startsWith('VSV-LGC-')) {
+    const rawSuffix = id.slice('VSV-LGC-'.length)
+    // Jika hanya nomor urut pendek (misal: "001" atau 8 char hex), biarkan
+    if (rawSuffix.length <= 8 && !rawSuffix.includes('-') && !rawSuffix.includes(' ')) {
+      return id
+    }
+    // Hasilkan hash deterministik 8 karakter uppercase
+    let hash = 0
+    for (let i = 0; i < id.length; i++) {
+      hash = (hash << 5) - hash + id.charCodeAt(i)
+      hash |= 0
+    }
+    const hex = Math.abs(hash).toString(16).padStart(8, '0').slice(0, 8).toUpperCase()
+    return `VSV-LGC-${hex}`
+  }
+  return id
 }
 
 function DestinationFlag({ destination }: { destination: string }) {
@@ -426,7 +505,7 @@ function MenuIcon({ id }: { id: MenuId }) {
           <path d="M14 2v6h6M8 13h8M8 17h5" strokeLinecap="round" />
         </svg>
       )
-    case 'installments':
+    case 'archiving':
       return (
         <svg
           className="size-4 shrink-0"
@@ -435,21 +514,46 @@ function MenuIcon({ id }: { id: MenuId }) {
           strokeWidth={1.8}
           viewBox="0 0 24 24"
         >
-          <rect height="14" rx="2" width="20" x="2" y="5" />
-          <path d="M2 10h20M6 15h4" strokeLinecap="round" />
+          <path
+            d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       )
     case 'activeInstallments':
       return (
         <svg
+          aria-hidden="true"
+          className="size-4 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={1.8}
+          viewBox="0 0 24 24"
+        >
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M16 11l2 2 4-4" />
+        </svg>
+      )
+    case 'alumni':
+      return (
+        <svg
+          aria-hidden="true"
           className="size-4 shrink-0"
           fill="none"
           stroke="currentColor"
           strokeWidth={1.8}
           viewBox="0 0 24 24"
         >
-          <rect height="14" rx="2" width="20" x="2" y="5" />
-          <path d="M8 12.5l2.5 2.5L16 9.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="m2 10 10-5 10 5-10 5-10-5Z" strokeLinejoin="round" />
+          <path
+            d="M6 12v5c3.5 3 8.5 3 12 0v-5M22 10v6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       )
     case 'schedule':
@@ -464,34 +568,6 @@ function MenuIcon({ id }: { id: MenuId }) {
           <rect height="16" rx="2" width="18" x="3" y="4" />
           <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
           <path d="M7.5 14h3M13.5 14h3M7.5 17.5h3" strokeLinecap="round" />
-        </svg>
-      )
-    case 'relief':
-      return (
-        <svg
-          className="size-4 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <path
-            d="M12 20.5S4 15.5 4 9.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 8 3.5c0 6-8 11-8 11z"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )
-    case 'statistics':
-      return (
-        <svg
-          className="size-4 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" />
         </svg>
       )
     case 'vip':
@@ -571,6 +647,13 @@ type ScheduleRow = {
   remainingBalance?: number
 }
 
+type InstallmentDetail = ScheduleRow & {
+  appliedAmount: number
+  remaining: number
+  isPaid: boolean
+  isPartial: boolean
+}
+
 const readScheduleRows = (value: unknown): ScheduleRow[] => {
   if (!Array.isArray(value)) return []
   return value.filter(
@@ -594,12 +677,14 @@ const getDaysBetween = (fromIso: string, toIso: string) =>
 
 type InstallmentSummary = {
   schedule: ScheduleRow[]
+  rows: InstallmentDetail[]
+  isLegacy: boolean
   paidCount: number
   paidAmount: number
   obligation: number | null
   remaining: number
   unpaidCount: number
-  nextDue: ScheduleRow | null
+  nextDue: InstallmentDetail | null
   overdueCount: number
   dueSoon: boolean
   openRelief: number
@@ -608,27 +693,75 @@ type InstallmentSummary = {
 const summarizeInstallments = (
   app: FinancingApplicationRecord,
   todayIso: string,
+  payments: AdminPaymentRecord[] = [],
 ): InstallmentSummary => {
   const schedule = readScheduleRows(app.financialPlan?.schedule)
   const paidSet = new Set(Array.isArray(app.paidInstallments) ? app.paidInstallments : [])
-  const paidRows = schedule.filter((row) => paidSet.has(row.installment))
-  const paidCount = paidRows.length
-  const paidAmount = paidRows.reduce((sum, row) => sum + row.amount, 0)
+  const isLegacy =
+    Boolean(app.legacy) ||
+    (typeof app.contractScheme === 'string' && app.contractScheme.startsWith('LEGACY_'))
+  const applicationPayments = isLegacy
+    ? payments.filter(
+        (payment) =>
+          payment.applicationDocId === app.id || payment.applicationId === app.applicationId,
+      )
+    : []
+  const paidApplicationPayments = applicationPayments.filter((payment) => payment.status === 'PAID')
+  const allocatedByInstallment = new Map<number, number>()
+  for (const payment of paidApplicationPayments) {
+    if (payment.installmentNumber === null) continue
+    allocatedByInstallment.set(
+      payment.installmentNumber,
+      (allocatedByInstallment.get(payment.installmentNumber) ?? 0) + payment.amount,
+    )
+  }
+  const rows: InstallmentDetail[] = schedule.map((row) => {
+    const allocatedAmount = Math.min(row.amount, allocatedByInstallment.get(row.installment) ?? 0)
+    const isPaid =
+      paidSet.has(row.installment) || (isLegacy && row.amount > 0 && allocatedAmount >= row.amount)
+    const appliedAmount = isPaid
+      ? row.amount
+      : isLegacy
+        ? allocatedAmount
+        : paidSet.has(row.installment)
+          ? row.amount
+          : 0
+    return {
+      ...row,
+      appliedAmount,
+      remaining: Math.max(0, row.amount - appliedAmount),
+      isPaid,
+      isPartial: !isPaid && appliedAmount > 0,
+    }
+  })
+  const paidCount = rows.filter((row) => row.isPaid).length
+  const scheduledPaidAmount = rows.reduce((sum, row) => sum + row.appliedAmount, 0)
+  const paidAmount = isLegacy
+    ? Math.max(
+        typeof app.paidAmount === 'number' && Number.isFinite(app.paidAmount) ? app.paidAmount : 0,
+        paidApplicationPayments.reduce((sum, payment) => sum + payment.amount, 0),
+        scheduledPaidAmount,
+      )
+    : scheduledPaidAmount
   const obligation =
     typeof app.financialPlan?.totalObligation === 'number'
       ? app.financialPlan.totalObligation
       : null
-  const unpaidRows = schedule.filter((row) => !paidSet.has(row.installment))
-  const remaining =
-    obligation !== null
-      ? Math.max(0, obligation - paidAmount)
-      : unpaidRows.reduce((sum, row) => sum + row.amount, 0)
+  const unpaidRows = rows.filter((row) => !row.isPaid)
+  const remaining = Math.max(
+    0,
+    (obligation ?? schedule.reduce((sum, row) => sum + row.amount, 0)) - paidAmount,
+  )
   const soon = addDaysIso(todayIso, 7)
   const nextDue = unpaidRows[0] ?? null
-  const overdueCount = unpaidRows.filter((row) => row.dueDate < todayIso).length
+  const overdueCount = unpaidRows.filter(
+    (row) => row.dueDate < todayIso && (isLegacy || row.isPartial),
+  ).length
   const openRelief = (app.supportRequests ?? []).filter((req) => req.status === 'OPEN').length
   return {
     schedule,
+    rows,
+    isLegacy,
     paidCount,
     paidAmount,
     obligation,
@@ -636,13 +769,25 @@ const summarizeInstallments = (
     unpaidCount: unpaidRows.length,
     nextDue,
     overdueCount,
-    dueSoon: Boolean(nextDue && nextDue.dueDate >= todayIso && nextDue.dueDate <= soon),
+    dueSoon: Boolean(
+      nextDue &&
+      (isLegacy || nextDue.isPartial) &&
+      nextDue.dueDate >= todayIso &&
+      nextDue.dueDate <= soon,
+    ),
     openRelief,
   }
 }
 
+const isAlumnus = (app: FinancingApplicationRecord, summary: InstallmentSummary) =>
+  app.status === 'COMPLETED' ||
+  (summary.obligation !== null &&
+    summary.obligation > 0 &&
+    summary.remaining === 0 &&
+    summary.paidCount >= summary.schedule.length)
+
 const hasActiveInstallment = (app: FinancingApplicationRecord, summary: InstallmentSummary) =>
-  app.status === 'ACTIVE' || summary.remaining > 0 || summary.unpaidCount > 0
+  !isAlumnus(app, summary) && summary.remaining > 0
 
 const compareInstallmentRows = (
   a: { summary: InstallmentSummary },
@@ -680,6 +825,7 @@ function DrawerAction({
       }`}
       disabled={disabled}
       onClick={onClick}
+      suppressHydrationWarning
       type="button"
     >
       {label}
@@ -714,8 +860,12 @@ function ApplicationDrawerForm({
   onAgreePricing,
   onUploadAgreement,
   onClose,
+  payments,
+  todayIso,
 }: {
   application: FinancingApplicationRecord
+  payments: AdminPaymentRecord[]
+  todayIso: string
   activeTab: DetailTabId
   setActiveTab: (tab: DetailTabId) => void
   pending: boolean
@@ -724,7 +874,12 @@ function ApplicationDrawerForm({
   onDismissError: () => void
   onDismissSaved: () => void
   onSave: (application: FinancingApplicationRecord, formData: FormData) => void
-  onWorkflow: (applicationId: string, status: string, internalNotes: string) => void
+  onWorkflow: (
+    applicationId: string,
+    status: string,
+    internalNotes: string,
+    departureDate?: string,
+  ) => void
   onApproveDocument: (applicationId: string, documentIndex: number) => void
   onDeleteDocument: (applicationId: string, documentIndex: number) => void
   onApprovePricing: (applicationId: string, newNominal: number | null) => void
@@ -737,8 +892,12 @@ function ApplicationDrawerForm({
   const [newNominal, setNewNominal] = useState('')
   const [workflowStatus, setWorkflowStatus] = useState(application.status)
   const [workflowNotes, setWorkflowNotes] = useState(application.internalNotes ?? '')
+  const [flightDepartureDate, setFlightDepartureDate] = useState(application.departureDate ?? '')
   const [agreementUploading, setAgreementUploading] = useState(false)
   const [agreementUploadError, setAgreementUploadError] = useState('')
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoError, setPhotoError] = useState('')
+  const [lightboxPhotoUrl, setLightboxPhotoUrl] = useState<string | null>(null)
   const [akadIssuing, setAkadIssuing] = useState(false)
   const [akadIssueError, setAkadIssueError] = useState('')
   const [akadPreviewOpen, setAkadPreviewOpen] = useState(false)
@@ -823,9 +982,8 @@ function ApplicationDrawerForm({
 
   const pricingStatusLabel =
     pricingStatus === 'ESTIMATED'
-      ? 'Nominal'
-      : (PRICING_STATUS_LABELS[pricingStatus as keyof typeof PRICING_STATUS_LABELS] ??
-        pricingStatus)
+      ? 'Belum Disetujui'
+      : (PRICING_STATUS_LABELS[pricingStatus as keyof typeof PRICING_STATUS_LABELS] ?? 'Disetujui')
 
   const akadMeta = (application.financialPlan?.akadDocument ?? null) as {
     documentNumber?: string
@@ -924,7 +1082,9 @@ function ApplicationDrawerForm({
   ] as const
 
   const workflowDirty =
-    workflowStatus !== application.status || workflowNotes !== (application.internalNotes ?? '')
+    workflowStatus !== application.status ||
+    workflowNotes !== (application.internalNotes ?? '') ||
+    flightDepartureDate !== (application.departureDate ?? '')
 
   const selectAgreementPdf = async (file: File | undefined) => {
     setAgreementUploadError('')
@@ -946,6 +1106,51 @@ function ApplicationDrawerForm({
       )
     } finally {
       setAgreementUploading(false)
+    }
+  }
+
+  const selectAkadPhotos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setPhotoUploading(true)
+    setPhotoError('')
+    try {
+      const formData = new FormData()
+      for (let i = 0; i < files.length; i++) {
+        formData.append('photos', files[i])
+      }
+      const response = await fetch(`/api/admin/applications/${application.id}/akad-photos`, {
+        method: 'POST',
+        body: formData,
+      })
+      const result = (await response.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+      }
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || 'Gagal mengunggah foto dokumentasi akad.')
+      }
+      router.refresh()
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Gagal mengunggah foto dokumentasi akad.')
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
+  const handleDeleteAkadPhoto = async (fileId: string) => {
+    if (!confirm('Hapus foto dokumentasi akad ini?')) return
+    setPhotoUploading(true)
+    setPhotoError('')
+    try {
+      const result = await deleteApplicationAkadPhoto(application.id, fileId)
+      if (!result.ok) {
+        throw new Error(result.message)
+      }
+      router.refresh()
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Gagal menghapus foto dokumentasi akad.')
+    } finally {
+      setPhotoUploading(false)
     }
   }
 
@@ -1389,16 +1594,14 @@ function ApplicationDrawerForm({
                   </div>
                   <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                     {pricingStatus === 'ESTIMATED'
-                      ? 'Setujui rincian untuk mengunci status biaya menjadi Terverifikasi. Dengan nominal baru, principal, invoice LPK, uang saku, Nafaqah, dan Ujrah dihitung ulang otomatis dari nominal tersebut, lalu jadwal angsuran disusun ulang.'
-                      : pricingStatus === 'VERIFIED'
-                        ? 'Rincian telah terverifikasi. Tandai Disepakati setelah pemohon menyetujui penawaran terbaru dan referensi akad final terisi pada kartu Dokumen Akad.'
-                        : 'Rincian biaya sudah disepakati dan siap diproses ke tahap akad.'}
+                      ? 'Persetujuan nominal pembiayaan siswa. Pilih "Setujui" untuk menyetujui sesuai nominal yang diajukan, atau "Setujui dengan Nominal Baru" untuk menetapkan plafon lain. Setelah disetujui, siswa otomatis berpindah ke halaman Persiapan Akad.'
+                      : 'Nominal pembiayaan telah disetujui dan pengajuan pemohon telah dipindahkan ke menu Persiapan Akad.'}
                   </p>
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2.5 px-5 py-4">
-              {pricingStatus === 'ESTIMATED' && (
+              {pricingStatus === 'ESTIMATED' ? (
                 <>
                   <DrawerAction
                     disabled={pending}
@@ -1412,15 +1615,24 @@ function ApplicationDrawerForm({
                     onClick={() => setShowNominalInput(true)}
                   />
                 </>
-              )}
-              {pricingStatus === 'VERIFIED' && (
-                <>
-                  <DrawerAction
-                    disabled={pending}
-                    label={pending ? 'Menyimpan…' : 'Tandai Disepakati'}
-                    onClick={() => onAgreePricing(application.id)}
-                    variant="primary"
-                  />
+              ) : (
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/70">
+                    <svg
+                      className="size-4 text-emerald-600"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                    Nominal telah disetujui — siswa berada di menu Persiapan Akad
+                  </span>
                   {!akadIssued && (
                     <DrawerAction
                       disabled={pending}
@@ -1428,12 +1640,7 @@ function ApplicationDrawerForm({
                       onClick={() => setShowNominalInput(true)}
                     />
                   )}
-                </>
-              )}
-              {pricingStatus === 'AGREED' && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
-                  ✓ Biaya disepakati — lanjutkan ke tahap akad
-                </span>
+                </div>
               )}
             </div>
           </section>
@@ -1628,9 +1835,171 @@ function ApplicationDrawerForm({
         </div>
 
         {/* TAB: PRICING & DRAFT AKAD */}
-        <div className={activeTab === 'pricing' ? 'block space-y-4' : 'hidden'}>
+        <div className={activeTab === 'pricing' ? 'flex flex-col gap-6' : 'hidden'}>
+          {/* EXECUTIVE HERO: PROGRAM & JENIS AKAD SUMMARY */}
+          {(() => {
+            const isFullCover = application.product === 'FULL_COVER'
+            const programName = isFullCover ? 'VSV Full Cover' : 'VSV Dana Keberangkatan'
+            const programSubtitle = isFullCover
+              ? 'Program Pembiayaan Pelatihan Bahasa, Skill, & Penempatan Kerja'
+              : 'Program Pembiayaan Dana Talang Tiket & Persiapan Berangkat'
+            const destinationLabel = application.destination === 'JAPAN' ? 'Jepang' : 'Turki'
+            const akadName = isFullCover
+              ? application.contractScheme === 'WAKALAH'
+                ? 'Akad Wakalah bil Ujrah'
+                : 'Akad Wakalah bil Ujrah + Ju’alah'
+              : 'Akad Wakalah bil Ujrah'
+            const akadDescription = isFullCover
+              ? 'Skema pembiayaan terpadu yang memadukan pelimpahan kuasa pengurusan pendidikan bahasa/skill (Wakalah bil Ujrah) serta komitmen imbalan atas pencapaian keberhasilan penempatan kerja ke luar negeri (Ju’alah). Hak dan kewajiban diselaraskan secara transparan pasca siswa resmi bekerja dan memperoleh penghasilan di negara tujuan.'
+              : 'Siswa (Muwakkil) memberikan pelimpahan kuasa penuh kepada VentureGo (Wakil) untuk mengurus, membiayai, dan menyelesaikan kewajiban persiapan keberangkatan siswa ke negara tujuan dengan imbalan jasa (Ujrah) yang disepakati secara transparan dan proporsional tanpa bunga/riba. Biaya pokok (Nafaqah) disalurkan langsung kepada pihak LPK mitra dan maskapai.'
+
+            return (
+              <section className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-blue-50/25 to-slate-50 p-5 shadow-xs">
+                {/* Decorative background glow */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-10 -top-10 size-56 rounded-full bg-blue-100/40 blur-3xl"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full bg-indigo-50/50 blur-2xl"
+                />
+
+                <div className="relative space-y-4">
+                  {/* Top Bar: Program Badges & Destination */}
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#0b57d0] ring-1 ring-inset ring-blue-200/70">
+                        <span className="size-1.5 rounded-full bg-[#0b57d0]" />
+                        {programName}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200/70">
+                        {akadName}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                        <DestinationFlag destination={application.destination} />
+                        Tujuan {destinationLabel}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {akadIssued ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-300">
+                          <svg
+                            className="size-3 text-emerald-600"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M4.5 12.75l6 6 9-13.5"
+                            />
+                          </svg>
+                          Naskah Akad Terbit
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                          <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Fase Penyusunan Draft
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Main Header with Glowing Icon */}
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0b57d0] to-[#4285f4] text-white shadow-md shadow-blue-500/20 ring-4 ring-blue-50">
+                      <svg
+                        aria-hidden="true"
+                        className="size-5.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.8}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-base font-bold text-slate-900 sm:text-lg">
+                          Penyusunan Naskah Akad: {akadName}
+                        </h2>
+                        <span className="text-xs text-slate-400">·</span>
+                        <span className="text-xs font-semibold text-slate-600">
+                          {application.applicantName} ({application.lpkName})
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">{programSubtitle}</p>
+                    </div>
+                  </div>
+
+                  {/* Deskripsi Karakteristik Syariah & Dinamika Akad */}
+                  <div className="rounded-xl border border-blue-100/80 bg-white/90 p-4 shadow-2xs backdrop-blur-xs">
+                    <div className="flex items-start gap-2.5">
+                      <svg
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-[#0b57d0]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                        />
+                      </svg>
+                      <div className="space-y-1 text-xs">
+                        <strong className="font-bold text-slate-900">
+                          Karakteristik & Landasan Akad:
+                        </strong>
+                        <p className="leading-relaxed text-slate-600">{akadDescription}</p>
+                      </div>
+                    </div>
+
+                    {/* 3 Dinamika Penyesuaian Pilar */}
+                    <div className="mt-3.5 grid gap-2.5 border-t border-slate-100 pt-3 sm:grid-cols-3">
+                      <div className="rounded-lg bg-slate-50/80 px-3 py-2">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Prinsip Biaya Riil (Nafaqah)
+                        </span>
+                        <p className="mt-0.5 text-[11px] font-bold text-slate-800">
+                          Beban riil tagihan LPK & kebutuhan persiapan tanpa mark-up sepihak
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50/80 px-3 py-2">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Imbalan Jasa Terbuka (Ujrah)
+                        </span>
+                        <p className="mt-0.5 text-[11px] font-bold text-slate-800">
+                          Proporsional sesuai kesepakatan, tanpa bunga berjalan maupun denda
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50/80 px-3 py-2">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Keluwesan Angsuran
+                        </span>
+                        <p className="mt-0.5 text-[11px] font-bold text-slate-800">
+                          Mulai diangsur setelah siswa aktif menerima penghasilan di negara tujuan
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )
+          })()}
+
           <fieldset
-            className="m-0 min-w-0 border-0 p-0 disabled:opacity-75 [&_button]:disabled:cursor-not-allowed [&_input]:disabled:bg-slate-50"
+            className="m-0 min-w-0 border-0 p-0 block disabled:opacity-75 [&_button]:disabled:cursor-not-allowed [&_input]:disabled:bg-slate-50"
             disabled={akadIssued}
           >
             <FinanceTermsFields
@@ -1647,10 +2016,10 @@ function ApplicationDrawerForm({
             />
           </fieldset>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/60 shadow-sm">
-            <div className="border-b border-blue-100/70 bg-white/70 px-5 py-4">
+          <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+            <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0b57d0]">
+                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0b57d0] ring-1 ring-blue-100">
                   <svg
                     aria-hidden="true"
                     className="size-4"
@@ -1779,149 +2148,1494 @@ function ApplicationDrawerForm({
         </div>
 
         {/* TAB: CONTRACT APPROVAL */}
-        <div className={activeTab === 'contract' ? 'block space-y-4' : 'hidden'}>
-          <section className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className={activeTab === 'contract' ? 'block space-y-5' : 'hidden'}>
+          {/* BAGIAN 1: HEADER & READINESS QUICK BAR */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/50 p-5 shadow-xs">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Status Pengajuan</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Perjalanan Persetujuan Pembiayaan
+                  </h3>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${
+                      STATUS_BADGE_STYLES[application.status] ??
+                      'bg-slate-100 text-slate-700 ring-slate-200'
+                    }`}
+                  >
+                    {STATUS_LABELS[application.status as keyof typeof STATUS_LABELS] ??
+                      application.status}
+                  </span>
+                  {akadMeta?.studentNumber && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200">
+                      NIS {akadMeta.studentNumber}
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Atur tahap proses pemohon dan simpan catatan internal staf.
+                  Pemohon: <strong className="text-slate-800">{application.applicantName}</strong> ·
+                  LPK: <strong className="text-slate-800">{application.lpkName}</strong> · Terakhir
+                  diperbarui: {formatDateTime(application.updatedAt ?? application.createdAt)}
                 </p>
               </div>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${
-                  STATUS_BADGE_STYLES[application.status] ??
-                  'bg-slate-100 text-slate-700 ring-slate-200'
-                }`}
-              >
-                {STATUS_LABELS[application.status as keyof typeof STATUS_LABELS] ??
-                  application.status}
-              </span>
             </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-[11px] font-semibold text-slate-600">
-                <span>Status Pengajuan</span>
-                <select
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                  onChange={(event) => setWorkflowStatus(event.target.value)}
-                  value={workflowStatus}
+
+            {/* Readiness 4-item Checklist Cards */}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {/* 1. Berkas */}
+              <div className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition hover:border-[#0b57d0]/40">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    1. Kelengkapan Berkas
+                  </span>
+                  {verifiedCount === application.documents.length &&
+                  application.documents.length > 0 ? (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <strong className="block text-sm font-bold text-slate-900">
+                    {verifiedCount}/{application.documents.length} Sesuai
+                  </strong>
+                  <span className="mt-0.5 block text-[11px] text-slate-500">
+                    {reviewCount > 0
+                      ? `${reviewCount} menunggu tinjauan`
+                      : revisionCount > 0
+                        ? `${revisionCount} perlu revisi`
+                        : 'Seluruh berkas terverifikasi'}
+                  </span>
+                </div>
+                <button
+                  className="mt-3 inline-flex items-center text-[11px] font-semibold text-[#0b57d0] hover:underline"
+                  onClick={() => setActiveTab('documents')}
+                  type="button"
                 >
-                  {APPLICATION_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {STATUS_LABELS[status]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="space-y-1 text-[11px] font-semibold text-slate-600">
-                <span>Catatan Internal</span>
-                <input
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-[11px] font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                  maxLength={2000}
-                  onChange={(event) => setWorkflowNotes(event.target.value)}
-                  placeholder="Catatan internal staf…"
-                  value={workflowNotes}
-                />
-              </label>
-            </div>
-            <div className="mt-3 flex items-center justify-end gap-3">
-              <span className="text-[11px] text-slate-400">
-                Perubahan disimpan terpisah dari rincian biaya.
-              </span>
-              <button
-                className="rounded-lg bg-[#0b57d0] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-60"
-                disabled={pending || !workflowDirty}
-                onClick={() => onWorkflow(application.id, workflowStatus, workflowNotes)}
-                type="button"
-              >
-                {pending ? 'Menyimpan…' : 'Simpan Status & Catatan'}
-              </button>
+                  Kelola berkas →
+                </button>
+              </div>
+
+              {/* 2. Biaya */}
+              <div className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition hover:border-[#0b57d0]/40">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    2. Penetapan Biaya
+                  </span>
+                  {pricingStatus === 'AGREED' ? (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : pricingStatus === 'VERIFIED' ? (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-100 text-cyan-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <strong className="block text-sm font-bold text-slate-900">
+                    {pricingStatusLabel} (Keputusan Admin)
+                  </strong>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                    Principal: {formatRupiah(planPrincipal > 0 ? planPrincipal : requestedAmount)}
+                  </span>
+                </div>
+                <button
+                  className="mt-3 inline-flex items-center text-[11px] font-semibold text-[#0b57d0] hover:underline"
+                  onClick={() => setActiveTab('nominal')}
+                  type="button"
+                >
+                  Atur nominal →
+                </button>
+              </div>
+
+              {/* 3. Dokumen Akad Resmi */}
+              <div className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition hover:border-[#0b57d0]/40">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    3. Dokumen Akad Resmi
+                  </span>
+                  {akadIssued ? (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M8 12h8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <strong className="block text-sm font-bold text-slate-900">
+                    {akadIssued ? 'Akad Terbit' : 'Draft Akad'}
+                  </strong>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                    {akadMeta?.documentNumber ?? 'Belum diterbitkan'}
+                  </span>
+                </div>
+                <button
+                  className="mt-3 inline-flex items-center text-[11px] font-semibold text-[#0b57d0] hover:underline"
+                  onClick={() => setActiveTab('pricing')}
+                  type="button"
+                >
+                  Kelola naskah akad →
+                </button>
+              </div>
+
+              {/* 4. Berkas Akad Bertandatangan */}
+              <div className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-xs transition hover:border-[#0b57d0]/40">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    4. Salinan PDF Akad
+                  </span>
+                  {agreementPdfCurrent ? (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2">
+                  <strong className="block text-sm font-bold text-slate-900">
+                    {agreementPdfCurrent ? 'Salinan PDF Siap' : 'Menunggu PDF Basah'}
+                  </strong>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                    {application.financialPlan?.finalAgreementReference
+                      ? String(application.financialPlan.finalAgreementReference)
+                      : 'Referensi belum diisi'}
+                  </span>
+                </div>
+                <span className="mt-3 text-[11px] text-slate-400">
+                  {agreementPdfCurrent ? 'Tersimpan di Drive' : 'Unggah pindaian di bawah'}
+                </span>
+              </div>
             </div>
           </section>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 p-4 text-xs">
-              <h3 className="font-bold text-slate-900">Persetujuan Siswa atas Penawaran</h3>
-              {application.userFinancingAcceptance?.acceptedAt ? (
-                <p className="mt-2 rounded-lg bg-emerald-50 p-3 font-medium text-emerald-900">
-                  ✓ Disetujui siswa pada{' '}
-                  <strong>{formatDateTime(application.userFinancingAcceptance.acceptedAt)}</strong>
-                </p>
+          {/* BAGIAN 2: TIMELINE STEPPER PERJALANAN PERSETUJUAN */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-sm font-bold text-slate-900">Timeline Tahapan Persetujuan</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Keputusan persetujuan dan nominal pembiayaan mutlak ditetapkan oleh staf admin.
+              </p>
+            </div>
+
+            <div className="p-5 space-y-5">
+              {/* Step 1 */}
+              <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center self-stretch">
+                  <div
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white shadow-xs ${
+                      verifiedCount === application.documents.length &&
+                      application.documents.length > 0
+                        ? 'bg-emerald-600 text-white'
+                        : uploadedCount > 0
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {verifiedCount === application.documents.length &&
+                    application.documents.length > 0 ? (
+                      <svg
+                        aria-hidden="true"
+                        className="size-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      '1'
+                    )}
+                  </div>
+                  <div className="my-1.5 w-0.5 grow bg-slate-200" />
+                </div>
+                <div className="min-w-0 flex-1 pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Pendaftaran & Pemeriksaan Berkas
+                    </h4>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        verifiedCount === application.documents.length &&
+                        application.documents.length > 0
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : reviewCount > 0
+                            ? 'bg-amber-50 text-amber-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {verifiedCount === application.documents.length &&
+                      application.documents.length > 0
+                        ? 'Selesai'
+                        : `${verifiedCount}/${application.documents.length} sesuai`}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    Diajukan pada <strong>{formatDateTime(application.createdAt)}</strong> oleh{' '}
+                    <strong>{application.applicantName}</strong> ({application.lpkName}).
+                    {reviewCount > 0 && ` Terdapat ${reviewCount} berkas baru menunggu tinjauan.`}
+                    {revisionCount > 0 && ` Ada ${revisionCount} berkas perlu perbaikan pemohon.`}
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center self-stretch">
+                  <div
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white shadow-xs ${
+                      pricingStatus === 'AGREED'
+                        ? 'bg-emerald-600 text-white'
+                        : pricingStatus === 'VERIFIED'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {pricingStatus === 'AGREED' ? (
+                      <svg
+                        aria-hidden="true"
+                        className="size-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      '2'
+                    )}
+                  </div>
+                  <div className="my-1.5 w-0.5 grow bg-slate-200" />
+                </div>
+                <div className="min-w-0 flex-1 pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Penetapan & Persetujuan Biaya (Keputusan Mutlak Admin)
+                    </h4>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        pricingStatus === 'AGREED'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : pricingStatus === 'VERIFIED'
+                            ? 'bg-cyan-50 text-cyan-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {pricingStatusLabel}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    Admin memiliki wewenang penuh menetapkan nominal pembiayaan: Principal diajukan{' '}
+                    <strong>{formatRupiah(requestedAmount)}</strong>
+                    {planPrincipal > 0 && planPrincipal !== requestedAmount && (
+                      <>
+                        {' '}
+                        · Disetujui admin: <strong>{formatRupiah(planPrincipal)}</strong>
+                      </>
+                    )}
+                    {planTotal > 0 && (
+                      <>
+                        {' '}
+                        · Total kewajiban: <strong>{formatRupiah(planTotal)}</strong>
+                      </>
+                    )}
+                    . Tidak memerlukan konfirmasi siswa; penetapan langsung sah menjadi acuan akad.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center self-stretch">
+                  <div
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white shadow-xs ${
+                      akadIssued
+                        ? 'bg-emerald-600 text-white'
+                        : pricingStatus === 'VERIFIED' || pricingStatus === 'AGREED'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {akadIssued ? (
+                      <svg
+                        aria-hidden="true"
+                        className="size-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      '3'
+                    )}
+                  </div>
+                  <div className="my-1.5 w-0.5 grow bg-slate-200" />
+                </div>
+                <div className="min-w-0 flex-1 pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Penerbitan Naskah Dokumen Akad Resmi
+                    </h4>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        akadIssued
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : pricingStatus === 'VERIFIED' || pricingStatus === 'AGREED'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {akadIssued ? 'Akad Terbit' : 'Draft Akad'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    {akadIssued ? (
+                      <>
+                        Dokumen akad resmi terbit dengan nomor kontrak{' '}
+                        <strong>{akadMeta?.documentNumber}</strong> (NIS:{' '}
+                        <strong>{akadMeta?.studentNumber}</strong>). Siap dicetak untuk proses tanda
+                        tangan basah bersama pemohon dan wali.
+                      </>
+                    ) : (
+                      'Naskah dokumen akad resmi (.docx) belum diterbitkan. Dapat diterbitkan langsung di tab Draft Akad setelah rincian biaya terverifikasi oleh staf.'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="flex items-start gap-4">
+                <div className="flex flex-col items-center self-stretch">
+                  <div
+                    className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white shadow-xs ${
+                      application.status === 'ACTIVE' || application.status === 'COMPLETED'
+                        ? 'bg-emerald-600 text-white'
+                        : agreementPdfCurrent
+                          ? 'bg-teal-600 text-white'
+                          : application.status === 'CANCELLED' || application.status === 'REJECTED'
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-slate-300 text-slate-700'
+                    }`}
+                  >
+                    {application.status === 'ACTIVE' || application.status === 'COMPLETED' ? (
+                      <svg
+                        aria-hidden="true"
+                        className="size-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      '4'
+                    )}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Tanda Tangan Basah, Unggah Salinan PDF, & Realisasi Aktif
+                    </h4>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        STATUS_BADGE_STYLES[application.status] ?? 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {STATUS_LABELS[application.status as keyof typeof STATUS_LABELS] ??
+                        application.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
+                    {application.status === 'ACTIVE'
+                      ? 'Pembiayaan aktif berjalan. Folder Google Drive siswa telah dipromosikan (hijau) dan jadwal angsuran aktif dipantau.'
+                      : application.status === 'COMPLETED'
+                        ? 'Kewajiban pembiayaan siswa telah tuntas selesai sepenuhnya.'
+                        : application.status === 'CANCELLED' || application.status === 'REJECTED'
+                          ? 'Pengajuan telah ditutup/dibatalkan.'
+                          : agreementPdfCurrent
+                            ? 'Salinan PDF bertandatangan basah telah tersimpan. Pengajuan siap dipindahkan ke status "Aktif".'
+                            : 'Kumpulkan tanda tangan fisik pada naskah akad, unggah salinan PDF pindaian di bawah, lalu ubah status ke "Aktif".'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* BAGIAN 3: CATATAN INTERNAL STAF */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <h3 className="text-sm font-bold text-slate-900">Catatan Internal Staf</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Catatan internal staf mengenai proses verifikasi, kondisi khusus siswa, atau
+                kelayakan pengajuan.
+              </p>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Field Tanggal Penerbangan Keberangkatan */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <label className="block">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <svg
+                        aria-hidden="true"
+                        className="size-4 text-[#0b57d0]"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                      </svg>
+                      Tanggal Penerbangan Keberangkatan
+                    </span>
+                    {flightDepartureDate ? (
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-200">
+                        Terjadwal · {formatDateShort(flightDepartureDate)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-normal text-slate-400">
+                        Belum dijadwalkan
+                      </span>
+                    )}
+                  </div>
+                  <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                    Diinput oleh admin setelah konfirmasi langsung ke siswa saat akad mengenai
+                    tanggal tiket penerbangan keberangkatan.
+                  </span>
+                  <div className="mt-2.5 flex items-center gap-3">
+                    <input
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-2xs focus:border-[#0b57d0] focus:ring-1 focus:ring-[#0b57d0] focus:outline-none"
+                      onChange={(event) => setFlightDepartureDate(event.target.value)}
+                      type="date"
+                      value={flightDepartureDate}
+                    />
+                    {flightDepartureDate && (
+                      <button
+                        className="text-[11px] font-medium text-slate-500 hover:text-red-600 transition"
+                        onClick={() => setFlightDepartureDate('')}
+                        type="button"
+                      >
+                        Hapus Tanggal
+                      </button>
+                    )}
+                  </div>
+                </label>
+              </div>
+
+              <label className="space-y-1.5 text-xs font-semibold text-slate-700">
+                <div className="flex items-center justify-between">
+                  <span className="sr-only">Catatan Internal</span>
+                  <span className="text-[10px] font-normal text-slate-400">
+                    {workflowNotes.length}/2000 karakter
+                  </span>
+                </div>
+                <textarea
+                  className="w-full resize-none rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:ring-1 focus:ring-[#0b57d0] focus:outline-none"
+                  maxLength={2000}
+                  onChange={(event) => setWorkflowNotes(event.target.value)}
+                  placeholder="Catatan khusus staf mengenai proses verifikasi, kondisi khusus siswa, atau catatan kelayakan…"
+                  rows={4}
+                  value={workflowNotes}
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                <span className="text-[11px] text-slate-400">
+                  Catatan staf & tanggal penerbangan disimpan terpisah dari rincian biaya.
+                </span>
+                <button
+                  className="rounded-lg bg-[#0b57d0] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-50"
+                  disabled={pending || !workflowDirty}
+                  onClick={() =>
+                    onWorkflow(application.id, workflowStatus, workflowNotes, flightDepartureDate)
+                  }
+                  type="button"
+                >
+                  {pending ? 'Menyimpan…' : 'Simpan Catatan & Tanggal'}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* BAGIAN 4: BERKAS AKAD FINAL BERTANDATANGAN (PDF VAULT & FIELD UPLOAD) */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Salinan PDF Akad Bertandatangan Basah
+                  </h3>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Unggah pindaian (scan) PDF naskah akad Wakalah bil Ujrah yang telah
+                    ditandatangani basah oleh siswa/wali dan pihak VentureGo.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                    Ref Akad:{' '}
+                    <strong className="text-slate-800">
+                      {application.financialPlan?.finalAgreementReference
+                        ? String(application.financialPlan.finalAgreementReference)
+                        : 'Belum diisi'}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Existing file box or prominent upload field */}
+              {agreementPdfCurrent && application.agreementPdf ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                      <svg
+                        aria-hidden="true"
+                        className="size-5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M14 2v6h6M8 13h8M8 17h5" strokeLinecap="round" />
+                      </svg>
+                    </span>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">
+                        {application.agreementPdf.fileName}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {formatSizeMb(application.agreementPdf.size)} · Diunggah oleh{' '}
+                        {application.agreementPdf.uploadedBy}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      className="rounded-lg border border-blue-200 bg-white px-3.5 py-2 text-xs font-semibold text-[#0b57d0] shadow-xs transition hover:bg-blue-50"
+                      href={`/api/admin/applications/${application.id}/agreement`}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      Buka PDF Salinan
+                    </a>
+                    <label className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
+                      <span>{agreementUploading ? 'Mengunggah…' : 'Ganti PDF'}</span>
+                      <input
+                        accept="application/pdf,.pdf"
+                        className="sr-only"
+                        disabled={agreementUploading}
+                        onChange={(event) => {
+                          void selectAgreementPdf(event.target.files?.[0])
+                          event.target.value = ''
+                        }}
+                        type="file"
+                      />
+                    </label>
+                  </div>
+                </div>
+              ) : application.agreementPdf ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold text-amber-900">
+                        PDF tersimpan untuk referensi akad sebelumnya (
+                        {application.agreementPdf.fileName}).
+                      </p>
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        Referensi akad pada Draft Akad telah diperbarui. Harap unggah salinan PDF
+                        baru untuk menyesuaikan dengan naskah akad terkini.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0b57d0] px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-[#0842a0]">
+                      <svg
+                        aria-hidden="true"
+                        className="size-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span>
+                        {agreementUploading ? 'Mengunggah PDF…' : 'Unggah PDF Versi Baru'}
+                      </span>
+                      <input
+                        accept="application/pdf,.pdf"
+                        className="sr-only"
+                        disabled={agreementUploading}
+                        onChange={(event) => {
+                          void selectAgreementPdf(event.target.files?.[0])
+                          event.target.value = ''
+                        }}
+                        type="file"
+                      />
+                    </label>
+                  </div>
+                </div>
               ) : (
-                <p className="mt-2 rounded-lg bg-amber-50 p-3 text-amber-900">
-                  Belum ada persetujuan siswa pada versi penawaran saat ini.
+                /* Field Upload Dropzone yang Jelas & Interaktif */
+                <label
+                  className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-6 text-center transition hover:border-[#0b57d0] hover:bg-blue-50/30 ${
+                    agreementUploading ? 'pointer-events-none opacity-60' : ''
+                  }`}
+                >
+                  <input
+                    accept="application/pdf,.pdf"
+                    className="sr-only"
+                    disabled={agreementUploading}
+                    onChange={(event) => {
+                      void selectAgreementPdf(event.target.files?.[0])
+                      event.target.value = ''
+                    }}
+                    type="file"
+                  />
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-blue-100/80 text-[#0b57d0] shadow-xs transition-transform group-hover:scale-105">
+                    {agreementUploading ? (
+                      <svg className="size-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          d="M4 12a8 8 0 018-8v8H4z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        aria-hidden="true"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <p className="mt-3 text-xs font-bold text-slate-800 group-hover:text-[#0b57d0]">
+                    {agreementUploading
+                      ? 'Sedang mengunggah salinan PDF ke Google Drive…'
+                      : 'Klik untuk Memilih / Mengunggah Salinan PDF Akad'}
+                  </p>
+                  <p className="mt-1 max-w-sm text-[11px] text-slate-500">
+                    Format berkas PDF, ukuran maksimal 4 MB. Berkas pindaian fisik ini otomatis
+                    diarsipkan langsung ke Google Drive siswa.
+                  </p>
+                  <div className="mt-3.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs group-hover:border-[#0b57d0] group-hover:text-[#0b57d0]">
+                    <svg
+                      aria-hidden="true"
+                      className="size-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Pilih Berkas PDF</span>
+                  </div>
+                </label>
+              )}
+
+              {agreementUploadError && (
+                <p className="text-xs text-red-700 font-medium" role="alert">
+                  {agreementUploadError}
                 </p>
               )}
             </div>
-            <div className="rounded-xl border border-slate-200 p-4 text-xs">
-              <h3 className="font-bold text-slate-900">Referensi Akad Final</h3>
-              <p className="mt-2 rounded-lg bg-slate-50 p-3 text-slate-700">
-                {application.financialPlan?.finalAgreementReference
-                  ? String(application.financialPlan.finalAgreementReference)
-                  : 'Belum diisi (isi pada tab Draft Akad)'}
-              </p>
-            </div>
-          </div>
-          <section className="rounded-xl border border-slate-200 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">PDF Akad Wakalah bil Ujrah</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Unggah salinan PDF final yang telah ditandatangani. Berkas disimpan privat di
-                  Google Drive dan hanya dapat diakses staf serta pemohon pengajuan ini.
-                </p>
+          </section>
+
+          {/* BAGIAN 5: FOTO DOKUMENTASI PENANDATANGANAN AKAD */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Foto Dokumentasi Ketika Akad</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Unggah foto-foto dokumentasi penandatanganan akad (siswa, wali, dan staf/LPK).
+                    Tersimpan otomatis di Google Drive pada folder <strong>Dokumentasi Akad</strong>{' '}
+                    di dalam folder root siswa.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-[#0b57d0]">
+                    {Array.isArray(application.akadPhotos) ? application.akadPhotos.length : 0} Foto
+                    Terunggah
+                  </span>
+                </div>
               </div>
-              {agreementPdfCurrent ? (
-                <a
-                  className="shrink-0 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-[#0b57d0] hover:bg-blue-100"
-                  href={`/api/admin/applications/${application.id}/agreement`}
-                >
-                  Buka PDF
-                </a>
-              ) : null}
             </div>
-            {pricingStatus !== 'AGREED' ? (
-              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                PDF final dapat diunggah setelah status biaya menjadi Disepakati.
-              </p>
-            ) : (
-              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[#0b57d0] px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-[#0842a0]">
-                <span>
-                  {agreementUploading
-                    ? 'Mengunggah PDF…'
-                    : agreementPdfCurrent
-                      ? 'Ganti PDF akad'
-                      : 'Unggah PDF akad'}
-                </span>
+
+            <div className="p-5 space-y-4">
+              {/* Existing photos gallery */}
+              {Array.isArray(application.akadPhotos) && application.akadPhotos.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {application.akadPhotos.map((photo, pIdx) => (
+                    <div
+                      className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-2xs transition hover:shadow-md"
+                      key={photo.fileId || pIdx}
+                    >
+                      <div className="relative aspect-4/3 w-full overflow-hidden bg-slate-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          alt={photo.fileName || `Foto akad ${pIdx + 1}`}
+                          className="size-full object-cover transition-transform group-hover:scale-105"
+                          src={`/api/admin/applications/${application.id}/akad-photos/${pIdx}?inline=1`}
+                        />
+                        <button
+                          className="absolute inset-0 flex items-center justify-center bg-slate-950/40 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={() =>
+                            setLightboxPhotoUrl(
+                              `/api/admin/applications/${application.id}/akad-photos/${pIdx}?inline=1`,
+                            )
+                          }
+                          type="button"
+                        >
+                          <span className="rounded-lg bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-slate-900 shadow-xs backdrop-blur-xs">
+                            Lihat Foto
+                          </span>
+                        </button>
+                      </div>
+                      <div className="p-2.5">
+                        <p
+                          className="truncate text-xs font-semibold text-slate-800"
+                          title={photo.fileName}
+                        >
+                          {photo.fileName}
+                        </p>
+                        <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
+                          <span>{formatSizeMb(photo.size)}</span>
+                          <button
+                            className="text-red-500 hover:text-red-700 hover:underline disabled:opacity-50"
+                            disabled={photoUploading}
+                            onClick={() => void handleDeleteAkadPhoto(photo.fileId)}
+                            title="Hapus foto ini"
+                            type="button"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload Dropzone */}
+              <label
+                className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/60 p-6 text-center transition hover:border-[#0b57d0] hover:bg-blue-50/30 ${
+                  photoUploading ? 'pointer-events-none opacity-60' : ''
+                }`}
+              >
                 <input
-                  accept="application/pdf,.pdf"
+                  accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                   className="sr-only"
-                  disabled={agreementUploading}
+                  disabled={photoUploading}
+                  multiple
                   onChange={(event) => {
-                    void selectAgreementPdf(event.target.files?.[0])
+                    void selectAkadPhotos(event.target.files)
                     event.target.value = ''
                   }}
                   type="file"
                 />
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-100/80 text-emerald-700 shadow-xs transition-transform group-hover:scale-105">
+                  {photoUploading ? (
+                    <svg className="size-6 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path className="opacity-75" d="M4 12a8 8 0 018-8v8H4z" fill="currentColor" />
+                    </svg>
+                  ) : (
+                    <svg
+                      aria-hidden="true"
+                      className="size-6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <p className="mt-3 text-xs font-bold text-slate-800 group-hover:text-[#0b57d0]">
+                  {photoUploading
+                    ? 'Sedang mengunggah foto ke folder Dokumentasi Akad…'
+                    : 'Unggah Foto Dokumentasi Akad'}
+                </p>
+                <p className="mt-1 max-w-sm text-[11px] text-slate-500">
+                  Dapat memilih beberapa foto sekaligus (JPG, PNG, WEBP, maks 10 MB per foto).
+                  Tersimpan langsung di Google Drive folder <strong>Dokumentasi Akad</strong>.
+                </p>
+                <div className="mt-3.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs group-hover:border-[#0b57d0] group-hover:text-[#0b57d0]">
+                  <svg
+                    aria-hidden="true"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M12 4v16m8-8H4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Pilih Foto Dokumentasi</span>
+                </div>
               </label>
-            )}
-            {agreementPdfCurrent && application.agreementPdf ? (
-              <p className="mt-2 text-[11px] text-slate-500">
-                {application.agreementPdf.fileName} · {formatSizeMb(application.agreementPdf.size)}{' '}
-                · Diunggah oleh {application.agreementPdf.uploadedBy}
-              </p>
-            ) : application.agreementPdf ? (
-              <p className="mt-2 text-[11px] text-amber-700">
-                PDF tersimpan untuk referensi akad sebelumnya. Unggah PDF baru untuk referensi akad
-                saat ini.
-              </p>
-            ) : null}
-            {agreementUploadError && (
-              <p className="mt-2 text-xs text-red-700" role="alert">
-                {agreementUploadError}
-              </p>
-            )}
+
+              {photoError && (
+                <p className="text-xs text-red-700 font-medium" role="alert">
+                  {photoError}
+                </p>
+              )}
+            </div>
           </section>
+
+          {/* Lightbox Preview Modal */}
+          {lightboxPhotoUrl && (
+            <div
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/85 p-4 backdrop-blur-xs"
+              onClick={() => setLightboxPhotoUrl(null)}
+            >
+              <div
+                className="relative max-h-[90vh] max-w-4xl overflow-hidden rounded-2xl bg-black p-2 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  className="absolute right-4 top-4 z-10 flex size-9 items-center justify-center rounded-full bg-slate-900/80 text-white shadow-md transition hover:bg-slate-900"
+                  onClick={() => setLightboxPhotoUrl(null)}
+                  type="button"
+                >
+                  ✕
+                </button>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  alt="Pratinjau foto dokumentasi akad"
+                  className="max-h-[82vh] w-auto rounded-lg object-contain"
+                  src={lightboxPhotoUrl}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* TAB: RIWAYAT ANGSURAN */}
+        <div className={activeTab === 'installment-history' ? 'block' : 'hidden'}>
+          {(() => {
+            const installmentSummary = summarizeInstallments(application, todayIso, payments)
+            const scheduleRows = installmentSummary.rows
+            const totalObligation =
+              installmentSummary.obligation ??
+              installmentSummary.schedule.reduce((sum, row) => sum + row.amount, 0)
+            const paidAmount = installmentSummary.paidAmount
+            const remaining = installmentSummary.remaining
+            const isStarted = paidAmount > 0
+            const legacyPayments = payments.filter(
+              (payment) =>
+                payment.applicationDocId === application.id ||
+                payment.applicationId === application.applicationId,
+            )
+
+            return (
+              <div className="space-y-5">
+                {/* Ringkasan skema angsuran */}
+                <div
+                  className={`rounded-2xl border p-4 shadow-xs ${installmentSummary.isLegacy ? 'border-amber-200/80 bg-amber-50/70' : 'border-blue-200/80 bg-blue-50/70'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[#0b57d0]">
+                      <svg
+                        aria-hidden="true"
+                        className="size-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        {installmentSummary.isLegacy
+                          ? 'Jadwal Angsuran LGC · Riwayat Kontrak Lama'
+                          : 'Skema Angsuran Fleksibel'}{' '}
+                        · {isStarted ? 'Sedang Berjalan' : 'Belum Mulai Mengangsur'}
+                      </h4>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                        {installmentSummary.isLegacy
+                          ? 'Tanggal dan nominal mengikuti jadwal kontrak legacy yang diimpor. Status pembayaran memakai paidInstallments dan alokasi transaksi legacy yang tersedia; pembayaran tanpa nomor cicilan ditampilkan terpisah dan tidak ditebak alokasinya.'
+                          : 'Jadwal dan nominal cicilan di bawah merupakan asumsi default / estimasi acuan. Tanggal dan besaran angsuran bersifat fleksibel menyesuaikan kemampuan serta kesepakatan riil saat siswa mulai mengangsur.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Tabel Angsuran */}
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {installmentSummary.isLegacy
+                          ? 'Jadwal & Riwayat Pembayaran LGC'
+                          : 'Riwayat & Estimasi Angsuran'}
+                      </h3>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {installmentSummary.isLegacy
+                          ? 'Rincian cicilan dan transaksi historis yang berhasil dialokasikan ke kontrak lama.'
+                          : 'Rincian asumsi default angsuran dan pencatatan pembayaran siswa.'}
+                      </p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                        isStarted
+                          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                          : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`size-2 rounded-full ${
+                          isStarted ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                        }`}
+                      />
+                      {isStarted ? 'Angsuran Berjalan' : 'Belum Mulai Mengangsur'}
+                    </span>
+                  </div>
+
+                  {scheduleRows.length === 0 && !installmentSummary.isLegacy ? (
+                    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
+                      <span className="flex size-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                        <svg
+                          aria-hidden="true"
+                          className="size-6"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                      <p className="mt-3 text-xs font-bold text-slate-700">
+                        Belum ada jadwal angsuran
+                      </p>
+                      <p className="mt-1 max-w-sm text-[11px] text-slate-500">
+                        Jadwal asumsi default akan tersedia setelah rincian biaya disetujui dan
+                        dokumen akad diterbitkan.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Stat strip ringkasan */}
+                      <div className="grid grid-cols-2 divide-x divide-slate-100 border-b border-slate-100 sm:grid-cols-4">
+                        <div className="px-5 py-3.5 text-center">
+                          <p className="text-[11px] font-medium text-slate-500">
+                            {installmentSummary.isLegacy
+                              ? 'Total Kewajiban Kontrak'
+                              : 'Total Kewajiban (Asumsi)'}
+                          </p>
+                          <p className="mt-0.5 text-sm font-extrabold text-slate-900">
+                            {formatRupiah(totalObligation)}
+                          </p>
+                        </div>
+                        <div className="px-5 py-3.5 text-center">
+                          <p className="text-[11px] font-medium text-slate-500">
+                            Realisasi Terbayar
+                          </p>
+                          <p className="mt-0.5 text-sm font-extrabold text-emerald-700">
+                            {formatRupiah(paidAmount)}
+                          </p>
+                        </div>
+                        <div className="px-5 py-3.5 text-center">
+                          <p className="text-[11px] font-medium text-slate-500">Sisa Kewajiban</p>
+                          <p
+                            className={`mt-0.5 text-sm font-extrabold ${remaining > 0 ? 'text-amber-700' : 'text-emerald-700'}`}
+                          >
+                            {formatRupiah(remaining)}
+                          </p>
+                        </div>
+                        <div className="px-5 py-3.5 text-center">
+                          <p className="text-[11px] font-medium text-slate-500">Progres Lunas</p>
+                          <p className="mt-0.5 text-sm font-extrabold text-slate-800">
+                            {installmentSummary.paidCount}
+                            <span className="text-xs font-normal text-slate-400">
+                              /{scheduleRows.length} bulan
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Tabel jadwal */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              <th className="px-5 py-3.5"># Cicilan</th>
+                              <th className="px-5 py-3.5">
+                                {installmentSummary.isLegacy ? 'Jatuh Tempo' : 'Tanggal Angsuran'}
+                              </th>
+                              <th className="px-5 py-3.5 text-right">
+                                {installmentSummary.isLegacy
+                                  ? 'Nominal Angsuran'
+                                  : 'Nominal Asumsi (Default)'}
+                              </th>
+                              <th className="px-5 py-3.5 text-right">Realisasi Bayar</th>
+                              <th className="px-5 py-3.5">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {scheduleRows.length === 0 ? (
+                              <tr>
+                                <td className="px-5 py-5 text-center text-slate-500" colSpan={5}>
+                                  Belum ada rincian jadwal cicilan pada kontrak ini.
+                                </td>
+                              </tr>
+                            ) : (
+                              scheduleRows.map((row) => {
+                                const overdue =
+                                  installmentSummary.isLegacy &&
+                                  !row.isPaid &&
+                                  row.dueDate < todayIso
+                                const rowStatus = row.isPaid
+                                  ? 'Lunas'
+                                  : row.isPartial
+                                    ? overdue
+                                      ? 'Sebagian · Terlambat'
+                                      : 'Sebagian dibayar'
+                                    : overdue
+                                      ? 'Terlambat'
+                                      : installmentSummary.isLegacy
+                                        ? 'Belum dibayar'
+                                        : 'Belum Mulai'
+                                return (
+                                  <tr
+                                    className={`transition-colors hover:bg-slate-50/60 ${row.isPaid ? 'bg-emerald-50/20' : ''}`}
+                                    key={row.installment}
+                                  >
+                                    <td className="px-5 py-3.5 font-bold text-slate-800">
+                                      Cicilan #{row.installment}
+                                    </td>
+                                    <td className="px-5 py-3.5 text-slate-500">
+                                      {installmentSummary.isLegacy || row.isPaid ? (
+                                        <span className="font-medium text-slate-700">
+                                          {formatDateShort(row.dueDate)}
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-slate-400">
+                                          <span>—</span>
+                                          <span className="text-[10px] text-slate-400 font-normal">
+                                            (fleksibel)
+                                          </span>
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3.5 text-right">
+                                      <span className="font-semibold text-slate-900">
+                                        {formatRupiah(row.amount)}
+                                      </span>
+                                      {!installmentSummary.isLegacy && (
+                                        <span className="block text-[10px] text-slate-400 font-normal">
+                                          asumsi default
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3.5 text-right">
+                                      {row.appliedAmount > 0 ? (
+                                        <span className="font-semibold text-emerald-700">
+                                          {formatRupiah(row.appliedAmount)}
+                                          {row.isPartial && (
+                                            <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+                                              Sisa {formatRupiah(row.remaining)}
+                                            </span>
+                                          )}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-400">—</span>
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                      <span
+                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                          row.isPaid
+                                            ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                            : overdue
+                                              ? 'bg-red-50 text-red-700 ring-1 ring-red-200'
+                                              : row.isPartial
+                                                ? 'bg-amber-50 text-amber-800 ring-1 ring-amber-200'
+                                                : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+                                        }`}
+                                      >
+                                        {row.isPaid ? '✓ Lunas' : rowStatus}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                )
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                      {installmentSummary.isLegacy && (
+                        <div className="border-t border-slate-100 p-4">
+                          <h4 className="mb-2 text-xs font-bold text-slate-700">
+                            Riwayat Transaksi LGC ({legacyPayments.length})
+                          </h4>
+                          {legacyPayments.length > 0 ? (
+                            <div className="overflow-x-auto rounded-xl border border-slate-200">
+                              <table className="w-full border-collapse text-left text-xs">
+                                <thead>
+                                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                    <th className="px-3 py-2">Tanggal</th>
+                                    <th className="px-3 py-2">Alokasi</th>
+                                    <th className="px-3 py-2">Keterangan</th>
+                                    <th className="px-3 py-2 text-right">Nominal</th>
+                                    <th className="px-3 py-2">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {legacyPayments.map((payment) => (
+                                    <tr
+                                      className="border-b border-slate-100 last:border-0"
+                                      key={payment.id}
+                                    >
+                                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
+                                        {formatDateShort(payment.paidAt ?? payment.createdAt)}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
+                                        {payment.installmentNumber
+                                          ? `Cicilan #${payment.installmentNumber}`
+                                          : 'Belum dialokasikan'}
+                                      </td>
+                                      <td className="px-3 py-2 text-slate-700">
+                                        {payment.description || 'Pembayaran legacy'}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-900">
+                                        {formatRupiah(payment.amount)}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-2 text-slate-600">
+                                        {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500">
+                              Belum ada transaksi legacy yang tercatat.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </section>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* TAB: RIWAYAT PROGRAM */}
+        <div className={activeTab === 'program-history' ? 'block' : 'hidden'}>
+          {(() => {
+            const dep = application.departureDetails ?? {}
+            const depDest = typeof dep.destination === 'string' ? dep.destination : '-'
+            const depAmount = Number(dep.requestedFinancingAmount) || 0
+            const programs: {
+              applicationId: string
+              product: string
+              lpk: string
+              destination: string
+              status: string
+              requestedAmount: number
+              pricingStatus: string
+              akadIssued: boolean
+              documentNumber?: string
+              createdAt: string
+            }[] = [
+              {
+                applicationId: application.applicationId,
+                product:
+                  (application.product as string) === 'FULL_COVER'
+                    ? 'VSV Full Cover'
+                    : 'VSV Dana Keberangkatan',
+                lpk: application.lpkName,
+                destination: depDest,
+                status: application.status,
+                requestedAmount: depAmount,
+                pricingStatus:
+                  typeof application.financialPlan?.pricingStatus === 'string'
+                    ? application.financialPlan.pricingStatus
+                    : 'ESTIMATED',
+                akadIssued: Boolean(
+                  application.financialPlan?.akadDocument &&
+                  typeof (application.financialPlan.akadDocument as Record<string, unknown>)
+                    .documentNumber === 'string',
+                ),
+                documentNumber:
+                  typeof (application.financialPlan?.akadDocument as Record<string, unknown>)
+                    ?.documentNumber === 'string'
+                    ? String(
+                        (application.financialPlan?.akadDocument as Record<string, unknown>)
+                          .documentNumber,
+                      )
+                    : undefined,
+                createdAt: application.createdAt,
+              },
+            ]
+
+            const isRunning = (s: string) => s === 'ACTIVE'
+            const isDone = (s: string) => s === 'COMPLETED'
+
+            return (
+              <div className="space-y-5">
+                <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+                  <div className="border-b border-slate-100 px-5 py-4">
+                    <h3 className="text-sm font-bold text-slate-900">Riwayat Program Siswa</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Daftar program pembiayaan yang diikuti siswa beserta informasi umum dan status
+                      perjalanan program.
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <th className="px-5 py-3.5">Informasi Umum Program</th>
+                          <th className="px-5 py-3.5">LPK Mitra & Tujuan</th>
+                          <th className="px-5 py-3.5 text-right">Plafon Pembiayaan</th>
+                          <th className="px-5 py-3.5">Dokumen Akad</th>
+                          <th className="px-5 py-3.5">Status Program</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {programs.map((prog) => (
+                          <tr
+                            className="hover:bg-slate-50/60 transition-colors"
+                            key={prog.applicationId}
+                          >
+                            <td className="px-5 py-3.5">
+                              <span className="block font-semibold text-slate-900">
+                                {prog.product}
+                              </span>
+                              <span className="font-mono text-[11px] text-slate-500">
+                                ID: {prog.applicationId} · Didaftarkan:{' '}
+                                {formatDateShort(prog.createdAt)}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span className="block font-medium text-slate-900">{prog.lpk}</span>
+                              <span className="text-[11px] text-slate-500">
+                                {prog.destination === 'JAPAN'
+                                  ? '🇯🇵 Jepang'
+                                  : prog.destination === 'TURKEY'
+                                    ? '🇹🇷 Turki'
+                                    : prog.destination}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-right font-semibold text-slate-900">
+                              {formatRupiah(prog.requestedAmount)}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                  prog.akadIssued
+                                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                    : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200'
+                                }`}
+                              >
+                                {prog.akadIssued ? 'Terbit' : 'Draft'}
+                              </span>
+                              {prog.documentNumber && (
+                                <span className="block mt-0.5 font-mono text-[10px] text-slate-500">
+                                  {prog.documentNumber}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                                  isDone(prog.status)
+                                    ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                                    : isRunning(prog.status)
+                                      ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                      : prog.status === 'CANCELLED' || prog.status === 'REJECTED'
+                                        ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
+                                        : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
+                                }`}
+                              >
+                                {isDone(prog.status) ? (
+                                  '✓ Sudah Selesai'
+                                ) : isRunning(prog.status) ? (
+                                  <>
+                                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    Sedang Berjalan
+                                  </>
+                                ) : (
+                                  (STATUS_LABELS[prog.status as keyof typeof STATUS_LABELS] ??
+                                  prog.status)
+                                )}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="border-t border-slate-100 px-5 py-3">
+                    <p className="text-[11px] text-slate-400">
+                      Menampilkan {programs.length} program terdaftar untuk siswa ini.
+                    </p>
+                  </div>
+                </section>
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -2335,6 +4049,90 @@ function ApplicationDrawerForm({
   )
 }
 
+type DashboardChartPoint = { label: string; value: number }
+
+function DashboardBarChart({
+  data,
+  formatValue,
+  color = 'fill-[var(--primary)]',
+}: {
+  data: DashboardChartPoint[]
+  formatValue: (value: number) => string
+  color?: string
+}) {
+  const maxValue = Math.max(1, ...data.map((point) => point.value))
+  const slot = 560 / Math.max(data.length, 1)
+  const barWidth = Math.min(30, slot * 0.58)
+
+  return (
+    <svg
+      aria-label={data.map((point) => `${point.label}: ${formatValue(point.value)}`).join(', ')}
+      className="h-44 w-full overflow-visible"
+      preserveAspectRatio="none"
+      role="img"
+      viewBox="0 0 560 190"
+    >
+      <line className="stroke-slate-200" x1="0" x2="560" y1="150" y2="150" />
+      {data.map((point, index) => {
+        const height = (point.value / maxValue) * 112
+        const x = index * slot + (slot - barWidth) / 2
+        const y = 149 - height
+        return (
+          <g key={point.label}>
+            <title>{`${point.label}: ${formatValue(point.value)}`}</title>
+            <rect
+              className={`${color} opacity-90`}
+              height={Math.max(height, 2)}
+              rx="4"
+              width={barWidth}
+              x={x}
+              y={y}
+            />
+            <text
+              className="fill-slate-600"
+              fontSize="10"
+              textAnchor="middle"
+              x={x + barWidth / 2}
+              y="170"
+            >
+              {point.label}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+function DashboardMeter({
+  label,
+  value,
+  total,
+  color = 'bg-[var(--primary)]',
+  detail,
+}: {
+  label: string
+  value: number
+  total: number
+  color?: string
+  detail?: string
+}) {
+  const percent = total > 0 ? Math.min(100, (value / total) * 100) : 0
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+        <span className="truncate font-medium text-slate-700">{label}</span>
+        <span className="shrink-0 font-bold tabular-nums text-slate-900">
+          {detail ?? value.toLocaleString('id-ID')}
+        </span>
+      </div>
+      <div aria-hidden="true" className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  )
+}
+
 export function AdminDashboard({
   email,
   applications,
@@ -2353,24 +4151,66 @@ export function AdminDashboard({
     null,
   )
   const [deleteApplicationError, setDeleteApplicationError] = useState('')
+  const [revertTarget, setRevertTarget] = useState<FinancingApplicationRecord | null>(null)
+  const [revertError, setRevertError] = useState('')
   const [pending, startTransition] = useTransition()
 
   const [activeMenu, setActiveMenu] = useState<MenuId>('dashboard')
+  const [dashboardRange, setDashboardRange] = useState<6 | 12>(6)
   const [drawerAppId, setDrawerAppId] = useState<string | null>(null)
   const [drawerTab, setDrawerTab] = useState<DetailTabId>('profile')
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null)
-  const [reliefEdits, setReliefEdits] = useState<
-    Record<string, { status: string; response: string }>
-  >({})
 
   const [searchQuery, setSearchQuery] = useState('')
   const [productFilter, setProductFilter] = useState<'ALL' | 'FULL_COVER' | 'DEPARTURE_BRIDGING'>(
     'ALL',
   )
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
+  const [destinationFilter, setDestinationFilter] = useState<string>('ALL')
+  const [isDestinationDropdownOpen, setIsDestinationDropdownOpen] = useState(false)
+  const destinationDropdownRef = useRef<HTMLDivElement>(null)
+
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false)
+  const productDropdownRef = useRef<HTMLDivElement>(null)
+
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false)
+  const statusDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node
+      if (destinationDropdownRef.current && !destinationDropdownRef.current.contains(target)) {
+        setIsDestinationDropdownOpen(false)
+      }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(target)) {
+        setIsProductDropdownOpen(false)
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) {
+        setIsStatusDropdownOpen(false)
+      }
+    }
+    if (isDestinationDropdownOpen || isProductDropdownOpen || isStatusDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isDestinationDropdownOpen, isProductDropdownOpen, isStatusDropdownOpen])
   const [activeInstallmentFilter, setActiveInstallmentFilter] = useState<
     'ALL' | 'OVERDUE' | 'DUE_SOON' | 'CURRENT'
   >('ALL')
+  const [alumniFilter, setAlumniFilter] = useState<'ALL' | 'ON_TIME' | 'EARLY'>('ALL')
+
+  const hasActiveFilter =
+    searchQuery.trim() !== '' ||
+    productFilter !== 'ALL' ||
+    statusFilter !== 'ALL' ||
+    destinationFilter !== 'ALL'
+
+  const resetAllFilters = () => {
+    setSearchQuery('')
+    setProductFilter('ALL')
+    setStatusFilter('ALL')
+    setDestinationFilter('ALL')
+  }
 
   const logout = async () => {
     await fetch('/api/admin/session', { method: 'DELETE' })
@@ -2402,20 +4242,70 @@ export function AdminDashboard({
     })
   }
 
+  const handleConfirmRevert = (target: FinancingApplicationRecord) => {
+    setRevertError('')
+    startTransition(async () => {
+      const result = await revertApplicationPricingToEstimated(target.id)
+      if (!result.ok) {
+        setRevertError(result.message)
+      } else {
+        setSavedNotice(
+          `Pengajuan ${target.applicationId} telah dikembalikan ke menu Pengajuan untuk ditinjau ulang.`,
+        )
+        setRevertTarget(null)
+        router.refresh()
+      }
+    })
+  }
+
   const filteredApplications = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     return applications.filter((app) => {
+      if (destinationFilter !== 'ALL' && app.destination !== destinationFilter) return false
       if (productFilter !== 'ALL' && app.product !== productFilter) return false
       if (statusFilter !== 'ALL' && app.status !== statusFilter) return false
       if (!query) return true
+      const displayId = formatDisplayApplicationId(app.applicationId).toLowerCase()
       return (
         app.applicationId.toLowerCase().includes(query) ||
+        displayId.includes(query) ||
         app.applicantName.toLowerCase().includes(query) ||
         app.phone.toLowerCase().includes(query) ||
         app.lpkName.toLowerCase().includes(query)
       )
     })
-  }, [applications, productFilter, statusFilter, searchQuery])
+  }, [applications, destinationFilter, productFilter, statusFilter, searchQuery])
+
+  const pendingApprovalApplications = useMemo(
+    () =>
+      filteredApplications.filter((app) => {
+        const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
+        return pricing !== 'VERIFIED' && pricing !== 'AGREED'
+      }),
+    [filteredApplications],
+  )
+
+  const contractPrepApplications = useMemo(
+    () =>
+      filteredApplications.filter((app) => {
+        const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
+        return pricing === 'VERIFIED' || pricing === 'AGREED'
+      }),
+    [filteredApplications],
+  )
+
+  const archivingApplications = useMemo(
+    () =>
+      filteredApplications.filter(
+        (app) =>
+          Boolean(app.financialPlan?.akadDocument) ||
+          Boolean(app.agreementPdf) ||
+          (Array.isArray(app.akadPhotos) && app.akadPhotos.length > 0) ||
+          app.financialPlan?.pricingStatus === 'VERIFIED' ||
+          app.financialPlan?.pricingStatus === 'AGREED',
+      ),
+    [filteredApplications],
+  )
 
   const drawerApplication = useMemo(
     () => (drawerAppId ? (applications.find((app) => app.id === drawerAppId) ?? null) : null),
@@ -2428,8 +4318,17 @@ export function AdminDashboard({
     let activeCount = 0
     let agreedTotalVolume = 0
     let openReliefCount = 0
+    let pendingApprovalCount = 0
+    let contractPrepCount = 0
 
     for (const app of applications) {
+      const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
+      if (pricing === 'VERIFIED' || pricing === 'AGREED') {
+        contractPrepCount += 1
+      } else {
+        pendingApprovalCount += 1
+      }
+
       if (
         ['SUBMITTED', 'ELIGIBILITY_REVIEW', 'DOCUMENT_REVIEW', 'COST_VERIFICATION'].includes(
           app.status,
@@ -2457,6 +4356,10 @@ export function AdminDashboard({
 
     return {
       total: applications.length,
+      pendingApprovalCount,
+      contractPrepCount,
+      japanCount: applications.filter((a) => a.destination === 'JAPAN').length,
+      turkeyCount: applications.filter((a) => a.destination === 'TURKEY').length,
       pendingReview,
       activeCount,
       agreedTotalVolume,
@@ -2498,7 +4401,7 @@ export function AdminDashboard({
       string,
       { lpkName: string; count: number; active: number; totalObligation: number }
     >()
-    for (const app of applications) {
+    for (const app of filteredApplications) {
       const key = app.lpkName.trim() || 'Tanpa Nama LPK'
       const current = map.get(key) ?? { lpkName: key, count: 0, active: 0, totalObligation: 0 }
       current.count += 1
@@ -2509,19 +4412,96 @@ export function AdminDashboard({
       map.set(key, current)
     }
     return [...map.values()].sort((a, b) => b.count - a.count)
-  }, [applications])
+  }, [filteredApplications])
 
   // Ringkasan angsuran per pengajuan (dasar menu Angsuran Aktif & Jadwal Angsuran)
   const installmentSummaries = useMemo(
     () =>
-      filteredApplications.map((app) => ({ app, summary: summarizeInstallments(app, todayIso) })),
-    [filteredApplications, todayIso],
+      filteredApplications.map((app) => ({
+        app,
+        summary: summarizeInstallments(app, todayIso, payments),
+      })),
+    [filteredApplications, todayIso, payments],
   )
 
   const activeInstallmentSummaries = useMemo(
     () => installmentSummaries.filter(({ app, summary }) => hasActiveInstallment(app, summary)),
     [installmentSummaries],
   )
+
+  const alumniSummaries = useMemo(
+    () => installmentSummaries.filter(({ app, summary }) => isAlumnus(app, summary)),
+    [installmentSummaries],
+  )
+
+  const alumniRows = useMemo(
+    () =>
+      alumniSummaries.map(({ app, summary }) => {
+        const paidPayments = payments.filter(
+          (payment) =>
+            payment.applicationDocId === app.id &&
+            payment.status === 'PAID' &&
+            payment.type === 'INSTALLMENT',
+        )
+        const latestPaidAt =
+          paidPayments
+            .map((payment) => payment.paidAt)
+            .filter((date): date is string => Boolean(date))
+            .sort()
+            .at(-1) ?? null
+        const hasPaymentEvidence = paidPayments.some((payment) => Boolean(payment.paidAt))
+        const paidLate = paidPayments.some((payment) => {
+          if (!payment.paidAt || payment.installmentNumber === null) return false
+          const dueDate = summary.schedule.find(
+            (row) => row.installment === payment.installmentNumber,
+          )?.dueDate
+          return Boolean(dueDate && payment.paidAt.slice(0, 10) > dueDate)
+        })
+        const lastDueDate = summary.schedule.at(-1)?.dueDate
+        const accelerated = Boolean(
+          latestPaidAt && lastDueDate && latestPaidAt.slice(0, 10) < lastDueDate,
+        )
+        return { app, summary, latestPaidAt, paidLate, accelerated, hasPaymentEvidence }
+      }),
+    [alumniSummaries, payments],
+  )
+
+  const visibleAlumni = useMemo(
+    () =>
+      alumniRows.filter(({ paidLate, accelerated, hasPaymentEvidence }) => {
+        if (alumniFilter === 'ON_TIME') return hasPaymentEvidence && !paidLate
+        if (alumniFilter === 'EARLY') return accelerated
+        return true
+      }),
+    [alumniRows, alumniFilter],
+  )
+
+  const alumniMetrics = useMemo(() => {
+    const totalRecovered = alumniRows.reduce((sum, row) => sum + row.summary.paidAmount, 0)
+    const verifiablePayments = alumniRows.filter((row) => row.hasPaymentEvidence)
+    const onTimeCount = verifiablePayments.filter((row) => !row.paidLate).length
+    const completedMonths = alumniRows
+      .map(({ app, latestPaidAt }) => {
+        if (!latestPaidAt || !app.createdAt) return null
+        const start = new Date(app.createdAt).getTime()
+        const end = new Date(latestPaidAt).getTime()
+        return Number.isFinite(start) && Number.isFinite(end) && end >= start
+          ? Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.4375)))
+          : null
+      })
+      .filter((months): months is number => months !== null)
+    return {
+      totalRecovered,
+      punctuality: verifiablePayments.length
+        ? Math.round((onTimeCount / verifiablePayments.length) * 100)
+        : 0,
+      averageMonths: completedMonths.length
+        ? (
+            completedMonths.reduce((sum, months) => sum + months, 0) / completedMonths.length
+          ).toFixed(1)
+        : '—',
+    }
+  }, [alumniRows])
 
   const scheduleRows = useMemo(
     () =>
@@ -2530,18 +4510,6 @@ export function AdminDashboard({
         .sort(compareInstallmentRows),
     [installmentSummaries],
   )
-
-  const reliefRows = useMemo(() => {
-    const rows: {
-      app: FinancingApplicationRecord
-      request: NonNullable<FinancingApplicationRecord['supportRequests']>[number]
-      index: number
-    }[] = []
-    for (const app of filteredApplications) {
-      ;(app.supportRequests ?? []).forEach((request, index) => rows.push({ app, request, index }))
-    }
-    return rows.sort((a, b) => b.request.requestedAt.localeCompare(a.request.requestedAt))
-  }, [filteredApplications])
 
   const activeInstallmentMetrics = useMemo(() => {
     let overdue = 0
@@ -2562,6 +4530,123 @@ export function AdminDashboard({
       openRelief,
     }
   }, [activeInstallmentSummaries])
+
+  const dashboardAnalytics = useMemo(() => {
+    const [yearText, monthText] = todayIso.slice(0, 7).split('-')
+    const currentMonth = new Date(Date.UTC(Number(yearText), Number(monthText) - 1, 1))
+    const months = Array.from({ length: dashboardRange }, (_, index) => {
+      const date = new Date(currentMonth)
+      date.setUTCMonth(date.getUTCMonth() - (dashboardRange - index - 1))
+      return {
+        key: date.toISOString().slice(0, 7),
+        label: new Intl.DateTimeFormat('id-ID', { month: 'short', timeZone: 'UTC' })
+          .format(date)
+          .replace('.', ''),
+      }
+    })
+    const monthKeys = new Set(months.map((month) => month.key))
+    const applicationIds = new Set(
+      filteredApplications.flatMap((app) => [app.id, app.applicationId]),
+    )
+    const scopedPayments = payments.filter(
+      (payment) =>
+        applicationIds.has(payment.applicationDocId) || applicationIds.has(payment.applicationId),
+    )
+    const paidPayments = scopedPayments.filter((payment) => payment.status === 'PAID')
+    const pendingReviewStatuses = [
+      'SUBMITTED',
+      'ELIGIBILITY_REVIEW',
+      'DOCUMENT_REVIEW',
+      'REVISION_REQUIRED',
+      'COST_VERIFICATION',
+    ]
+    const statusGroups = [
+      {
+        label: 'Verifikasi awal',
+        count: filteredApplications.filter((app) => pendingReviewStatuses.includes(app.status))
+          .length,
+      },
+      {
+        label: 'Persiapan akad',
+        count: filteredApplications.filter((app) =>
+          ['APPROVED', 'CONTRACT_PREPARATION'].includes(app.status),
+        ).length,
+      },
+      {
+        label: 'Aktif',
+        count: filteredApplications.filter((app) => app.status === 'ACTIVE').length,
+      },
+      {
+        label: 'Selesai',
+        count: filteredApplications.filter((app) => app.status === 'COMPLETED').length,
+      },
+      {
+        label: 'Ditolak / dibatalkan',
+        count: filteredApplications.filter((app) => ['REJECTED', 'CANCELLED'].includes(app.status))
+          .length,
+      },
+    ]
+    const groupMax = Math.max(1, ...statusGroups.map((group) => group.count))
+    const submissionsByMonth = new Map(months.map((month) => [month.key, 0]))
+    const paymentsByMonth = new Map(months.map((month) => [month.key, 0]))
+    for (const app of filteredApplications) {
+      const month = app.createdAt.slice(0, 7)
+      if (monthKeys.has(month))
+        submissionsByMonth.set(month, (submissionsByMonth.get(month) ?? 0) + 1)
+    }
+    for (const payment of paidPayments) {
+      const month = payment.paidAt?.slice(0, 7)
+      if (month && monthKeys.has(month)) {
+        paymentsByMonth.set(month, (paymentsByMonth.get(month) ?? 0) + payment.amount)
+      }
+    }
+    const departureCount = filteredApplications.filter(
+      (app) => app.product === 'DEPARTURE_BRIDGING',
+    ).length
+    const fullCoverCount = filteredApplications.filter((app) => app.product === 'FULL_COVER').length
+    const japanCount = filteredApplications.filter((app) => app.destination === 'JAPAN').length
+    const turkeyCount = filteredApplications.filter((app) => app.destination === 'TURKEY').length
+    const openReliefCount = filteredApplications.reduce(
+      (sum, app) =>
+        sum + (app.supportRequests ?? []).filter((request) => request.status === 'OPEN').length,
+      0,
+    )
+    const agreedObligation = filteredApplications.reduce((sum, app) => {
+      const obligation = app.financialPlan?.totalObligation
+      return app.financialPlan?.pricingStatus === 'AGREED' &&
+        typeof obligation === 'number' &&
+        Number.isFinite(obligation)
+        ? sum + obligation
+        : sum
+    }, 0)
+
+    return {
+      applicationCount: filteredApplications.length,
+      pendingReviewCount: filteredApplications.filter((app) =>
+        pendingReviewStatuses.includes(app.status),
+      ).length,
+      paidVolume: paidPayments.reduce((sum, payment) => sum + payment.amount, 0),
+      agreedObligation,
+      alumniCount: alumniSummaries.length,
+      openReliefCount,
+      statusGroups: statusGroups.map((group) => ({
+        ...group,
+        percent: (group.count / groupMax) * 100,
+      })),
+      submissions: months.map((month) => ({
+        label: month.label,
+        value: submissionsByMonth.get(month.key) ?? 0,
+      })),
+      collections: months.map((month) => ({
+        label: month.label,
+        value: paymentsByMonth.get(month.key) ?? 0,
+      })),
+      departureCount,
+      fullCoverCount,
+      japanCount,
+      turkeyCount,
+    }
+  }, [alumniSummaries.length, dashboardRange, filteredApplications, payments, todayIso])
 
   const visibleActiveInstallments = useMemo(() => {
     const rows = activeInstallmentSummaries.filter(({ summary }) => {
@@ -2651,15 +4736,25 @@ export function AdminDashboard({
     })
   }
 
-  const saveWorkflow = (applicationId: string, status: string, internalNotes: string) => {
+  const saveWorkflow = (
+    applicationId: string,
+    status: string,
+    internalNotes: string,
+    departureDate?: string,
+  ) => {
     setError('')
     setSavedNotice('')
     startTransition(async () => {
-      const result = await updateApplicationWorkflow(applicationId, status, internalNotes)
+      const result = await updateApplicationWorkflow(
+        applicationId,
+        status,
+        internalNotes,
+        departureDate,
+      )
       if (!result.ok) {
         setError(result.message)
       } else {
-        setSavedNotice(`Status & catatan pengajuan berhasil diperbarui.`)
+        setSavedNotice(`Catatan & tanggal penerbangan berhasil disimpan.`)
         router.refresh()
       }
     })
@@ -2710,8 +4805,8 @@ export function AdminDashboard({
       } else {
         setSavedNotice(
           newNominal !== null
-            ? `Rincian biaya disetujui dengan nominal baru ${formatRupiah(newNominal)}.`
-            : 'Rincian biaya disetujui menjadi Terverifikasi.',
+            ? `Nominal disetujui dengan nominal baru ${formatRupiah(newNominal)}. Pengajuan dipindahkan ke menu Persiapan Akad.`
+            : 'Nominal pengajuan berhasil disetujui. Pengajuan dipindahkan ke menu Persiapan Akad.',
         )
         router.refresh()
       }
@@ -2752,32 +4847,6 @@ export function AdminDashboard({
     router.refresh()
   }
 
-  const reliefKey = (applicationId: string, index: number) => `${applicationId}:${index}`
-
-  const saveRelief = (
-    app: FinancingApplicationRecord,
-    index: number,
-    status: string,
-    response: string,
-  ) => {
-    setError('')
-    setSavedNotice('')
-    startTransition(async () => {
-      const result = await updateSupportRequest(app.id, index, status, response)
-      if (!result.ok) {
-        setError(result.message)
-      } else {
-        setSavedNotice(`Permohonan keringanan ${app.applicationId} diperbarui.`)
-        setReliefEdits((current) => {
-          const next = { ...current }
-          delete next[reliefKey(app.id, index)]
-          return next
-        })
-        router.refresh()
-      }
-    })
-  }
-
   const openScheduleDetail = (appId: string) => {
     setActiveMenu('schedule')
     setExpandedScheduleId(appId)
@@ -2789,7 +4858,11 @@ export function AdminDashboard({
   const getMenuBadge = (id: MenuId): number | null => {
     switch (id) {
       case 'applications':
-        return applications.length
+        return applications.filter(
+          (a) =>
+            a.financialPlan?.pricingStatus !== 'VERIFIED' &&
+            a.financialPlan?.pricingStatus !== 'AGREED',
+        ).length
       case 'students':
         return applications.length
       case 'contracts':
@@ -2798,14 +4871,21 @@ export function AdminDashboard({
             a.financialPlan?.pricingStatus === 'VERIFIED' ||
             a.financialPlan?.pricingStatus === 'AGREED',
         ).length
-      case 'installments':
-        return metrics.openReliefCount > 0 ? metrics.openReliefCount : metrics.activeCount
+      case 'archiving':
+        return applications.filter(
+          (a) =>
+            Boolean(a.financialPlan?.akadDocument) ||
+            Boolean(a.agreementPdf) ||
+            (Array.isArray(a.akadPhotos) && a.akadPhotos.length > 0) ||
+            a.financialPlan?.pricingStatus === 'VERIFIED' ||
+            a.financialPlan?.pricingStatus === 'AGREED',
+        ).length
       case 'activeInstallments':
         return activeInstallmentMetrics.count
+      case 'alumni':
+        return alumniRows.length
       case 'schedule':
         return scheduleRows.length
-      case 'relief':
-        return metrics.openReliefCount
       case 'audit':
         return auditEntries.length
       default:
@@ -2814,9 +4894,15 @@ export function AdminDashboard({
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-[#f8fafc] text-slate-900 lg:h-dvh lg:flex-row lg:overflow-hidden">
+    <div
+      className="flex min-h-dvh flex-col bg-[#f8fafc] text-slate-900 lg:flex-row"
+      suppressHydrationWarning
+    >
       {/* FIXED 100dvh SIDEBAR */}
-      <aside className="flex w-full flex-col justify-between border-b border-slate-200 bg-[#0b57d0] text-white lg:h-dvh lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:border-[#0842a0]">
+      <aside
+        className="flex w-full flex-col justify-between border-b border-slate-200 bg-[#0b57d0] text-white lg:sticky lg:top-0 lg:h-dvh lg:w-60 lg:shrink-0 lg:self-start lg:border-b-0 lg:border-r lg:border-[#0842a0]"
+        suppressHydrationWarning
+      >
         {/* Brand Header */}
         <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-3.5">
           <img
@@ -2846,34 +4932,44 @@ export function AdminDashboard({
                 {group.items.map((item) => {
                   const active = activeMenu === item.id
                   const badge = getMenuBadge(item.id)
+                  const workflowStep = SIDEBAR_WORKFLOW_STEPS[item.id]
                   return (
                     <button
-                      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition lg:w-full ${
+                      className={`relative flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition lg:w-full ${
+                        workflowStep && workflowStep < 5
+                          ? "lg:after:pointer-events-none lg:after:absolute lg:after:left-[18px] lg:after:top-1/2 lg:after:-bottom-5 lg:after:z-0 lg:after:w-px lg:after:bg-white/30 lg:after:content-['']"
+                          : ''
+                      } ${
                         active
                           ? 'bg-[#0842a0] font-semibold text-white shadow-2xs ring-1 ring-white/20'
                           : 'text-blue-100/80 hover:bg-white/10 hover:text-white'
                       }`}
                       key={item.id}
                       onClick={() => setActiveMenu(item.id)}
+                      suppressHydrationWarning
                       type="button"
                     >
-                      <span className="flex items-center gap-2.5 truncate">
-                        <MenuIcon id={item.id} />
-                        <span className="truncate">{item.label}</span>
+                      <span className="flex min-w-0 items-center gap-2.5 truncate">
+                        {workflowStep ? (
+                          <span
+                            className={`relative z-10 flex size-4 shrink-0 items-center justify-center rounded-full border text-[9px] font-bold leading-none ${active ? 'border-white bg-white text-[#0b57d0]' : 'border-white/40 bg-[#0b57d0] text-blue-100'}`}
+                          >
+                            {workflowStep}
+                          </span>
+                        ) : (
+                          <MenuIcon id={item.id} />
+                        )}
+                        <span className="relative z-10 truncate">{item.label}</span>
                       </span>
                       {badge !== null && badge > 0 && (
                         <span
                           className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
                             active
                               ? 'bg-white text-[#0b57d0]'
-                              : item.id === 'installments' && metrics.openReliefCount > 0
+                              : item.id === 'activeInstallments' &&
+                                  activeInstallmentMetrics.overdue > 0
                                 ? 'bg-amber-400 text-slate-950'
-                                : item.id === 'relief' && metrics.openReliefCount > 0
-                                  ? 'bg-amber-400 text-slate-950'
-                                  : item.id === 'activeInstallments' &&
-                                      activeInstallmentMetrics.overdue > 0
-                                    ? 'bg-amber-400 text-slate-950'
-                                    : 'bg-white/10 text-blue-200'
+                                : 'bg-white/10 text-blue-200'
                           }`}
                         >
                           {badge}
@@ -2899,6 +4995,7 @@ export function AdminDashboard({
             <button
               className="rounded-md border border-white/15 bg-white/5 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/10"
               onClick={() => router.refresh()}
+              suppressHydrationWarning
               type="button"
             >
               Segarkan
@@ -2906,6 +5003,7 @@ export function AdminDashboard({
             <button
               className="rounded-md border border-rose-400/30 bg-rose-500/20 py-1.5 text-[11px] font-semibold text-rose-100 transition hover:bg-rose-500/30"
               onClick={logout}
+              suppressHydrationWarning
               type="button"
             >
               Keluar
@@ -2915,47 +5013,384 @@ export function AdminDashboard({
       </aside>
 
       {/* INDEPENDENTLY SCROLLABLE MAIN CONTENT */}
-      <div className="flex min-w-0 flex-1 flex-col lg:h-dvh lg:overflow-y-auto">
-        {/* Sticky Minimalist Header */}
-        <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-6 py-3.5 backdrop-blur">
-          <div>
-            <h1 className="text-base font-bold text-slate-900">{activeMenuInfo.label}</h1>
-            <p className="text-xs text-slate-500">{activeMenuInfo.subtitle}</p>
-          </div>
-
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Sticky Minimalist & Aesthetic Header */}
+        <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 px-6 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md">
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              aria-label="Cari pengajuan atau siswa"
-              className="w-52 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-900 focus:border-[#0b57d0] focus:bg-white focus:outline-none"
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari ID, nama, WA, LPK…"
-              value={searchQuery}
-            />
-            <select
-              aria-label="Filter produk"
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700"
-              onChange={(e) =>
-                setProductFilter(e.target.value as 'ALL' | 'FULL_COVER' | 'DEPARTURE_BRIDGING')
-              }
-              value={productFilter}
+            {/* Search with Icon & Clear Button — Full Width */}
+            <div className="relative flex-1 min-w-[180px]">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <svg
+                  aria-hidden="true"
+                  className="size-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.35-4.35" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <input
+                aria-label="Cari pengajuan atau siswa"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-8.5 pr-7 text-[11px] font-medium text-slate-900 placeholder:text-[11px] placeholder:font-medium placeholder:text-slate-400 transition hover:bg-white focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15"
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari ID, nama, WA, LPK…"
+                style={{ fontSize: '11px', fontWeight: 500 }}
+                suppressHydrationWarning
+                value={searchQuery}
+              />
+              {searchQuery && (
+                <button
+                  aria-label="Hapus pencarian"
+                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 transition hover:text-slate-600"
+                  onClick={() => setSearchQuery('')}
+                  type="button"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="size-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Filter Negara Tujuan (Custom Dropdown with Visual SVG Flags) */}
+            <div className="relative shrink-0" ref={destinationDropdownRef}>
+              <button
+                aria-expanded={isDestinationDropdownOpen}
+                aria-haspopup="listbox"
+                aria-label="Filter negara tujuan"
+                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
+                  destinationFilter !== 'ALL'
+                    ? 'border-[#0b57d0] bg-blue-50/60 !text-[#0b57d0] ring-1 ring-[#0b57d0]/20'
+                    : 'border-slate-200 bg-slate-50/70 hover:bg-white focus:border-[#0b57d0]'
+                }`}
+                onClick={() => setIsDestinationDropdownOpen((prev) => !prev)}
+                suppressHydrationWarning
+                style={{ fontSize: '11px', fontWeight: 500 }}
+                type="button"
+              >
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  {destinationFilter === 'ALL' && (
+                    <>
+                      <span className="text-[11px]">🌏</span>
+                      <span className="whitespace-nowrap">Semua Negara</span>
+                    </>
+                  )}
+                  {destinationFilter === 'JAPAN' && (
+                    <>
+                      <DestinationFlag destination="JAPAN" />
+                      <span className="whitespace-nowrap">Jepang</span>
+                    </>
+                  )}
+                  {destinationFilter === 'TURKEY' && (
+                    <>
+                      <DestinationFlag destination="TURKEY" />
+                      <span className="whitespace-nowrap">Turki</span>
+                    </>
+                  )}
+                </span>
+                <svg
+                  aria-hidden="true"
+                  className={`size-3 text-slate-400 transition-transform duration-200 ${
+                    isDestinationDropdownOpen ? 'rotate-180 text-[#0b57d0]' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {isDestinationDropdownOpen && (
+                <div className="absolute left-0 top-full z-30 mt-1.5 w-max min-w-[160px] overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-lg ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      destinationFilter === 'ALL'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setDestinationFilter('ALL')
+                      setIsDestinationDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <span className="text-[11px]">🌏</span>
+                      <span className="whitespace-nowrap">Semua Negara</span>
+                    </div>
+                    {destinationFilter === 'ALL' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      destinationFilter === 'JAPAN'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setDestinationFilter('JAPAN')
+                      setIsDestinationDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <DestinationFlag destination="JAPAN" />
+                      <span className="whitespace-nowrap">Jepang</span>
+                    </div>
+                    {destinationFilter === 'JAPAN' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      destinationFilter === 'TURKEY'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setDestinationFilter('TURKEY')
+                      setIsDestinationDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <DestinationFlag destination="TURKEY" />
+                      <span className="whitespace-nowrap">Turki</span>
+                    </div>
+                    {destinationFilter === 'TURKEY' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Filter Produk (Custom Dropdown) */}
+            <div className="relative shrink-0" ref={productDropdownRef}>
+              <button
+                aria-expanded={isProductDropdownOpen}
+                aria-haspopup="listbox"
+                aria-label="Filter produk"
+                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
+                  productFilter !== 'ALL'
+                    ? 'border-[#0b57d0] bg-blue-50/60 !text-[#0b57d0] ring-1 ring-[#0b57d0]/20'
+                    : 'border-slate-200 bg-slate-50/70 hover:bg-white focus:border-[#0b57d0]'
+                }`}
+                onClick={() => setIsProductDropdownOpen((prev) => !prev)}
+                suppressHydrationWarning
+                style={{ fontSize: '11px', fontWeight: 500 }}
+                type="button"
+              >
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  {productFilter === 'ALL' && <span>Semua Produk</span>}
+                  {productFilter === 'DEPARTURE_BRIDGING' && <span>Dana Keberangkatan</span>}
+                  {productFilter === 'FULL_COVER' && <span>Full Cover</span>}
+                </span>
+                <svg
+                  aria-hidden="true"
+                  className={`size-3 text-slate-400 transition-transform duration-200 ${
+                    isProductDropdownOpen ? 'rotate-180 text-[#0b57d0]' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {isProductDropdownOpen && (
+                <div className="absolute left-0 top-full z-30 mt-1.5 w-max min-w-[170px] overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-lg ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      productFilter === 'ALL'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setProductFilter('ALL')
+                      setIsProductDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <span className="whitespace-nowrap">Semua Produk</span>
+                    {productFilter === 'ALL' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      productFilter === 'DEPARTURE_BRIDGING'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setProductFilter('DEPARTURE_BRIDGING')
+                      setIsProductDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <span className="whitespace-nowrap">Dana Keberangkatan</span>
+                    {productFilter === 'DEPARTURE_BRIDGING' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      productFilter === 'FULL_COVER'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setProductFilter('FULL_COVER')
+                      setIsProductDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <span className="whitespace-nowrap">Full Cover</span>
+                    {productFilter === 'FULL_COVER' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Filter Status (Custom Dropdown) */}
+            <div className="relative shrink-0" ref={statusDropdownRef}>
+              <button
+                aria-expanded={isStatusDropdownOpen}
+                aria-haspopup="listbox"
+                aria-label="Filter status"
+                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
+                  statusFilter !== 'ALL'
+                    ? 'border-[#0b57d0] bg-blue-50/60 !text-[#0b57d0] ring-1 ring-[#0b57d0]/20'
+                    : 'border-slate-200 bg-slate-50/70 hover:bg-white focus:border-[#0b57d0]'
+                }`}
+                onClick={() => setIsStatusDropdownOpen((prev) => !prev)}
+                suppressHydrationWarning
+                style={{ fontSize: '11px', fontWeight: 500 }}
+                type="button"
+              >
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  {statusFilter === 'ALL'
+                    ? 'Semua Status'
+                    : (STATUS_LABELS[statusFilter as (typeof APPLICATION_STATUSES)[number]] ??
+                      statusFilter)}
+                </span>
+                <svg
+                  aria-hidden="true"
+                  className={`size-3 text-slate-400 transition-transform duration-200 ${
+                    isStatusDropdownOpen ? 'rotate-180 text-[#0b57d0]' : ''
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M19 9l-7 7-7-7" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {isStatusDropdownOpen && (
+                <div className="absolute left-0 top-full z-30 mt-1.5 max-h-72 w-max min-w-[200px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg ring-1 ring-black/5 animate-in fade-in-0 zoom-in-95">
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      statusFilter === 'ALL'
+                        ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setStatusFilter('ALL')
+                      setIsStatusDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <span className="whitespace-nowrap">Semua Status</span>
+                    {statusFilter === 'ALL' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+
+                  {APPLICATION_STATUSES.map((status) => (
+                    <button
+                      className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                        statusFilter === status
+                          ? 'bg-blue-50 font-semibold text-[#0b57d0]'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                      key={status}
+                      onClick={() => {
+                        setStatusFilter(status)
+                        setIsStatusDropdownOpen(false)
+                      }}
+                      style={{ fontSize: '11px', fontWeight: 500 }}
+                      type="button"
+                    >
+                      <span className="whitespace-nowrap">{STATUS_LABELS[status]}</span>
+                      {statusFilter === status && (
+                        <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Reset Filter Button — always visible */}
+            <button
+              aria-label="Reset semua filter"
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-medium transition ${
+                hasActiveFilter
+                  ? 'border-slate-200 bg-white text-slate-600 shadow-2xs hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-95'
+                  : 'border-slate-100 bg-slate-50/50 text-slate-300 cursor-default'
+              }`}
+              disabled={!hasActiveFilter}
+              onClick={resetAllFilters}
+              style={{ fontSize: '11px', fontWeight: 500 }}
+              type="button"
             >
-              <option value="ALL">Semua Produk</option>
-              <option value="DEPARTURE_BRIDGING">Dana Keberangkatan</option>
-              <option value="FULL_COVER">Full Cover</option>
-            </select>
-            <select
-              aria-label="Filter status"
-              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700"
-              onChange={(e) => setStatusFilter(e.target.value)}
-              value={statusFilter}
-            >
-              <option value="ALL">Semua Status</option>
-              {APPLICATION_STATUSES.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
+              <svg
+                aria-hidden="true"
+                className={`size-3 ${hasActiveFilter ? 'text-slate-500' : 'text-slate-300'}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Reset</span>
+            </button>
           </div>
         </header>
 
@@ -2987,47 +5422,388 @@ export function AdminDashboard({
           {/* 1. MENU: DASHBOARD */}
           {activeMenu === 'dashboard' && (
             <div className="space-y-5">
-              {/* 4 KPI Cards */}
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Total Pengajuan</span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-slate-900">
-                    {metrics.total}
-                  </strong>
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    Seluruh produk pembiayaan
-                  </span>
+              <section className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/50 to-emerald-50/30 p-5 shadow-xs sm:p-6">
+                <div className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full bg-blue-100/50 blur-3xl" />
+                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0b57d0]">
+                      Pusat kendali operasional
+                    </p>
+                    <h2 className="mt-1 text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+                      Ringkasan VentureGo
+                    </h2>
+                    <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-600">
+                      Pantau alur pengajuan, portofolio, pembayaran, dan tindak lanjut siswa dari
+                      satu halaman.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-white/80 px-3 py-2 text-[10px] leading-relaxed text-slate-500 shadow-2xs">
+                    Memuat hingga 500 pengajuan dan 500 pembayaran terbaru. Grafik pembayaran
+                    bulanan hanya memasukkan transaksi PAID yang memiliki tanggal pembayaran.
+                  </div>
                 </div>
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Menunggu Verifikasi</span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-[#0b57d0]">
-                    {metrics.pendingReview}
-                  </strong>
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    Kelayakan, berkas, & biaya
-                  </span>
-                </div>
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Nilai Akad Disepakati</span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-emerald-700">
-                    {formatRupiah(metrics.agreedTotalVolume)}
-                  </strong>
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    {metrics.activeCount} program aktif / selesai
-                  </span>
-                </div>
+              </section>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
                   <span className="text-xs font-medium text-slate-500">
-                    Pembayaran Masuk (Xendit)
+                    Pengajuan dalam cakupan
                   </span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-slate-900">
-                    {formatRupiah(metrics.totalPaidVolume)}
+                  <strong className="mt-1 block text-2xl font-extrabold text-slate-900">
+                    {dashboardAnalytics.applicationCount}
                   </strong>
-                  <span className="mt-1 block text-[11px] text-amber-700">
-                    {metrics.openReliefCount} permohonan keringanan terbuka
+                  <span className="mt-1 block text-[11px] text-slate-400">
+                    Mengikuti filter global aktif
                   </span>
                 </div>
+                <button
+                  className="rounded-xl border border-blue-100 bg-white p-4 text-left shadow-2xs transition hover:border-blue-300 hover:bg-blue-50/40"
+                  onClick={() => setActiveMenu('applications')}
+                  type="button"
+                >
+                  <span className="text-xs font-medium text-slate-500">Perlu tinjauan</span>
+                  <strong className="mt-1 block text-2xl font-extrabold text-[#0b57d0]">
+                    {dashboardAnalytics.pendingReviewCount}
+                  </strong>
+                  <span className="mt-1 block text-[11px] text-[#0b57d0]">
+                    Buka daftar pengajuan →
+                  </span>
+                </button>
+                <button
+                  className="rounded-xl border border-emerald-100 bg-white p-4 text-left shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-50/40"
+                  onClick={() => setActiveMenu('activeInstallments')}
+                  type="button"
+                >
+                  <span className="text-xs font-medium text-slate-500">
+                    Siswa dengan angsuran aktif
+                  </span>
+                  <strong className="mt-1 block text-2xl font-extrabold text-emerald-700">
+                    {activeInstallmentMetrics.count}
+                  </strong>
+                  <span className="mt-1 block text-[11px] text-emerald-700">
+                    Sisa kewajiban {formatRupiah(activeInstallmentMetrics.totalRemaining)}
+                  </span>
+                </button>
+                <button
+                  className="rounded-xl border border-red-100 bg-white p-4 text-left shadow-2xs transition hover:border-red-300 hover:bg-red-50/40"
+                  onClick={() => {
+                    setActiveInstallmentFilter('OVERDUE')
+                    setActiveMenu('activeInstallments')
+                  }}
+                  type="button"
+                >
+                  <span className="text-xs font-medium text-slate-500">Siswa menunggak</span>
+                  <strong className="mt-1 block text-2xl font-extrabold text-red-700">
+                    {activeInstallmentMetrics.overdue}
+                  </strong>
+                  <span className="mt-1 block text-[11px] text-red-700">
+                    Buka daftar keterlambatan →
+                  </span>
+                </button>
+                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <span className="text-xs font-medium text-slate-500">Nilai akad disepakati</span>
+                  <strong className="mt-1 block text-xl font-extrabold text-slate-900">
+                    {formatRupiah(dashboardAnalytics.agreedObligation)}
+                  </strong>
+                  <span className="mt-1 block text-[11px] text-slate-400">
+                    Bukan nilai pencairan atau saldo kas
+                  </span>
+                </div>
+                <button
+                  className="rounded-xl border border-amber-100 bg-white p-4 text-left shadow-2xs transition hover:border-amber-300 hover:bg-amber-50/40"
+                  onClick={() => setActiveMenu('alumni')}
+                  type="button"
+                >
+                  <span className="text-xs font-medium text-slate-500">
+                    Pembayaran tercatat · Alumnus
+                  </span>
+                  <strong className="mt-1 block text-lg font-extrabold text-slate-900">
+                    {formatRupiah(dashboardAnalytics.paidVolume)}
+                  </strong>
+                  <span className="mt-1 block text-[11px] text-amber-700">
+                    {dashboardAnalytics.alumniCount} alumnus · {dashboardAnalytics.openReliefCount}{' '}
+                    keringanan terbuka
+                  </span>
+                </button>
               </div>
+
+              <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs sm:p-5">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Tren bulanan
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Pengajuan baru dan realisasi transaksi PAID
+                    </p>
+                  </div>
+                  <div
+                    aria-label="Rentang grafik"
+                    className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+                    role="group"
+                  >
+                    {[6, 12].map((range) => (
+                      <button
+                        aria-pressed={dashboardRange === range}
+                        className={`rounded-md px-3 py-1.5 text-[11px] font-semibold ${dashboardRange === range ? 'bg-white text-[#0b57d0] shadow-2xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        key={range}
+                        onClick={() => setDashboardRange(range as 6 | 12)}
+                        type="button"
+                      >
+                        {range} bulan
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="min-w-0 rounded-lg bg-slate-50/70 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-700">Pengajuan masuk</span>
+                      <span className="size-2 rounded-full bg-[#0b57d0]" />
+                    </div>
+                    <DashboardBarChart
+                      data={dashboardAnalytics.submissions}
+                      formatValue={(value) => `${value} pengajuan`}
+                    />
+                  </div>
+                  <div className="min-w-0 rounded-lg bg-slate-50/70 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-700">
+                        Pembayaran diterima
+                      </span>
+                      <span className="size-2 rounded-full bg-emerald-500" />
+                    </div>
+                    <DashboardBarChart
+                      color="fill-emerald-500"
+                      data={dashboardAnalytics.collections}
+                      formatValue={formatRupiah}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs sm:p-5">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Peta status pengajuan
+                      </h3>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Posisi terkini, bukan konversi historis
+                      </p>
+                    </div>
+                    <button
+                      className="text-[11px] font-semibold text-[#0b57d0] hover:underline"
+                      onClick={() => setActiveMenu('applications')}
+                      type="button"
+                    >
+                      Buka daftar →
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {dashboardAnalytics.statusGroups.map((group) => (
+                      <DashboardMeter
+                        color={
+                          group.label === 'Ditolak / dibatalkan'
+                            ? 'bg-rose-400'
+                            : group.label === 'Selesai'
+                              ? 'bg-emerald-500'
+                              : 'bg-[var(--primary)]'
+                        }
+                        detail={`${group.count} pengajuan`}
+                        key={group.label}
+                        label={group.label}
+                        total={Math.max(
+                          ...dashboardAnalytics.statusGroups.map((item) => item.count),
+                          1,
+                        )}
+                        value={group.count}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs sm:p-5">
+                  <div className="mb-4">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Komposisi portofolio
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Jumlah pengajuan berdasarkan produk dan tujuan
+                    </p>
+                  </div>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Produk
+                      </p>
+                      <DashboardMeter
+                        color="bg-blue-600"
+                        detail={`${dashboardAnalytics.departureCount} siswa`}
+                        label="Dana Keberangkatan"
+                        total={dashboardAnalytics.applicationCount}
+                        value={dashboardAnalytics.departureCount}
+                      />
+                      <DashboardMeter
+                        color="bg-emerald-500"
+                        detail={`${dashboardAnalytics.fullCoverCount} siswa`}
+                        label="Full Cover"
+                        total={dashboardAnalytics.applicationCount}
+                        value={dashboardAnalytics.fullCoverCount}
+                      />
+                    </div>
+                    <div className="space-y-4">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Negara tujuan
+                      </p>
+                      <DashboardMeter
+                        color="bg-rose-500"
+                        detail={`${dashboardAnalytics.japanCount} siswa`}
+                        label="🇯🇵 Jepang"
+                        total={dashboardAnalytics.applicationCount}
+                        value={dashboardAnalytics.japanCount}
+                      />
+                      <DashboardMeter
+                        color="bg-amber-500"
+                        detail={`${dashboardAnalytics.turkeyCount} siswa`}
+                        label="🇹🇷 Turki"
+                        total={dashboardAnalytics.applicationCount}
+                        value={dashboardAnalytics.turkeyCount}
+                      />
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                <section className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs sm:p-5">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        LPK dengan pengajuan terbanyak
+                      </h3>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Lima mitra teratas dalam cakupan data
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-slate-400">{lpkStats.length} LPK</span>
+                  </div>
+                  <div className="space-y-4">
+                    {lpkStats.slice(0, 5).map((row) => (
+                      <DashboardMeter
+                        detail={`${row.count} pengajuan`}
+                        key={row.lpkName}
+                        label={row.lpkName}
+                        total={Math.max(...lpkStats.map((item) => item.count), 1)}
+                        value={row.count}
+                      />
+                    ))}
+                    {lpkStats.length === 0 && (
+                      <p className="py-5 text-center text-xs text-slate-400">Belum ada data LPK.</p>
+                    )}
+                  </div>
+                </section>
+                <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+                  <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Rekapitulasi per LPK Mitra
+                    </h3>
+                  </div>
+                  <div className="max-h-72 overflow-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead className="sticky top-0 bg-slate-50/95 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2.5">Nama LPK</th>
+                          <th className="px-3 py-2.5">Pengajuan</th>
+                          <th className="px-3 py-2.5">Aktif / Selesai</th>
+                          <th className="whitespace-nowrap px-3 py-2.5 text-right">
+                            Kewajiban tercatat
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {lpkStats.map((row) => (
+                          <tr className="hover:bg-slate-50" key={row.lpkName}>
+                            <td
+                              className="max-w-40 truncate px-3 py-2.5 font-semibold text-slate-900"
+                              title={row.lpkName}
+                            >
+                              {row.lpkName}
+                            </td>
+                            <td className="px-3 py-2.5 text-slate-700">{row.count}</td>
+                            <td className="px-3 py-2.5 text-emerald-700">{row.active}</td>
+                            <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold text-slate-900">
+                              {formatRupiah(row.totalObligation)}
+                            </td>
+                          </tr>
+                        ))}
+                        {lpkStats.length === 0 && (
+                          <tr>
+                            <td className="px-3 py-6 text-center text-slate-400" colSpan={4}>
+                              Belum ada data rekap LPK.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+
+              <section className="rounded-xl border border-amber-200/70 bg-gradient-to-r from-white to-amber-50/50 p-4 shadow-2xs sm:p-5">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                      Perlu perhatian
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Pintasan ke antrean operasional yang memerlukan tindak lanjut
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Mengikuti filter global aktif</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <button
+                    className="flex items-center justify-between rounded-lg border border-red-100 bg-white px-3 py-3 text-left hover:bg-red-50/50"
+                    onClick={() => {
+                      setActiveInstallmentFilter('OVERDUE')
+                      setActiveMenu('activeInstallments')
+                    }}
+                    type="button"
+                  >
+                    <span className="text-xs font-medium text-slate-700">Terlambat</span>
+                    <strong className="text-sm text-red-700">
+                      {activeInstallmentMetrics.overdue}
+                    </strong>
+                  </button>
+                  <button
+                    className="flex items-center justify-between rounded-lg border border-amber-100 bg-white px-3 py-3 text-left hover:bg-amber-50/50"
+                    onClick={() => {
+                      setActiveInstallmentFilter('DUE_SOON')
+                      setActiveMenu('activeInstallments')
+                    }}
+                    type="button"
+                  >
+                    <span className="text-xs font-medium text-slate-700">Jatuh tempo ≤ 7 hari</span>
+                    <strong className="text-sm text-amber-700">
+                      {activeInstallmentMetrics.dueSoon}
+                    </strong>
+                  </button>
+                  <button
+                    className="flex items-center justify-between rounded-lg border border-blue-100 bg-white px-3 py-3 text-left hover:bg-blue-50/50"
+                    onClick={() => setActiveMenu('activeInstallments')}
+                    type="button"
+                  >
+                    <span className="text-xs font-medium text-slate-700">
+                      Permohonan keringanan
+                    </span>
+                    <strong className="text-sm text-[#0b57d0]">
+                      {activeInstallmentMetrics.openRelief}
+                    </strong>
+                  </button>
+                </div>
+              </section>
 
               {/* Quick Table: Recent Applications */}
               <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
@@ -3038,6 +5814,7 @@ export function AdminDashboard({
                   <button
                     className="text-xs font-semibold text-[#0b57d0] hover:underline"
                     onClick={() => setActiveMenu('applications')}
+                    suppressHydrationWarning
                     type="button"
                   >
                     Lihat Semua Pengajuan →
@@ -3062,8 +5839,11 @@ export function AdminDashboard({
                         const uploaded = app.documents.filter((d) => Boolean(d.fileId)).length
                         return (
                           <tr className="hover:bg-slate-50/80" key={app.id}>
-                            <td className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]">
-                              {app.applicationId}
+                            <td
+                              className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]"
+                              title={app.applicationId}
+                            >
+                              {formatDisplayApplicationId(app.applicationId)}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-slate-500">
                               {formatDateShort(app.createdAt)}
@@ -3108,130 +5888,431 @@ export function AdminDashboard({
             </div>
           )}
 
-          {/* 2. MENU: PENGAJUAN (Multi-column 1-row Table) */}
+          {/* 2. MENU: PENGAJUAN (Executive View) */}
           {activeMenu === 'applications' && (
-            <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
-                      <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
-                      <th className="whitespace-nowrap px-4 py-3">Tgl Masuk</th>
-                      <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
-                      <th className="whitespace-nowrap px-4 py-3">LPK Mitra</th>
-                      <th className="whitespace-nowrap px-4 py-3">Tujuan</th>
-                      <th className="whitespace-nowrap px-4 py-3">Produk</th>
-                      <th className="whitespace-nowrap px-4 py-3">Berkas</th>
-                      <th className="whitespace-nowrap px-4 py-3">Status Biaya</th>
-                      <th className="whitespace-nowrap px-4 py-3">Status Pengajuan</th>
-                      <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredApplications.length === 0 ? (
-                      <tr>
-                        <td className="px-4 py-8 text-center text-slate-400" colSpan={10}>
-                          Tidak ada data pengajuan yang sesuai filter.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredApplications.map((app) => {
-                        const uploaded = app.documents.filter((d) => Boolean(d.fileId)).length
-                        const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
-                        const isLegacyApplication = Boolean(app.legacy)
-                        return (
-                          <tr className="hover:bg-slate-50/80" key={app.id}>
-                            <td className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]">
-                              {app.applicationId}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                              {formatDateShort(app.createdAt)}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                              {app.applicantName}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                              {app.lpkName}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                              {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                              {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                              {uploaded}/{app.documents.length}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                  PRICING_BADGE_STYLES[pricing] ?? 'bg-slate-100 text-slate-700'
-                                }`}
-                              >
-                                {PRICING_STATUS_LABELS[
-                                  pricing as keyof typeof PRICING_STATUS_LABELS
-                                ] ?? pricing}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3">
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
-                                  STATUS_BADGE_STYLES[app.status] ??
-                                  'bg-slate-100 text-slate-700 ring-slate-200'
-                                }`}
-                              >
-                                {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ??
-                                  app.status}
-                              </span>
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-right">
-                              <div className="inline-flex items-center justify-end gap-2">
-                                <button
-                                  aria-label={`Tolak dan hapus pengajuan ${app.applicationId}`}
-                                  className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 shadow-xs transition hover:border-red-300 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                  disabled={pending || isLegacyApplication}
-                                  onClick={() => {
-                                    setDeleteApplicationError('')
-                                    setApplicationToDelete(app)
-                                  }}
-                                  title={
-                                    isLegacyApplication
-                                      ? 'Data kontrak legacy dilindungi'
-                                      : `Tolak dan hapus ${app.applicationId}`
-                                  }
-                                  type="button"
-                                >
-                                  <svg
-                                    aria-hidden="true"
-                                    className="size-4"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={1.8}
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path d="M3 6h18M8 6V4h8v2m3 0-.9 14H5.9L5 6m4 4v6m6-6v6" />
-                                  </svg>
-                                </button>
-                                <DrawerAction
-                                  ariaLabel={`Kelola pengajuan ${app.applicationId}`}
-                                  label="Kelola"
-                                  onClick={() => openApplicationDrawer(app.id, 'profile')}
-                                />
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    )}
-                  </tbody>
-                </table>
+            <div className="space-y-5">
+              {/* Executive Hero Banner for Applications */}
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white via-blue-50/25 to-slate-50 p-6 shadow-xs">
+                <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-blue-100/40 blur-3xl" />
+                <div className="pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full bg-indigo-50/50 blur-2xl" />
+
+                <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0b57d0] to-[#4285f4] text-white shadow-md shadow-blue-500/25 ring-4 ring-blue-50">
+                      <svg
+                        aria-hidden="true"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h2 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+                          Pengajuan Pembiayaan
+                        </h2>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200/70">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Live Sync
+                        </span>
+                      </div>
+                      <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+                        Sentral verifikasi berkas, persetujuan nominal wakalah mutlak staf admin,
+                        dan monitoring status penerbitan dokumen akad resmi bagi siswa LPK.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 3 Metric Cards Ringkas & Elegan */}
+                  <div className="grid grid-cols-3 gap-3 shrink-0">
+                    <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-slate-500">Total Masuk</p>
+                      <p className="mt-1 text-lg font-extrabold text-slate-900">
+                        {metrics.pendingApprovalCount}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">Perlu persetujuan</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-[#0b57d0]">Perlu Tinjauan</p>
+                      <p className="mt-1 text-lg font-extrabold text-[#0b57d0]">
+                        {metrics.pendingReview}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-blue-600/80">Berkas & Biaya</p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-emerald-800">Akad Berjalan</p>
+                      <p className="mt-1 text-lg font-extrabold text-emerald-700">
+                        {metrics.activeCount}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-emerald-600/80">Aktif & Selesai</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </section>
+
+              {/* Multi-column Table */}
+              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
+                        <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
+                        <th className="whitespace-nowrap px-4 py-3">Tgl Masuk</th>
+                        <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
+                        <th className="whitespace-nowrap px-4 py-3">LPK Mitra</th>
+                        <th className="whitespace-nowrap px-4 py-3">Tujuan</th>
+                        <th className="whitespace-nowrap px-4 py-3">Produk</th>
+                        <th className="whitespace-nowrap px-4 py-3">Berkas</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {pendingApprovalApplications.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-8 text-center text-slate-400" colSpan={8}>
+                            Tidak ada data pengajuan yang belum disetujui.
+                          </td>
+                        </tr>
+                      ) : (
+                        pendingApprovalApplications.map((app) => {
+                          const uploaded = app.documents.filter((d) => Boolean(d.fileId)).length
+                          const isLegacyApplication = Boolean(app.legacy)
+                          return (
+                            <tr className="hover:bg-slate-50/80" key={app.id}>
+                              <td
+                                className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]"
+                                title={app.applicationId}
+                              >
+                                {formatDisplayApplicationId(app.applicationId)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                                {formatDateShort(app.createdAt)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                {app.applicantName}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                                {app.lpkName}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {uploaded}/{app.documents.length}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right">
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  <button
+                                    aria-label={`Tolak dan hapus pengajuan ${app.applicationId}`}
+                                    className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 shadow-xs transition hover:border-red-300 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                    disabled={pending || isLegacyApplication}
+                                    onClick={() => {
+                                      setDeleteApplicationError('')
+                                      setApplicationToDelete(app)
+                                    }}
+                                    title={
+                                      isLegacyApplication
+                                        ? 'Data kontrak legacy dilindungi'
+                                        : `Tolak dan hapus ${app.applicationId}`
+                                    }
+                                    type="button"
+                                  >
+                                    <svg
+                                      aria-hidden="true"
+                                      className="size-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={1.8}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path d="M3 6h18M8 6V4h8v2m3 0-.9 14H5.9L5 6m4 4v6m6-6v6" />
+                                    </svg>
+                                  </button>
+                                  <DrawerAction
+                                    ariaLabel={`Kelola pengajuan ${app.applicationId}`}
+                                    label="Kelola"
+                                    onClick={() => openApplicationDrawer(app.id, 'profile')}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
           )}
 
-          {/* 3. MENU: DATA SISWA (Student Directory & Document Readiness Table) */}
+          {/* MENU: PENGARSIPAN (Akad Documents, Signed PDF Vault & Photo Documentation) */}
+          {activeMenu === 'archiving' && (
+            <div className="space-y-5">
+              {/* Executive Hero Banner for Archiving */}
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white via-indigo-50/20 to-slate-50 p-6 shadow-xs">
+                <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-blue-100/30 blur-3xl" />
+                <div className="pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full bg-indigo-100/40 blur-2xl" />
+
+                <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0b57d0] to-[#6366f1] text-white shadow-md shadow-indigo-500/25 ring-4 ring-indigo-50">
+                      <svg
+                        aria-hidden="true"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h2 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+                          Pengarsipan Berkas & Dokumentasi Akad
+                        </h2>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200/70">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Live Sync
+                        </span>
+                      </div>
+                      <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+                        Pusat monitoring dan pengarsipan naskah dokumen akad resmi (.docx), salinan
+                        scan PDF bertandatangan basah, serta foto-foto dokumentasi penandatanganan
+                        akad siswa LPK di Google Drive.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 3 Metric Cards Ringkas & Elegan */}
+                  <div className="grid grid-cols-3 gap-3 shrink-0">
+                    <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-slate-500">Total Arsip</p>
+                      <p className="mt-1 text-lg font-extrabold text-slate-900">
+                        {archivingApplications.length}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">Proses / selesai akad</p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-emerald-800">PDF Basah</p>
+                      <p className="mt-1 text-lg font-extrabold text-emerald-700">
+                        {archivingApplications.filter((a) => Boolean(a.agreementPdf)).length}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-emerald-600/80">
+                        Scan naskah bertanda tangan
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-indigo-800">Foto Akad</p>
+                      <p className="mt-1 text-lg font-extrabold text-indigo-700">
+                        {
+                          archivingApplications.filter(
+                            (a) => Array.isArray(a.akadPhotos) && a.akadPhotos.length > 0,
+                          ).length
+                        }
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-indigo-600/80">Dokumentasi tersimpan</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Multi-column Table */}
+              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
+                        <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
+                        <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
+                        <th className="whitespace-nowrap px-4 py-3">Naskah Akad (.docx)</th>
+                        <th className="whitespace-nowrap px-4 py-3">Salinan PDF Basah</th>
+                        <th className="whitespace-nowrap px-4 py-3">Foto Dokumentasi</th>
+                        <th className="whitespace-nowrap px-4 py-3">Kelengkapan</th>
+                        <th className="whitespace-nowrap px-4 py-3">Tanggal Penerbangan</th>
+                        <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {archivingApplications.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-8 text-center text-slate-400" colSpan={8}>
+                            Belum ada berkas pengarsipan akad. Pengajuan yang telah disetujui
+                            nominalnya akan tampil di sini untuk pengarsipan.
+                          </td>
+                        </tr>
+                      ) : (
+                        archivingApplications.map((app) => {
+                          const akadMeta = (app.financialPlan?.akadDocument ?? null) as {
+                            documentNumber?: string
+                            studentNumber?: string
+                            issuedAt?: string
+                          } | null
+                          const hasDocx = Boolean(akadMeta)
+                          const hasPdf = Boolean(app.agreementPdf)
+                          const photoCount = Array.isArray(app.akadPhotos)
+                            ? app.akadPhotos.length
+                            : 0
+                          const hasPhotos = photoCount > 0
+
+                          let completenessLabel = 'Menunggu'
+                          let completenessBadge = 'bg-slate-100 text-slate-600'
+                          if (hasDocx && hasPdf && hasPhotos) {
+                            completenessLabel = 'Lengkap'
+                            completenessBadge =
+                              'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                          } else if (hasDocx || hasPdf || hasPhotos) {
+                            completenessLabel = 'Sebagian'
+                            completenessBadge = 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                          }
+
+                          return (
+                            <tr className="hover:bg-slate-50/80" key={app.id}>
+                              <td
+                                className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]"
+                                title={app.applicationId}
+                              >
+                                {formatDisplayApplicationId(app.applicationId)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <p className="font-semibold text-slate-900">{app.applicantName}</p>
+                                <p className="text-[11px] text-slate-400">{app.lpkName}</p>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                {hasDocx ? (
+                                  <div className="space-y-0.5">
+                                    <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                      Terbit
+                                    </span>
+                                    <p
+                                      className="font-mono text-[11px] text-slate-700"
+                                      title={akadMeta?.documentNumber}
+                                    >
+                                      {akadMeta?.documentNumber}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                    Belum terbit
+                                  </span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                {hasPdf ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                                    <svg
+                                      className="size-3 text-emerald-600"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth={2.5}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M4.5 12.75l6 6 9-13.5"
+                                      />
+                                    </svg>
+                                    PDF Terunggah
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                    Belum ada
+                                  </span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                {hasPhotos ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700">
+                                    <svg
+                                      className="size-3 text-indigo-600"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
+                                      />
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
+                                      />
+                                    </svg>
+                                    {photoCount} Foto
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                    Belum ada
+                                  </span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${completenessBadge}`}
+                                >
+                                  {completenessLabel}
+                                </span>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                {app.departureDate ? (
+                                  <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+                                    <svg
+                                      aria-hidden="true"
+                                      className="size-3.5 text-[#0b57d0] shrink-0"
+                                      fill="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+                                    </svg>
+                                    <span>{formatDateShort(app.departureDate)}</span>
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-medium text-slate-500">
+                                    Belum dijadwalkan
+                                  </span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right">
+                                <DrawerAction
+                                  ariaLabel={`Kelola arsip ${app.applicationId}`}
+                                  label="Kelola Arsip"
+                                  onClick={() => openApplicationDrawer(app.id, 'contract')}
+                                  variant="primary"
+                                />
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          )}
           {activeMenu === 'students' && (
             <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
               <div className="overflow-x-auto">
@@ -3259,7 +6340,9 @@ export function AdminDashboard({
                         <tr className="hover:bg-slate-50/80" key={app.id}>
                           <td className="whitespace-nowrap px-4 py-3">
                             <p className="font-semibold text-slate-900">{app.applicantName}</p>
-                            <p className="text-[11px] text-slate-400">{app.applicationId}</p>
+                            <p className="text-[11px] text-slate-400" title={app.applicationId}>
+                              {formatDisplayApplicationId(app.applicationId)}
+                            </p>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
                             {app.phone}
@@ -3310,184 +6393,180 @@ export function AdminDashboard({
             </section>
           )}
 
-          {/* 4. MENU: DRAFT & AKAD (Financial Plan & Shariah Contract Table) */}
+          {/* 4. MENU: PERSIAPAN AKAD (Financial Plan & Shariah Contract Table) */}
           {activeMenu === 'contracts' && (
-            <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
-                      <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
-                      <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
-                      <th className="whitespace-nowrap px-4 py-3">Produk & Skema</th>
-                      <th className="whitespace-nowrap px-4 py-3">Pengajuan Awal</th>
-                      <th className="whitespace-nowrap px-4 py-3">Nafaqah + Ujrah</th>
-                      <th className="whitespace-nowrap px-4 py-3">Total Akad</th>
-                      <th className="whitespace-nowrap px-4 py-3">Status Biaya</th>
-                      <th className="whitespace-nowrap px-4 py-3">Persetujuan Siswa</th>
-                      <th className="whitespace-nowrap px-4 py-3">Referensi Akad</th>
-                      <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredApplications.map((app) => {
-                      const plan = app.financialPlan ?? {}
-                      const pricing = String(plan.pricingStatus ?? 'ESTIMATED')
-                      const nafaqah = Number(plan.nafaqahTotal) || 0
-                      const ujrah = Number(plan.ujrahTotal) || 0
-                      const requested = app.departureDetails?.requestedFinancingAmount
-                      const accepted = Boolean(app.userFinancingAcceptance?.acceptedAt)
-
-                      return (
-                        <tr className="hover:bg-slate-50/80" key={app.id}>
-                          <td className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]">
-                            {app.applicationId}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                            {app.applicantName}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                            {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                            {formatRupiah(requested)}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-700">
-                            {nafaqah + ujrah > 0 ? formatRupiah(nafaqah + ujrah) : '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-900">
-                            {formatRupiah(plan.totalObligation)}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                                PRICING_BADGE_STYLES[pricing] ?? 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {PRICING_STATUS_LABELS[
-                                pricing as keyof typeof PRICING_STATUS_LABELS
-                              ] ?? pricing}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                accepted
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-slate-100 text-slate-500'
-                              }`}
-                            >
-                              {accepted ? '✓ Disetujui' : 'Menunggu'}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                            {plan.finalAgreementReference
-                              ? String(plan.finalAgreementReference)
-                              : '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right">
-                            <DrawerAction
-                              ariaLabel={`Susun akad ${app.applicationId}`}
-                              label="Susun Akad"
-                              onClick={() => openApplicationDrawer(app.id, 'pricing')}
-                              variant="primary"
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
-
-          {/* 5. MENU: ANGSURAN & KAS (Installment Schedule & Xendit Table) */}
-          {activeMenu === 'installments' && (
             <div className="space-y-5">
-              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-                <div className="border-b border-slate-100 px-5 py-3.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Monitoring Angsuran Siswa
-                  </h2>
+              {/* Executive Hero Banner for Persiapan Akad */}
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white via-blue-50/25 to-slate-50 p-6 shadow-xs">
+                <div className="pointer-events-none absolute -right-12 -top-12 size-64 rounded-full bg-blue-100/40 blur-3xl" />
+                <div className="pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full bg-indigo-50/50 blur-2xl" />
+
+                <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0b57d0] to-[#4285f4] text-white shadow-md shadow-blue-500/25 ring-4 ring-blue-50">
+                      <svg
+                        aria-hidden="true"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <h2 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+                          Persiapan Akad
+                        </h2>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200/70">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Live Sync
+                        </span>
+                      </div>
+                      <p className="mt-1 max-w-xl text-xs leading-relaxed text-slate-500">
+                        Penyusunan rincian Nafaqah, Ujrah, simulasi pembiayaan syariah, verifikasi
+                        nominal wakalah mutlak admin, dan penguncian akad resmi.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 3 Metric Cards Ringkas & Elegan */}
+                  <div className="grid grid-cols-3 gap-3 shrink-0">
+                    <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-slate-500">Total Masuk</p>
+                      <p className="mt-1 text-lg font-extrabold text-slate-900">
+                        {metrics.contractPrepCount}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400">Siap proses akad</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-[#0b57d0]">Perlu Tinjauan</p>
+                      <p className="mt-1 text-lg font-extrabold text-[#0b57d0]">
+                        {metrics.pendingReview}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-blue-600/80">Biaya & Dokumen</p>
+                    </div>
+                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                      <p className="text-[11px] font-medium text-emerald-800">Akad Berjalan</p>
+                      <p className="mt-1 text-lg font-extrabold text-emerald-700">
+                        {metrics.activeCount}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-emerald-600/80">Aktif & Selesai</p>
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              {/* Multi-column Table */}
+              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
                         <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
                         <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
-                        <th className="whitespace-nowrap px-4 py-3">Total Kewajiban</th>
-                        <th className="whitespace-nowrap px-4 py-3">Tenor</th>
-                        <th className="whitespace-nowrap px-4 py-3">Progres Cicilan</th>
-                        <th className="whitespace-nowrap px-4 py-3">Total Terbayar</th>
-                        <th className="whitespace-nowrap px-4 py-3">Sisa Kewajiban</th>
-                        <th className="whitespace-nowrap px-4 py-3">Keringanan</th>
+                        <th className="whitespace-nowrap px-4 py-3">Produk & Skema</th>
+                        <th className="whitespace-nowrap px-4 py-3">Pengajuan Awal</th>
+                        <th className="whitespace-nowrap px-4 py-3">Nafaqah + Ujrah</th>
+                        <th className="whitespace-nowrap px-4 py-3">Total Akad</th>
+                        <th className="whitespace-nowrap px-4 py-3">Status Biaya</th>
                         <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filteredApplications.map((app) => {
-                        const schedule = readScheduleRows(app.financialPlan?.schedule)
-                        const paidSet = new Set(
-                          Array.isArray(app.paidInstallments) ? app.paidInstallments : [],
-                        )
-                        const paidCount = schedule.filter((r) => paidSet.has(r.installment)).length
-                        const paidAmount = schedule
-                          .filter((r) => paidSet.has(r.installment))
-                          .reduce((s, r) => s + r.amount, 0)
-                        const obligation =
-                          typeof app.financialPlan?.totalObligation === 'number'
-                            ? app.financialPlan.totalObligation
-                            : null
-                        const openRelief = (app.supportRequests ?? []).filter(
-                          (r) => r.status === 'OPEN',
-                        ).length
+                      {contractPrepApplications.length === 0 ? (
+                        <tr>
+                          <td className="px-4 py-8 text-center text-slate-400" colSpan={8}>
+                            Belum ada pengajuan dengan nominal disetujui. Setujui nominal pengajuan
+                            di menu Pengajuan agar masuk ke Persiapan Akad.
+                          </td>
+                        </tr>
+                      ) : (
+                        contractPrepApplications.map((app) => {
+                          const plan = app.financialPlan ?? {}
+                          const pricing = String(plan.pricingStatus ?? 'ESTIMATED')
+                          const nafaqah = Number(plan.nafaqahTotal) || 0
+                          const ujrah = Number(plan.ujrahTotal) || 0
+                          const requested = app.departureDetails?.requestedFinancingAmount
 
-                        return (
-                          <tr className="hover:bg-slate-50/80" key={app.id}>
-                            <td className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]">
-                              {app.applicationId}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                              {app.applicantName}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                              {formatRupiah(obligation)}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                              {schedule.length > 0 ? `${schedule.length} bln` : '—'}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-700">
-                              {schedule.length > 0 ? `${paidCount}/${schedule.length} lunas` : '—'}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-emerald-700">
-                              {paidAmount > 0 ? formatRupiah(paidAmount) : 'Rp0'}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                              {obligation !== null
-                                ? formatRupiah(Math.max(0, obligation - paidAmount))
-                                : '—'}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3">
-                              {openRelief > 0 ? (
-                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                                  {openRelief} menunggu
+                          return (
+                            <tr className="hover:bg-slate-50/80" key={app.id}>
+                              <td
+                                className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]"
+                                title={app.applicationId}
+                              >
+                                {formatDisplayApplicationId(app.applicationId)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
+                                {app.applicantName}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                                {formatRupiah(requested)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                                {nafaqah + ujrah > 0 ? formatRupiah(nafaqah + ujrah) : '—'}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-bold text-slate-900">
+                                {formatRupiah(plan.totalObligation)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <span
+                                  className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                                    PRICING_BADGE_STYLES[pricing] ?? 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {PRICING_STATUS_LABELS[
+                                    pricing as keyof typeof PRICING_STATUS_LABELS
+                                  ] ?? pricing}
                                 </span>
-                              ) : (
-                                <span className="text-slate-400">—</span>
-                              )}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-3 text-right">
-                              <DrawerAction
-                                ariaLabel={`Lihat rincian angsuran ${app.applicationId}`}
-                                label="Rincian"
-                                onClick={() => openScheduleDetail(app.id)}
-                              />
-                            </td>
-                          </tr>
-                        )
-                      })}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right">
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  <button
+                                    aria-label={`Kembalikan pengajuan ${app.applicationId} ke menu Pengajuan`}
+                                    className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 shadow-xs transition hover:border-red-300 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                    disabled={pending}
+                                    onClick={() => {
+                                      setRevertError('')
+                                      setRevertTarget(app)
+                                    }}
+                                    title="Kembalikan ke Pengajuan (Batalkan Persetujuan Nominal)"
+                                    type="button"
+                                  >
+                                    <svg
+                                      aria-hidden="true"
+                                      className="size-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={1.8}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path d="M3 6h18M8 6V4h8v2m3 0-.9 14H5.9L5 6m4 4v6m6-6v6" />
+                                    </svg>
+                                  </button>
+                                  <DrawerAction
+                                    ariaLabel={`Susun akad ${app.applicationId}`}
+                                    label="Susun Akad"
+                                    onClick={() => openApplicationDrawer(app.id, 'pricing')}
+                                    variant="primary"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -3495,36 +6574,449 @@ export function AdminDashboard({
             </div>
           )}
 
-          {/* 6. MENU: ANGSURAN AKTIF (Outstanding & Active Installments) */}
+          {activeMenu === 'alumni' && (
+            <div className="space-y-5">
+              <section className="relative overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-br from-white via-amber-50/20 to-emerald-50/20 p-6 shadow-xs">
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-emerald-600 text-white shadow-md">
+                      <svg
+                        aria-hidden="true"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="m2 10 10-5 10 5-10 5-10-5Z" strokeLinejoin="round" />
+                        <path
+                          d="M6 12v5c3.5 3 8.5 3 12 0v-5M22 10v6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h1 className="text-lg font-extrabold text-slate-900">
+                        Direktori Alumnus &amp; Pelunasan Tuntas
+                      </h1>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Daftar pembiayaan siswa yang telah diselesaikan 100% secara amanah, tuntas,
+                        dan tepat waktu.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-5 sm:gap-7">
+                    <div>
+                      <span className="block text-xl font-extrabold text-emerald-700">
+                        {formatRupiah(alumniMetrics.totalRecovered)}
+                      </span>
+                      <span className="text-[11px] text-slate-500">Total dana terpulihkan</span>
+                    </div>
+                    <div>
+                      <span className="block text-xl font-extrabold text-amber-700">
+                        {alumniMetrics.averageMonths}
+                        {typeof alumniMetrics.averageMonths === 'string' ? '' : ' bln'}
+                      </span>
+                      <span className="text-[11px] text-slate-500">
+                        Rata-rata waktu sampai lunas
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-xl font-extrabold text-emerald-700">
+                        {alumniMetrics.punctuality}%
+                      </span>
+                      <span className="text-[11px] text-slate-500">Tingkat tepat waktu</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
+                  <h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                    Daftar Alumnus ({visibleAlumni.length})
+                  </h2>
+                  <div className="flex flex-wrap gap-1">
+                    {(
+                      [
+                        ['ALL', 'Semua Alumnus'],
+                        ['ON_TIME', 'Lunas Tepat Waktu'],
+                        ['EARLY', 'Pelunasan Dipercepat'],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${alumniFilter === id ? 'bg-emerald-100 text-emerald-800' : 'text-slate-500 hover:bg-slate-100'}`}
+                        key={id}
+                        onClick={() => setAlumniFilter(id)}
+                        style={{ fontSize: '10px' }}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {visibleAlumni.length === 0 ? (
+                  <div className="px-4 py-12 text-center text-sm text-slate-500">
+                    Belum ada alumnus yang cocok dengan filter ini.
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-white text-[10px] uppercase tracking-wider text-slate-500">
+                          <tr>
+                            <th className="px-4 py-2">Alumnus</th>
+                            <th className="px-4 py-2">Program &amp; LPK</th>
+                            <th className="px-4 py-2">Negara &amp; Keberangkatan</th>
+                            <th className="px-4 py-2">Total Realisasi Lunas</th>
+                            <th className="px-4 py-2">Penyelesaian Angsuran</th>
+                            <th className="px-4 py-2">Rekam Jejak</th>
+                            <th className="px-4 py-2 text-right">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {visibleAlumni.map(
+                            ({
+                              app,
+                              summary,
+                              latestPaidAt,
+                              paidLate,
+                              accelerated,
+                              hasPaymentEvidence,
+                            }) => (
+                              <tr className="hover:bg-emerald-50/30" key={app.id}>
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span className="block font-semibold text-slate-900">
+                                    {app.applicantName}
+                                  </span>
+                                  <span className="block text-[11px] font-bold text-emerald-700">
+                                    NIS{' '}
+                                    {String(
+                                      app.financialPlan?.akadDocument &&
+                                        typeof app.financialPlan.akadDocument === 'object'
+                                        ? ((
+                                            app.financialPlan.akadDocument as Record<
+                                              string,
+                                              unknown
+                                            >
+                                          ).studentNumber ?? '')
+                                        : '',
+                                    ) || 'belum tersedia'}
+                                  </span>
+                                  <span className="block text-[10px] font-medium text-slate-500">
+                                    {formatDisplayApplicationId(app.applicationId)}
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-left">
+                                  <div className="flex flex-col items-start text-left">
+                                    <span
+                                      className={`flex w-fit rounded-full px-2 py-0.5 text-left text-[10px] font-semibold ${app.product === 'FULL_COVER' ? 'bg-blue-50 text-blue-700' : 'bg-teal-50 text-teal-700'}`}
+                                    >
+                                      {app.product === 'FULL_COVER'
+                                        ? 'Full Cover'
+                                        : 'Dana Keberangkatan'}
+                                    </span>
+                                    <span className="mt-1 text-left text-[11px] text-slate-500">
+                                      {app.lpkName}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span
+                                    className="inline-flex items-center gap-2 text-slate-700"
+                                    title={`${app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}, keberangkatan ${formatDateShort(app.departureDate)}`}
+                                  >
+                                    <DestinationFlag destination={app.destination} />
+                                    <span className="sr-only">
+                                      {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
+                                    </span>
+                                    <span className="text-[11px]">
+                                      {formatDateShort(app.departureDate)}
+                                    </span>
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span className="block font-semibold text-slate-900">
+                                    {formatRupiah(summary.paidAmount)}
+                                  </span>
+                                  <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                    ✓ Lunas 100%
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span className="block font-medium text-slate-700">
+                                    {summary.paidCount}/{summary.schedule.length} Angsuran
+                                  </span>
+                                  <span className="text-[11px] text-slate-500">
+                                    Terakhir: {formatDateShort(latestPaidAt)}
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-center">
+                                  <div className="flex flex-col items-center">
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${paidLate ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}
+                                    >
+                                      {!hasPaymentEvidence
+                                        ? 'Riwayat belum tersedia'
+                                        : paidLate
+                                          ? 'Pernah terlambat'
+                                          : 'Disiplin / Lancar'}
+                                    </span>
+                                    {accelerated && (
+                                      <span className="mt-1 text-[10px] font-semibold text-blue-700">
+                                        Pelunasan Awal
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-right">
+                                  <button
+                                    className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+                                    onClick={() =>
+                                      openApplicationDrawer(app.id, 'installment-history')
+                                    }
+                                    type="button"
+                                  >
+                                    Rincian Riwayat
+                                  </button>
+                                </td>
+                              </tr>
+                            ),
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="divide-y divide-slate-100 md:hidden">
+                      {visibleAlumni.map(({ app, summary, latestPaidAt }) => (
+                        <article className="space-y-3 p-4" key={app.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="font-bold text-slate-900">{app.applicantName}</h3>
+                              <p className="text-[11px] font-semibold text-emerald-700">
+                                NIS{' '}
+                                {String(
+                                  app.financialPlan?.akadDocument &&
+                                    typeof app.financialPlan.akadDocument === 'object'
+                                    ? ((app.financialPlan.akadDocument as Record<string, unknown>)
+                                        .studentNumber ?? '')
+                                    : '',
+                                ) || 'belum tersedia'}
+                              </p>
+                              <p className="text-[10px] font-medium text-slate-500">
+                                {formatDisplayApplicationId(app.applicationId)}
+                              </p>
+                              <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                              </span>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                              ✓ Lunas 100%
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="block text-[10px] text-slate-400">
+                                Total terbayar
+                              </span>
+                              <strong>{formatRupiah(summary.paidAmount)}</strong>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400">
+                                Angsuran selesai
+                              </span>
+                              <strong>
+                                {summary.paidCount}/{summary.schedule.length}
+                              </strong>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400">
+                                Pembayaran terakhir
+                              </span>
+                              <strong>{formatDateShort(latestPaidAt)}</strong>
+                            </div>
+                            <div>
+                              <span className="block text-[10px] text-slate-400">
+                                Negara · Keberangkatan
+                              </span>
+                              <strong>
+                                {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'} ·{' '}
+                                {formatDateShort(app.departureDate)}
+                              </strong>
+                            </div>
+                          </div>
+                          <button
+                            className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+                            onClick={() => openApplicationDrawer(app.id, 'installment-history')}
+                            type="button"
+                          >
+                            Rincian Riwayat
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* 6. MENU: SISWA AKTIF (Outstanding & Active Students) */}
           {activeMenu === 'activeInstallments' && (
             <div className="space-y-5">
+              {/* Executive Hero Banner — Siswa Aktif */}
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/20 to-slate-50 p-6 shadow-xs">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-200/20 blur-2xl"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -bottom-8 left-1/3 h-32 w-32 rounded-full bg-teal-200/20 blur-2xl"
+                />
+                <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-md">
+                      <svg
+                        aria-hidden="true"
+                        className="h-6 w-6 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h1 className="text-lg font-extrabold text-slate-900">
+                        Pemantauan Siswa Aktif
+                      </h1>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Pantau progress angsuran, jatuh tempo, dan status kewajiban seluruh siswa
+                        yang sedang aktif menjalani program pembiayaan
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-4 sm:gap-6">
+                    <div className="text-center">
+                      <span className="block text-2xl font-extrabold text-[#0b57d0]">
+                        {activeInstallmentMetrics.count}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium text-slate-500">
+                        Siswa Aktif
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <span
+                        className={`block text-2xl font-extrabold ${activeInstallmentMetrics.overdue > 0 ? 'text-red-600' : 'text-slate-400'}`}
+                      >
+                        {activeInstallmentMetrics.overdue}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium text-slate-500">
+                        Terlambat
+                      </span>
+                    </div>
+                    <div className="text-center">
+                      <span
+                        className={`block text-2xl font-extrabold ${activeInstallmentMetrics.dueSoon > 0 ? 'text-amber-600' : 'text-slate-400'}`}
+                      >
+                        {activeInstallmentMetrics.dueSoon}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium text-slate-500">
+                        Jatuh Tempo
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Cards */}
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">
-                    Siswa dengan Tanggungan
-                  </span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-[#0b57d0]">
+                <div className="relative overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-start justify-between">
+                    <span className="text-xs font-medium text-slate-500">Siswa Aktif</span>
+                    <span className="rounded-lg bg-[#e8f0fe] p-1.5 text-[#0b57d0]">
+                      <svg
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </div>
+                  <strong className="mt-2 block text-2xl font-extrabold text-[#0b57d0]">
                     {activeInstallmentMetrics.count}
                   </strong>
                   <span className="mt-1 block text-[11px] text-slate-400">
-                    Aktif mengangsur atau sisa tanggungan
+                    Aktif berjalan &amp; dalam masa angsuran
                   </span>
                 </div>
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Total Sisa Kewajiban</span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-slate-900">
+                <div className="relative overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-start justify-between">
+                    <span className="text-xs font-medium text-slate-500">Total Sisa Kewajiban</span>
+                    <span className="rounded-lg bg-slate-100 p-1.5 text-slate-500">
+                      <svg
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </div>
+                  <strong className="mt-2 block text-2xl font-extrabold text-slate-900">
                     {formatRupiah(activeInstallmentMetrics.totalRemaining)}
                   </strong>
                   <span className="mt-1 block text-[11px] text-slate-400">
                     Akumulasi seluruh tanggungan
                   </span>
                 </div>
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Terlambat Bayar</span>
+                <div className="relative overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-start justify-between">
+                    <span className="text-xs font-medium text-slate-500">Terlambat Bayar</span>
+                    <span
+                      className={`rounded-lg p-1.5 ${activeInstallmentMetrics.overdue > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-400'}`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </div>
                   <strong
-                    className={`mt-1.5 block text-2xl font-extrabold ${
-                      activeInstallmentMetrics.overdue > 0 ? 'text-red-600' : 'text-slate-900'
-                    }`}
+                    className={`mt-2 block text-2xl font-extrabold ${activeInstallmentMetrics.overdue > 0 ? 'text-red-600' : 'text-slate-900'}`}
                   >
                     {activeInstallmentMetrics.overdue}
                   </strong>
@@ -3532,52 +7024,115 @@ export function AdminDashboard({
                     Lewat tanggal jatuh tempo
                   </span>
                 </div>
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Jatuh Tempo ≤ 7 Hari</span>
+                <div className="relative overflow-hidden rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
+                  <div className="flex items-start justify-between">
+                    <span className="text-xs font-medium text-slate-500">Jatuh Tempo ≤ 7 Hari</span>
+                    <span
+                      className={`rounded-lg p-1.5 ${activeInstallmentMetrics.dueSoon > 0 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  </div>
                   <strong
-                    className={`mt-1.5 block text-2xl font-extrabold ${
-                      activeInstallmentMetrics.dueSoon > 0 ? 'text-amber-600' : 'text-slate-900'
-                    }`}
+                    className={`mt-2 block text-2xl font-extrabold ${activeInstallmentMetrics.dueSoon > 0 ? 'text-amber-600' : 'text-slate-900'}`}
                   >
                     {activeInstallmentMetrics.dueSoon}
                   </strong>
-                  <span className="mt-1 block text-[11px] text-amber-700">
-                    {activeInstallmentMetrics.openRelief} permohonan keringanan terbuka
+                  <span className="mt-1 block text-[11px] text-slate-400">
+                    Jatuh tempo dalam 7 hari ke depan
                   </span>
                 </div>
               </div>
 
+              {/* Table Section */}
               <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Siswa dengan Tanggungan ({visibleActiveInstallments.length}
+                {/* Table header + filter chips */}
+                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
+                  <h2
+                    className="text-[10px] font-semibold uppercase tracking-wider text-slate-600"
+                    style={{ fontSize: '10px' }}
+                  >
+                    Daftar Siswa Aktif ({visibleActiveInstallments.length}
                     {activeInstallmentFilter !== 'ALL'
                       ? ` dari ${activeInstallmentMetrics.count}`
                       : ''}
                     )
                   </h2>
-                  <div className="flex flex-wrap gap-1.5">
-                    {ACTIVE_INSTALLMENT_FILTERS.map((filter) => (
-                      <button
-                        className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] ${
-                          activeInstallmentFilter === filter.id
-                            ? 'bg-[#0b57d0] text-white'
-                            : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
-                        key={filter.id}
-                        onClick={() => setActiveInstallmentFilter(filter.id)}
-                        type="button"
-                      >
-                        {filter.label}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-1">
+                    {ACTIVE_INSTALLMENT_FILTERS.map((filter) => {
+                      const count =
+                        filter.id === 'ALL'
+                          ? activeInstallmentSummaries.length
+                          : filter.id === 'OVERDUE'
+                            ? activeInstallmentMetrics.overdue
+                            : filter.id === 'DUE_SOON'
+                              ? activeInstallmentMetrics.dueSoon
+                              : activeInstallmentSummaries.length -
+                                activeInstallmentMetrics.overdue -
+                                activeInstallmentMetrics.dueSoon
+                      return (
+                        <button
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] ${
+                            activeInstallmentFilter === filter.id
+                              ? 'bg-[#0b57d0] text-white shadow-2xs'
+                              : 'border border-slate-200/80 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                          }`}
+                          key={filter.id}
+                          onClick={() => setActiveInstallmentFilter(filter.id)}
+                          style={{ fontSize: '10px' }}
+                          type="button"
+                        >
+                          <span>{filter.label}</span>
+                          <span
+                            className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold leading-none ${
+                              activeInstallmentFilter === filter.id
+                                ? 'bg-white/20 text-white'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 
                 {visibleActiveInstallments.length === 0 ? (
-                  <p className="px-5 py-8 text-center text-xs text-slate-400">
-                    Tidak ada siswa dengan tanggungan pada filter ini.
-                  </p>
+                  /* Empty state */
+                  <div className="flex flex-col items-center px-5 py-12 text-center">
+                    <svg
+                      aria-hidden="true"
+                      className="h-9 w-9 text-slate-300"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <p className="mt-2.5 text-xs font-semibold text-slate-700">Tidak ada siswa</p>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      Tidak ada siswa aktif pada filter ini.
+                    </p>
+                  </div>
                 ) : (
                   <>
                     {/* Mobile cards */}
@@ -3587,62 +7142,92 @@ export function AdminDashboard({
                           summary.nextDue && summary.overdueCount > 0
                             ? getDaysBetween(summary.nextDue.dueDate, todayIso)
                             : 0
+                        const progressPercent =
+                          summary.schedule.length > 0
+                            ? Math.round((summary.paidCount / summary.schedule.length) * 100)
+                            : 0
+                        const rowBg =
+                          overdueDays > 0 ? 'bg-red-50/40' : summary.dueSoon ? 'bg-amber-50/40' : ''
                         return (
-                          <li className="p-4" key={app.id}>
+                          <li className={`p-3.5 ${rowBg}`} key={app.id}>
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <p className="truncate font-semibold text-slate-900">
                                   {app.applicantName}
                                 </p>
-                                <p className="truncate text-[11px] text-slate-400">
+                                <p className="mt-0.5 truncate text-[11px] text-slate-400">
                                   {app.applicationId} · {app.lpkName}
                                 </p>
+                                <div className="mt-1">
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                      app.product === 'FULL_COVER'
+                                        ? 'bg-blue-50 text-blue-700'
+                                        : 'bg-teal-50 text-teal-700'
+                                    }`}
+                                  >
+                                    {app.product === 'FULL_COVER'
+                                      ? 'Full Cover'
+                                      : 'Dana Keberangkatan'}
+                                  </span>
+                                </div>
                               </div>
-                              <span
-                                className={`inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
-                                  STATUS_BADGE_STYLES[app.status] ??
-                                  'bg-slate-100 text-slate-700 ring-slate-200'
-                                }`}
-                              >
-                                {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ??
-                                  app.status}
-                              </span>
+                              {/* Status bayar badge */}
+                              {overdueDays > 0 ? (
+                                <span className="inline-flex shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                                  Terlambat {overdueDays} hr
+                                </span>
+                              ) : summary.dueSoon ? (
+                                <span className="inline-flex shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                                  ≤7 hari
+                                </span>
+                              ) : (
+                                <span className="inline-flex shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                  Berjalan
+                                </span>
+                              )}
                             </div>
-                            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                              <div className="rounded-lg bg-slate-50 p-2">
-                                <dt className="text-slate-400">Sisa Kewajiban</dt>
+                            <dl className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+                              <div className="rounded-lg bg-white/80 p-2 ring-1 ring-slate-100">
+                                <dt className="text-[11px] text-slate-400">Sisa Kewajiban</dt>
                                 <dd className="mt-0.5 font-bold text-slate-900">
                                   {formatRupiah(summary.remaining)}
                                 </dd>
                               </div>
-                              <div className="rounded-lg bg-slate-50 p-2">
-                                <dt className="text-slate-400">Progres</dt>
-                                <dd className="mt-0.5 font-bold text-slate-900">
-                                  {summary.paidCount}/{summary.schedule.length} lunas
+                              <div className="rounded-lg bg-white/80 p-2 ring-1 ring-slate-100">
+                                <dt className="text-[11px] text-slate-400">Terbayar</dt>
+                                <dd className="mt-0.5 font-semibold text-emerald-700">
+                                  {summary.paidAmount > 0 ? formatRupiah(summary.paidAmount) : '—'}
                                 </dd>
                               </div>
-                              <div className="col-span-2 rounded-lg bg-slate-50 p-2">
-                                <dt className="text-slate-400">Jatuh Tempo Berikutnya</dt>
-                                <dd className="mt-0.5 flex flex-wrap items-center gap-1.5 font-bold text-slate-900">
+                              <div className="col-span-2 rounded-lg bg-white/80 p-2 ring-1 ring-slate-100">
+                                <dt className="mb-1 text-[11px] text-slate-400">
+                                  Progres · {summary.paidCount}/{summary.schedule.length} lunas (
+                                  {progressPercent}%)
+                                </dt>
+                                <dd>
+                                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                      className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                                      style={{ width: `${progressPercent}%` }}
+                                    />
+                                  </div>
+                                </dd>
+                              </div>
+                              <div className="col-span-2 rounded-lg bg-white/80 p-2 ring-1 ring-slate-100">
+                                <dt className="text-[11px] text-slate-400">
+                                  Jatuh Tempo Berikutnya
+                                </dt>
+                                <dd className="mt-0.5 font-bold text-slate-900">
                                   {summary.nextDue ? formatDateShort(summary.nextDue.dueDate) : '—'}
-                                  {overdueDays > 0 && (
-                                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
-                                      Terlambat {overdueDays} hr
-                                    </span>
-                                  )}
-                                  {overdueDays === 0 && summary.dueSoon && (
-                                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                                      ≤7 hari
-                                    </span>
-                                  )}
                                 </dd>
                               </div>
                             </dl>
-                            <div className="mt-3">
+                            <div className="mt-2.5 border-t border-slate-100 pt-2.5">
                               <DrawerAction
-                                ariaLabel={`Lihat rincian angsuran ${app.applicationId}`}
+                                ariaLabel={`Lihat riwayat angsuran ${app.applicationId}`}
                                 label="Rincian"
-                                onClick={() => openScheduleDetail(app.id)}
+                                onClick={() => openApplicationDrawer(app.id, 'installment-history')}
                               />
                             </div>
                           </li>
@@ -3650,21 +7235,18 @@ export function AdminDashboard({
                       })}
                     </ul>
 
-                    {/* Desktop table */}
+                    {/* Desktop table — 7 kolom (tanpa kolom tanggal penerbangan, tinggi baris lebih ringkas) */}
                     <div className="hidden overflow-x-auto lg:block">
                       <table className="w-full border-collapse text-left text-xs">
                         <thead>
-                          <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
-                            <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
-                            <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
-                            <th className="whitespace-nowrap px-4 py-3">LPK Mitra</th>
-                            <th className="whitespace-nowrap px-4 py-3">Status</th>
-                            <th className="whitespace-nowrap px-4 py-3">Total Kewajiban</th>
-                            <th className="whitespace-nowrap px-4 py-3">Terbayar</th>
-                            <th className="whitespace-nowrap px-4 py-3">Sisa & Progres</th>
-                            <th className="whitespace-nowrap px-4 py-3">Jatuh Tempo</th>
-                            <th className="whitespace-nowrap px-4 py-3">Keringanan</th>
-                            <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
+                          <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                            <th className="whitespace-nowrap px-4 py-2">Siswa</th>
+                            <th className="whitespace-nowrap px-4 py-2">Program &amp; LPK</th>
+                            <th className="whitespace-nowrap px-4 py-2">Kewajiban</th>
+                            <th className="whitespace-nowrap px-4 py-2">Sisa &amp; Progres</th>
+                            <th className="whitespace-nowrap px-4 py-2">Jatuh Tempo</th>
+                            <th className="whitespace-nowrap px-4 py-2">Status Bayar</th>
+                            <th className="whitespace-nowrap px-4 py-2 text-right">Aksi</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -3677,84 +7259,119 @@ export function AdminDashboard({
                               summary.schedule.length > 0
                                 ? Math.round((summary.paidCount / summary.schedule.length) * 100)
                                 : 0
+                            const rowBg =
+                              overdueDays > 0
+                                ? 'bg-red-50/40 hover:bg-red-50/60'
+                                : summary.dueSoon
+                                  ? 'bg-amber-50/40 hover:bg-amber-50/60'
+                                  : 'hover:bg-slate-50/80'
                             return (
-                              <tr className="hover:bg-slate-50/80" key={app.id}>
-                                <td className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]">
-                                  {app.applicationId}
+                              <tr className={rowBg} key={app.id}>
+                                {/* Kolom 1: Siswa */}
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span className="block font-semibold text-slate-900 leading-tight">
+                                    {app.applicantName}
+                                  </span>
+                                  <span className="block text-[11px] font-bold text-[#0b57d0] leading-tight">
+                                    {app.applicationId}
+                                  </span>
                                 </td>
-                                <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">
-                                  {app.applicantName}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                  {app.lpkName}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-3">
+                                {/* Kolom 2: Program & LPK */}
+                                <td className="whitespace-nowrap px-4 py-2">
                                   <span
-                                    className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
-                                      STATUS_BADGE_STYLES[app.status] ??
-                                      'bg-slate-100 text-slate-700 ring-slate-200'
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                      app.product === 'FULL_COVER'
+                                        ? 'bg-blue-50 text-blue-700'
+                                        : 'bg-teal-50 text-teal-700'
                                     }`}
                                   >
-                                    {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ??
-                                      app.status}
+                                    {app.product === 'FULL_COVER'
+                                      ? 'Full Cover'
+                                      : 'Dana Keberangkatan'}
+                                  </span>
+                                  <span className="mt-0.5 block text-[11px] text-slate-500 leading-tight">
+                                    {app.lpkName}
                                   </span>
                                 </td>
-                                <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">
-                                  {formatRupiah(summary.obligation)}
+                                {/* Kolom 3: Kewajiban (total + terbayar) */}
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span className="block font-medium text-slate-900 leading-tight">
+                                    {formatRupiah(summary.obligation)}
+                                  </span>
+                                  <span className="block text-[11px] font-semibold text-emerald-700 leading-tight">
+                                    {summary.paidAmount > 0
+                                      ? `Terbayar ${formatRupiah(summary.paidAmount)}`
+                                      : 'Belum ada pembayaran'}
+                                  </span>
                                 </td>
-                                <td className="whitespace-nowrap px-4 py-3 font-semibold text-emerald-700">
-                                  {summary.paidAmount > 0
-                                    ? formatRupiah(summary.paidAmount)
-                                    : 'Rp0'}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-3">
-                                  <span className="font-bold text-slate-900">
+                                {/* Kolom 4: Sisa & Progres */}
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <span className="block font-bold text-slate-900 leading-tight">
                                     {formatRupiah(summary.remaining)}
                                   </span>
-                                  <span className="mt-0.5 block text-[11px] text-slate-400">
-                                    {summary.paidCount}/{summary.schedule.length} lunas
-                                  </span>
-                                  {summary.schedule.length > 0 && (
-                                    <span className="mt-1 block h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
-                                      <span
-                                        className="block h-full rounded-full bg-[#0b57d0]"
-                                        style={{ width: `${progressPercent}%` }}
-                                      />
+                                  <div className="mt-0.5 flex items-center gap-2">
+                                    <span className="text-[11px] text-slate-400 leading-tight">
+                                      {summary.paidCount}/{summary.schedule.length} lunas
                                     </span>
-                                  )}
+                                    {summary.schedule.length > 0 && (
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-slate-100">
+                                          <div
+                                            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"
+                                            style={{ width: `${progressPercent}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-[10px] font-semibold text-slate-500">
+                                          {progressPercent}%
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
                                 </td>
-                                <td className="whitespace-nowrap px-4 py-3">
+                                {/* Kolom 5: Jatuh Tempo */}
+                                <td className="whitespace-nowrap px-4 py-2">
                                   <span className="font-medium text-slate-700">
                                     {summary.nextDue
                                       ? formatDateShort(summary.nextDue.dueDate)
                                       : '—'}
                                   </span>
-                                  {overdueDays > 0 && (
-                                    <span className="ml-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                                </td>
+                                {/* Kolom 6: Status Bayar */}
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  {overdueDays > 0 ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                                       Terlambat {overdueDays} hr
                                     </span>
-                                  )}
-                                  {overdueDays === 0 && summary.dueSoon && (
-                                    <span className="ml-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                                      ≤7 hari
+                                  ) : summary.dueSoon ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                      Jatuh tempo ≤7 hr
                                     </span>
-                                  )}
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-3">
-                                  {summary.openRelief > 0 ? (
-                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
-                                      {summary.openRelief} menunggu
+                                  ) : summary.remaining <= 0 ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                      Lunas
                                     </span>
                                   ) : (
-                                    <span className="text-slate-400">—</span>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                      Berjalan
+                                    </span>
                                   )}
                                 </td>
-                                <td className="whitespace-nowrap px-4 py-3 text-right">
-                                  <DrawerAction
-                                    ariaLabel={`Lihat rincian angsuran ${app.applicationId}`}
-                                    label="Rincian"
-                                    onClick={() => openScheduleDetail(app.id)}
-                                  />
+                                {/* Kolom 7: Aksi */}
+                                <td className="whitespace-nowrap px-4 py-2 text-right">
+                                  <button
+                                    aria-label={`Lihat riwayat angsuran ${app.applicationId}`}
+                                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-[#0b57d0] shadow-2xs transition hover:border-[#0b57d0]/30 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                                    onClick={() =>
+                                      openApplicationDrawer(app.id, 'installment-history')
+                                    }
+                                    type="button"
+                                  >
+                                    Rincian
+                                  </button>
                                 </td>
                               </tr>
                             )
@@ -3786,9 +7403,6 @@ export function AdminDashboard({
                     const expanded = expandedScheduleId === app.id
                     const rowPayments = payments.filter(
                       (p) => p.applicationDocId === app.id || p.applicationId === app.applicationId,
-                    )
-                    const paidSet = new Set(
-                      Array.isArray(app.paidInstallments) ? app.paidInstallments : [],
                     )
                     const overdueDays =
                       summary.nextDue && summary.overdueCount > 0
@@ -3880,7 +7494,7 @@ export function AdminDashboard({
                                     <strong
                                       className={`mt-1 block text-lg font-extrabold ${overdueDays > 0 ? 'text-red-600' : 'text-slate-900'}`}
                                     >
-                                      {formatRupiah(summary.nextDue.amount)}
+                                      {formatRupiah(summary.nextDue.remaining)}
                                     </strong>
                                     <span
                                       className={`mt-0.5 block text-[10px] ${overdueDays > 0 ? 'font-bold text-red-600' : 'text-slate-400'}`}
@@ -3898,66 +7512,100 @@ export function AdminDashboard({
                             </div>
 
                             {/* Tabel jadwal cicilan */}
-                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
                               <table className="w-full border-collapse text-left text-xs">
                                 <thead>
                                   <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                     <th className="px-4 py-2.5">Cicilan</th>
                                     <th className="px-4 py-2.5">Jatuh Tempo</th>
                                     <th className="px-4 py-2.5 text-right">Nominal</th>
+                                    <th className="px-4 py-2.5 text-right">Terbayar</th>
                                     <th className="px-4 py-2.5 text-right">Sisa</th>
                                     <th className="px-4 py-2.5">Status</th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {summary.schedule.map((row) => {
-                                    const paid = paidSet.has(row.installment)
-                                    return (
-                                      <tr
-                                        className="border-b border-slate-100 last:border-b-0"
-                                        key={row.installment}
+                                  {summary.rows.length === 0 ? (
+                                    <tr>
+                                      <td
+                                        className="px-4 py-4 text-center text-slate-500"
+                                        colSpan={6}
                                       >
-                                        <td className="px-4 py-2.5 font-semibold text-slate-900">
-                                          {row.installment}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-slate-600">
-                                          {formatDateShort(row.dueDate)}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right text-slate-900">
-                                          {formatRupiah(row.amount)}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right text-slate-600">
-                                          {paid ? '—' : formatRupiah(row.amount)}
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                          <span
-                                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                              paid
-                                                ? 'bg-emerald-50 text-emerald-700'
-                                                : row.dueDate < todayIso
-                                                  ? 'bg-red-50 text-red-700'
-                                                  : 'bg-amber-50 text-amber-700'
-                                            }`}
-                                          >
-                                            {paid
-                                              ? 'Lunas'
-                                              : row.dueDate < todayIso
-                                                ? 'Terlambat'
-                                                : 'Belum dibayar'}
-                                          </span>
-                                        </td>
-                                      </tr>
-                                    )
-                                  })}
+                                        Belum ada rincian jadwal cicilan pada kontrak ini.
+                                      </td>
+                                    </tr>
+                                  ) : (
+                                    summary.rows.map((row) => {
+                                      const overdue =
+                                        summary.isLegacy && !row.isPaid && row.dueDate < todayIso
+                                      const status = row.isPaid
+                                        ? 'Lunas'
+                                        : row.isPartial
+                                          ? overdue
+                                            ? 'Sebagian · Terlambat'
+                                            : 'Sebagian dibayar'
+                                          : overdue
+                                            ? 'Terlambat'
+                                            : summary.isLegacy
+                                              ? 'Belum dibayar'
+                                              : 'Belum Mulai'
+                                      return (
+                                        <tr
+                                          className="border-b border-slate-100 last:border-b-0"
+                                          key={row.installment}
+                                        >
+                                          <td className="px-4 py-2.5 font-semibold text-slate-900">
+                                            {row.installment}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-slate-600">
+                                            {formatDateShort(row.dueDate)}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right text-slate-900">
+                                            {formatRupiah(row.amount)}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right text-emerald-700">
+                                            {row.appliedAmount > 0
+                                              ? formatRupiah(row.appliedAmount)
+                                              : '—'}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right text-slate-600">
+                                            {row.remaining > 0 ? formatRupiah(row.remaining) : '—'}
+                                          </td>
+                                          <td className="px-4 py-2.5">
+                                            <span
+                                              className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                                row.isPaid
+                                                  ? 'bg-emerald-50 text-emerald-700'
+                                                  : overdue
+                                                    ? 'bg-red-50 text-red-700'
+                                                    : 'bg-amber-50 text-amber-700'
+                                              }`}
+                                            >
+                                              {status}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      )
+                                    })
+                                  )}
                                 </tbody>
                               </table>
                             </div>
 
-                            {/* Transaksi Xendit */}
+                            {summary.isLegacy && (
+                              <p className="text-[11px] leading-relaxed text-slate-500">
+                                Total terbayar mencakup seluruh transaksi LGC berstatus lunas.
+                                Transaksi tanpa nomor cicilan tetap masuk total, tetapi tidak
+                                dialokasikan ke baris jadwal.
+                              </p>
+                            )}
+
+                            {/* Histori pembayaran */}
                             {rowPayments.length > 0 ? (
                               <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                                 <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">
-                                  Transaksi Xendit ({rowPayments.length})
+                                  {summary.isLegacy ? 'Riwayat Pembayaran LGC' : 'Transaksi Xendit'}{' '}
+                                  ({rowPayments.length})
                                 </div>
                                 <table className="w-full border-collapse text-left text-xs">
                                   <thead>
@@ -4001,7 +7649,9 @@ export function AdminDashboard({
                               </div>
                             ) : (
                               <p className="text-xs text-slate-500">
-                                Belum ada transaksi Xendit untuk siswa ini.
+                                {summary.isLegacy
+                                  ? 'Belum ada transaksi pembayaran LGC untuk siswa ini.'
+                                  : 'Belum ada transaksi Xendit untuk siswa ini.'}
                               </p>
                             )}
                           </div>
@@ -4012,197 +7662,6 @@ export function AdminDashboard({
                 </ul>
               )}
             </section>
-          )}
-
-          {/* 8. MENU: KERINGANAN (Support Requests Review) */}
-          {activeMenu === 'relief' && (
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Menunggu Tinjauan</span>
-                  <strong
-                    className={`mt-1.5 block text-2xl font-extrabold ${
-                      reliefRows.some((row) => row.request.status === 'OPEN')
-                        ? 'text-amber-600'
-                        : 'text-slate-900'
-                    }`}
-                  >
-                    {reliefRows.filter((row) => row.request.status === 'OPEN').length}
-                  </strong>
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    Permohonan berstatus OPEN
-                  </span>
-                </div>
-                <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-2xs">
-                  <span className="text-xs font-medium text-slate-500">Ditinjau</span>
-                  <strong className="mt-1.5 block text-2xl font-extrabold text-emerald-600">
-                    {reliefRows.filter((row) => row.request.status === 'REVIEWED').length}
-                  </strong>
-                  <span className="mt-1 block text-[11px] text-slate-400">
-                    Permohonan sudah ditanggapi
-                  </span>
-                </div>
-              </div>
-
-              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-                <header className="border-b border-slate-100 px-5 py-3.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Permohonan Keringanan ({reliefRows.length})
-                  </h2>
-                </header>
-                {reliefRows.length === 0 ? (
-                  <p className="px-5 py-8 text-center text-xs text-slate-400">
-                    Belum ada permohonan keringanan masuk.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse text-left text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                          <th className="px-4 py-2.5">Siswa</th>
-                          <th className="px-4 py-2.5">Waktu</th>
-                          <th className="px-4 py-2.5">Pesan</th>
-                          <th className="px-4 py-2.5">Status</th>
-                          <th className="px-4 py-2.5">Tanggapan</th>
-                          <th className="px-4 py-2.5 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reliefRows.map(({ app, request, index }) => {
-                          const key = reliefKey(app.id, index)
-                          const edit = reliefEdits[key] ?? {
-                            status: request.status,
-                            response: request.response ?? '',
-                          }
-                          const unchanged =
-                            edit.status === request.status &&
-                            edit.response === (request.response ?? '')
-                          return (
-                            <tr
-                              className="border-b border-slate-100 align-top last:border-b-0"
-                              key={key}
-                            >
-                              <td className="px-4 py-3">
-                                <span className="font-semibold text-slate-900">
-                                  {app.applicantName}
-                                </span>
-                                <span className="mt-0.5 block text-[11px] text-slate-400">
-                                  {app.applicationId}
-                                </span>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                {formatDateTime(request.requestedAt)}
-                              </td>
-                              <td className="max-w-xs px-4 py-3 text-slate-600">
-                                {request.message || '—'}
-                              </td>
-                              <td className="px-4 py-3">
-                                <select
-                                  aria-label={`Status permohonan ${app.applicationId}`}
-                                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900"
-                                  onChange={(event) =>
-                                    setReliefEdits((current) => ({
-                                      ...current,
-                                      [key]: { ...edit, status: event.target.value },
-                                    }))
-                                  }
-                                  value={edit.status}
-                                >
-                                  <option value="OPEN">Menunggu tinjauan</option>
-                                  <option value="REVIEWED">Ditinjau</option>
-                                </select>
-                              </td>
-                              <td className="px-4 py-3">
-                                <input
-                                  aria-label={`Tanggapan untuk ${app.applicationId}`}
-                                  className="w-full min-w-44 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900"
-                                  maxLength={1000}
-                                  onChange={(event) =>
-                                    setReliefEdits((current) => ({
-                                      ...current,
-                                      [key]: { ...edit, response: event.target.value },
-                                    }))
-                                  }
-                                  placeholder="Tanggapan untuk pemohon…"
-                                  value={edit.response}
-                                />
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-right">
-                                <DrawerAction
-                                  ariaLabel={`Simpan tanggapan ${app.applicationId}`}
-                                  disabled={pending || unchanged}
-                                  label="Simpan"
-                                  onClick={() => saveRelief(app, index, edit.status, edit.response)}
-                                />
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-            </div>
-          )}
-
-          {/* 9. MENU: STATISTIK (Portfolio Analytics & LPK Partner Table) */}
-          {activeMenu === 'statistics' && (
-            <div className="space-y-5">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <span className="text-xs text-slate-500">Produk Dana Keberangkatan</span>
-                  <strong className="mt-1 block text-xl font-extrabold text-slate-900">
-                    {applications.filter((a) => a.product === 'DEPARTURE_BRIDGING').length} siswa
-                  </strong>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <span className="text-xs text-slate-500">Produk Full Cover</span>
-                  <strong className="mt-1 block text-xl font-extrabold text-slate-900">
-                    {applications.filter((a) => a.product === 'FULL_COVER').length} siswa
-                  </strong>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <span className="text-xs text-slate-500">Negara Tujuan (Jepang / Turki)</span>
-                  <strong className="mt-1 block text-xl font-extrabold text-slate-900">
-                    {applications.filter((a) => a.destination === 'JAPAN').length} Jepang ·{' '}
-                    {applications.filter((a) => a.destination === 'TURKEY').length} Turki
-                  </strong>
-                </div>
-              </div>
-
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
-                <div className="border-b border-slate-100 px-5 py-3.5">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Rekapitulasi per LPK Mitra ({lpkStats.length})
-                  </h2>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
-                        <th className="px-4 py-3">Nama LPK Mitra</th>
-                        <th className="px-4 py-3">Jumlah Siswa</th>
-                        <th className="px-4 py-3">Siswa Aktif / Selesai</th>
-                        <th className="px-4 py-3">Total Nilai Kewajiban Tercatat</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {lpkStats.map((row) => (
-                        <tr className="hover:bg-slate-50" key={row.lpkName}>
-                          <td className="px-4 py-3 font-semibold text-slate-900">{row.lpkName}</td>
-                          <td className="px-4 py-3 text-slate-700">{row.count} pengajuan</td>
-                          <td className="px-4 py-3 text-emerald-700">{row.active} aktif</td>
-                          <td className="px-4 py-3 font-bold text-slate-900">
-                            {formatRupiah(row.totalObligation)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            </div>
           )}
 
           {activeMenu === 'vip' && <AdminVipPanel searchQuery={searchQuery} todayIso={todayIso} />}
@@ -4371,6 +7830,107 @@ export function AdminDashboard({
         </div>
       )}
 
+      {revertTarget && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !pending) {
+              setRevertTarget(null)
+              setRevertError('')
+            }
+          }}
+        >
+          <section
+            aria-labelledby="revert-application-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="alertdialog"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700">
+                <svg
+                  aria-hidden="true"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-slate-900" id="revert-application-title">
+                  Kembalikan ke Menu Pengajuan?
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-600">
+                  <span className="font-semibold text-[#0b57d0]">
+                    {formatDisplayApplicationId(revertTarget.applicationId)}
+                  </span>{' '}
+                  · {revertTarget.applicantName}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3.5 text-xs leading-5 text-blue-900">
+              <p className="font-semibold flex items-center gap-1.5">
+                <svg
+                  className="size-4 shrink-0 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                  />
+                </svg>
+                Data siswa tidak akan hilang
+              </p>
+              <p className="mt-1.5 text-blue-800">
+                Data tidak akan dihapus dari sistem. Aksi ini hanya akan membatalkan status nominal
+                yang telah disetujui dan mengembalikan pengajuan ke menu <strong>Pengajuan</strong>{' '}
+                agar perlu persetujuan ulang oleh admin.
+              </p>
+            </div>
+            {revertError && (
+              <p
+                className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"
+                role="alert"
+              >
+                {revertError}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                autoFocus
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                onClick={() => {
+                  setRevertTarget(null)
+                  setRevertError('')
+                }}
+                type="button"
+              >
+                Batal
+              </button>
+              <button
+                className="rounded-lg bg-amber-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                onClick={() => handleConfirmRevert(revertTarget)}
+                type="button"
+              >
+                {pending ? 'Mengembalikan…' : 'Kembalikan ke Pengajuan'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {/* SLIDE-OVER DRAWER FOR APPLICATION MANAGEMENT */}
       {drawerApplication && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-[1px]">
@@ -4380,6 +7940,8 @@ export function AdminDashboard({
               application={drawerApplication}
               error={error}
               key={drawerApplication.id}
+              payments={payments}
+              todayIso={todayIso}
               onAgreePricing={agreePricing}
               onApproveDocument={approveDocument}
               onApprovePricing={approvePricing}

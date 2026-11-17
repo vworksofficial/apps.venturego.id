@@ -347,7 +347,7 @@ export function FinanceTermsFields({
 
   if (product === 'FULL_COVER') {
     return (
-      <div className="space-y-4">
+      <div className="flex flex-col gap-6">
         {identityEditor}
         {hppEditor}
         <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -458,7 +458,7 @@ export function FinanceTermsFields({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-6">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
           <span className="text-[11px] font-medium text-slate-500">Total Nafaqah (Riil)</span>

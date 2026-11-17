@@ -49,6 +49,16 @@ export type ApplicationDocumentRecord = {
   fileName?: string
   mimeType?: string
   size?: number
+  uploadedAt?: string
+}
+
+export type AkadPhotoRecord = {
+  fileId: string
+  fileName: string
+  mimeType: string
+  size: number
+  uploadedAt: string
+  uploadedBy: string
 }
 
 export type FinancingApplicationRecord = {
@@ -66,6 +76,7 @@ export type FinancingApplicationRecord = {
   updatedAt?: string
   updatedBy?: string
   paidInstallments?: number[]
+  paidAmount?: number
   personalDetails: Record<string, unknown>
   eligibility: Record<string, unknown>
   fullCoverDetails: Record<string, unknown> | null
@@ -81,6 +92,7 @@ export type FinancingApplicationRecord = {
     uploadedBy: string
     agreementReference: string
   }
+  akadPhotos?: AkadPhotoRecord[]
   financialPlanHistory?: {
     changedAt: string
     changedBy: string
@@ -104,6 +116,7 @@ export type FinancingApplicationRecord = {
     response?: string
   }[]
   internalNotes?: string
+  departureDate?: string
 }
 
 export type AdminPaymentRecord = {

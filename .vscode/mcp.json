@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "figcraft": {
+      "type": "stdio",
+      "command": "C:\\Users\\panut\\AppData\\Local\\Programs\\ArtCraft\\FigCraft\\figcraft-cli.exe",
+      "args": ["mcp", "--attach", "38147", "--timeout", "120"]
+    }
+  }
+}

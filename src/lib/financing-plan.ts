@@ -2,10 +2,10 @@ export const FINANCING_TENOR_MONTHS = 12
 export const UJRAH_RATE_PER_MONTH = 0.024
 
 export const FINANCING_OPTIONS = [
-  { amount: 31_000_000, label: 'Rp31 juta' },
-  { amount: 33_000_000, label: 'Rp33 juta' },
-  { amount: 36_000_000, label: 'Rp36 juta' },
-  { amount: 40_000_000, label: 'Rp40 juta' },
+  { amount: 31_000_000, label: 'Rp31.000.000' },
+  { amount: 33_000_000, label: 'Rp33.000.000' },
+  { amount: 36_000_000, label: 'Rp36.000.000' },
+  { amount: 40_000_000, label: 'Rp40.000.000' },
 ] as const
 
 export type FinancingAmount = (typeof FINANCING_OPTIONS)[number]['amount']

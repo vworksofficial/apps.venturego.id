@@ -66,6 +66,246 @@ const isIndonesianDate = (value: string) => {
     date.getDate() === Number(match[1])
   )
 }
+const formatIndonesianDate = (date: Date) =>
+  `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'long' })} ${date.getFullYear()}`
+
+function BirthDatePicker({
+  value,
+  onChange,
+  mode = 'past',
+}: {
+  value: string
+  onChange: (value: string) => void
+  mode?: 'past' | 'future'
+}) {
+  const [open, setOpen] = useState(false)
+  const [view, setView] = useState<'calendar' | 'months' | 'years'>('calendar')
+  const selectedDate = (() => {
+    const match = value.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+    if (!match) return null
+    const monthNames = [
+      'januari',
+      'februari',
+      'maret',
+      'april',
+      'mei',
+      'juni',
+      'juli',
+      'agustus',
+      'september',
+      'oktober',
+      'november',
+      'desember',
+    ]
+    const month = monthNames.indexOf(match[2].toLowerCase())
+    if (month < 0) return null
+    const date = new Date(Number(match[3]), month, Number(match[1]))
+    return date.getFullYear() === Number(match[3]) &&
+      date.getMonth() === month &&
+      date.getDate() === Number(match[1])
+      ? date
+      : null
+  })()
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date()
+    return selectedDate ?? new Date(today.getFullYear(), today.getMonth(), 1)
+  })
+  const rootRef = useRef<HTMLDivElement>(null)
+  const today = new Date()
+  const monthNames = Array.from({ length: 12 }, (_, month) =>
+    new Date(2024, month, 1).toLocaleDateString('id-ID', { month: 'long' }),
+  )
+  const weekDays = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
+  const firstDay = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1).getDay()
+  const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate()
+  const years =
+    mode === 'past'
+      ? Array.from(
+          { length: today.getFullYear() - 1940 + 1 },
+          (_, index) => today.getFullYear() - index,
+        )
+      : Array.from({ length: 11 }, (_, index) => today.getFullYear() + index)
+
+  useEffect(() => {
+    if (selectedDate)
+      setVisibleMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1))
+  }, [value])
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+        setView('calendar')
+      }
+    }
+    window.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => window.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [open])
+
+  const chooseDay = (day: number) => {
+    onChange(
+      formatIndonesianDate(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day)),
+    )
+    setOpen(false)
+    setView('calendar')
+  }
+
+  return (
+    <div className="form-select" ref={rootRef}>
+      <button
+        aria-label={
+          value
+            ? `Tanggal: ${value}`
+            : mode === 'past'
+              ? 'Pilih tanggal lahir'
+              : 'Pilih tanggal keberangkatan'
+        }
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className={`form-select-trigger${open ? ' is-open' : ''}`}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => event.key === 'Escape' && setOpen(false)}
+        type="button"
+      >
+        <span className={value ? '' : 'placeholder'}>
+          {value || (mode === 'past' ? 'Pilih tanggal lahir' : 'Pilih tanggal keberangkatan')}
+        </span>
+        <svg aria-hidden="true" className={open ? 'rotate' : ''} viewBox="0 0 24 24">
+          <rect x="3" y="5" width="18" height="16" rx="2" />
+          <path d="M16 3v4M8 3v4M3 11h18" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className="date-picker-menu"
+          role="dialog"
+          aria-label={mode === 'past' ? 'Pilih tanggal lahir' : 'Pilih tanggal keberangkatan'}
+        >
+          <div className="date-picker-header">
+            <button
+              aria-label="Bulan sebelumnya"
+              className="date-picker-nav"
+              disabled={
+                mode === 'future' &&
+                visibleMonth.getFullYear() === today.getFullYear() &&
+                visibleMonth.getMonth() <= today.getMonth()
+              }
+              onClick={() =>
+                setVisibleMonth(
+                  new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1),
+                )
+              }
+              type="button"
+            >
+              ‹
+            </button>
+            <div className="date-picker-heading">
+              <button
+                onClick={() => setView(view === 'months' ? 'calendar' : 'months')}
+                type="button"
+              >
+                {monthNames[visibleMonth.getMonth()]}
+              </button>
+              <button
+                onClick={() => setView(view === 'years' ? 'calendar' : 'years')}
+                type="button"
+              >
+                {visibleMonth.getFullYear()}
+              </button>
+            </div>
+            <button
+              aria-label="Bulan berikutnya"
+              className="date-picker-nav"
+              disabled={
+                mode === 'past' &&
+                visibleMonth.getFullYear() === today.getFullYear() &&
+                visibleMonth.getMonth() >= today.getMonth()
+              }
+              onClick={() =>
+                setVisibleMonth(
+                  new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1),
+                )
+              }
+              type="button"
+            >
+              ›
+            </button>
+          </div>
+          {view === 'calendar' && (
+            <>
+              <div className="date-picker-grid date-picker-weekdays">
+                {weekDays.map((day) => (
+                  <span key={day}>{day}</span>
+                ))}
+              </div>
+              <div className="date-picker-grid">
+                {Array.from({ length: firstDay }, (_, index) => (
+                  <span aria-hidden="true" key={`blank-${index}`} />
+                ))}
+                {Array.from({ length: daysInMonth }, (_, index) => {
+                  const day = index + 1
+                  const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day)
+                  const isSelected = selectedDate?.getTime() === date.getTime()
+                  const isDisabled =
+                    mode === 'past'
+                      ? date > today
+                      : date < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+                  return (
+                    <button
+                      aria-pressed={isSelected}
+                      className={`date-picker-day${isSelected ? ' selected' : ''}`}
+                      disabled={isDisabled}
+                      key={day}
+                      onClick={() => chooseDay(day)}
+                      type="button"
+                    >
+                      {day}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+          {view === 'months' && (
+            <div className="date-picker-months">
+              {monthNames.map((month, index) => (
+                <button
+                  className={index === visibleMonth.getMonth() ? 'selected' : ''}
+                  key={month}
+                  onClick={() => {
+                    setVisibleMonth(new Date(visibleMonth.getFullYear(), index, 1))
+                    setView('calendar')
+                  }}
+                  type="button"
+                >
+                  {month}
+                </button>
+              ))}
+            </div>
+          )}
+          {view === 'years' && (
+            <div className="date-picker-years">
+              {years.map((year) => (
+                <button
+                  className={year === visibleMonth.getFullYear() ? 'selected' : ''}
+                  key={year}
+                  onClick={() => {
+                    setVisibleMonth(new Date(year, visibleMonth.getMonth(), 1))
+                    setView('calendar')
+                  }}
+                  type="button"
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const FULL_COVER_NEEDS = [
   ['LANGUAGE_TRAINING', 'Biaya pelatihan bahasa'],
@@ -83,6 +323,12 @@ const initialForm: ApplicationInput = {
   guardianName: '',
   phone: '',
   lpkName: '',
+  personalBankName: '',
+  personalBankAccountNumber: '',
+  personalBankAccountName: '',
+  lpkBankName: '',
+  lpkBankAccountNumber: '',
+  lpkBankAccountName: '',
   birthPlace: '',
   birthDate: '',
   idCardNumber: '',
@@ -122,6 +368,7 @@ const applicationSteps = [
   { step: 2, label: 'Kesiapan' },
   { step: 3, label: 'Data diri' },
   { step: 4, label: 'Kebutuhan' },
+  { step: 5, label: 'Rekening' },
   { step: 6, label: 'Tinjau' },
 ]
 
@@ -156,7 +403,7 @@ function FormSelect({
 }: {
   value: string
   onChange: (value: string) => void
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; destination?: 'JAPAN' | 'TURKEY' }[]
   placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -188,7 +435,10 @@ function FormSelect({
         }}
         type="button"
       >
-        <span className={selected ? '' : 'placeholder'}>{selected?.label ?? placeholder}</span>
+        <span className={`form-select-value${selected ? '' : ' placeholder'}`}>
+          {selected?.destination && <FormDestinationFlag destination={selected.destination} />}
+          {selected?.label ?? placeholder}
+        </span>
         <svg aria-hidden="true" className={open ? 'rotate' : ''} viewBox="0 0 24 24">
           <path d="m6 9 6 6 6-6" />
         </svg>
@@ -207,13 +457,45 @@ function FormSelect({
               role="option"
               type="button"
             >
-              <span>{option.label}</span>
+              <span className="form-select-value">
+                {option.destination && <FormDestinationFlag destination={option.destination} />}
+                {option.label}
+              </span>
               {option.value === value && <span className="form-select-check" aria-hidden="true" />}
             </button>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+function FormDestinationFlag({ destination }: { destination: 'JAPAN' | 'TURKEY' }) {
+  return (
+    <svg aria-hidden="true" className="form-destination-flag" viewBox="0 0 24 24">
+      {destination === 'JAPAN' ? (
+        <>
+          <rect fill="#fff" height="24" width="24" />
+          <circle cx="12" cy="12" r="6" fill="#bc002d" />
+        </>
+      ) : (
+        <>
+          <rect fill="#e30a17" height="24" width="24" />
+          <path
+            d="M15.2 12a5.2 5.2 0 1 1-2.2-4.3A4.2 4.2 0 1 0 16.4 13"
+            fill="#fff"
+            stroke="#fff"
+            strokeLinejoin="round"
+            strokeWidth=".6"
+          />
+          <path
+            d="m16.8 10.2 2.9.85-1.85 2.35.02-2.92 2.86.9-2.87.88.03 2.92-1.87-2.35z"
+            fill="#fff"
+          />
+        </>
+      )}
+      <rect x=".5" y=".5" width="23" height="23" rx="2" fill="none" stroke="#cbd5e1" />
+    </svg>
   )
 }
 
@@ -256,7 +538,7 @@ export default function HomePage() {
         // Ignore unavailable storage.
       }
     } else if (requestedStep >= 1 && requestedStep <= 6) {
-      setStep(requestedStep === 5 ? 6 : requestedStep)
+      setStep(requestedStep)
     } else if (params.get('apply') === 'true' || params.get('baru') === 'true') {
       setStep(1)
     } else if (!hasFormIntent) {
@@ -265,10 +547,22 @@ export default function HomePage() {
         if (saved) {
           const draft = JSON.parse(saved) as { form?: Partial<ApplicationInput>; step?: number }
           if (draft.form && typeof draft.form === 'object') {
-            setForm({ ...initialForm, ...draft.form })
-            const savedStep = applicationSteps.some((item) => item.step === draft.step)
-              ? draft.step!
-              : 1
+            setForm({
+              ...initialForm,
+              ...draft.form,
+              personalBankName: '',
+              personalBankAccountNumber: '',
+              personalBankAccountName: '',
+              lpkBankName: '',
+              lpkBankAccountNumber: '',
+              lpkBankAccountName: '',
+            })
+            const savedStep =
+              draft.step && draft.step >= 5
+                ? 5
+                : applicationSteps.some((item) => item.step === draft.step)
+                  ? draft.step!
+                  : 1
             setStep(savedStep)
           }
         }
@@ -286,7 +580,21 @@ export default function HomePage() {
   useEffect(() => {
     if (!draftReady || step === 0) return
     try {
-      sessionStorage.setItem(APPLICATION_DRAFT_KEY, JSON.stringify({ form, step }))
+      sessionStorage.setItem(
+        APPLICATION_DRAFT_KEY,
+        JSON.stringify({
+          form: {
+            ...form,
+            personalBankName: '',
+            personalBankAccountNumber: '',
+            personalBankAccountName: '',
+            lpkBankName: '',
+            lpkBankAccountNumber: '',
+            lpkBankAccountName: '',
+          },
+          step,
+        }),
+      )
     } catch {
       // Storage may be unavailable or full; the in-memory form remains usable.
     }
@@ -772,14 +1080,13 @@ export default function HomePage() {
                   placeholder="Kota / kabupaten"
                 />
               </label>
-              <label className="field">
+              <div className="field">
                 <span>Tanggal lahir (wajib)</span>
-                <input
+                <BirthDatePicker
                   value={form.birthDate}
-                  onChange={(e) => set('birthDate', e.target.value)}
-                  placeholder="12 Februari 2000"
+                  onChange={(value) => set('birthDate', value)}
                 />
-              </label>
+              </div>
               <label className="field">
                 <span>Jenis kelamin</span>
                 <FormSelect
@@ -884,17 +1191,17 @@ export default function HomePage() {
                         set('destination', value as ApplicationInput['destination'])
                       }
                       options={[
-                        { value: 'JAPAN', label: '🇯🇵 Jepang' },
-                        { value: 'TURKEY', label: '🇹🇷 Turki' },
+                        { value: 'JAPAN', label: 'Jepang', destination: 'JAPAN' },
+                        { value: 'TURKEY', label: 'Turki', destination: 'TURKEY' },
                       ]}
                     />
                   </label>
                   <label className="field">
                     <span>Perkiraan tanggal keberangkatan</span>
-                    <input
+                    <BirthDatePicker
+                      mode="future"
                       value={form.estimatedDeparture}
-                      onChange={(e) => set('estimatedDeparture', e.target.value)}
-                      placeholder="12 Februari 2026"
+                      onChange={(value) => set('estimatedDeparture', value)}
                     />
                   </label>
                   <label className="field">
@@ -913,7 +1220,7 @@ export default function HomePage() {
                   </label>
                   <div className="need-section">
                     <label className="field">
-                      <span>Nilai pembiayaan sebelum potongan admin</span>
+                      <span>Nilai pembiayaan sebelum biaya jasa administrasi</span>
                       <FormSelect
                         value={form.financingAmount}
                         onChange={(value) => set('financingAmount', value)}
@@ -933,14 +1240,14 @@ export default function HomePage() {
                           <div className="wide finance-highlight">
                             <span>Estimasi dana cair</span>
                             <strong>{formatRupiah(estimatedCashDisbursed)}</strong>
-                            <small>Nilai pengajuan setelah potongan admin 5%</small>
+                            <small>Nilai pengajuan setelah dikurang jasa administrasi 5%</small>
                           </div>
                           <div>
-                            <span>Total Ujrah (simulasi 2,4% × 12 bulan)</span>
+                            <span>Total Ujrah</span>
                             <strong>{formatRupiah(estimatedTotalUjrah)}</strong>
                           </div>
                           <div>
-                            <span>Biaya admin (5%)</span>
+                            <span>Jasa administrasi (5%)</span>
                             <strong>{formatRupiah(estimatedAdminFee)}</strong>
                           </div>
                           <div className="finance-highlight">
@@ -949,9 +1256,12 @@ export default function HomePage() {
                             <small>Nilai pembiayaan + total Ujrah 12 bulan</small>
                           </div>
                           <div className="finance-highlight finance-installment">
-                            <span>Angsuran per bulan (simulasi 12 bulan)</span>
+                            <span>Angsuran per bulan</span>
                             <strong>{formatRupiah(estimatedFinancingTotal / 12)}</strong>
-                            <small>12 kali angsuran, belum menjadi jadwal akad final</small>
+                            <small>
+                              12 kali angsuran (simulasi 12 bulan), mulai dibayar ketika sudah
+                              bekerja
+                            </small>
                           </div>
                         </div>
                       )}
@@ -998,8 +1308,8 @@ export default function HomePage() {
                         set('destination', value as ApplicationInput['destination'])
                       }
                       options={[
-                        { value: 'JAPAN', label: '🇯🇵 Jepang' },
-                        { value: 'TURKEY', label: '🇹🇷 Turki' },
+                        { value: 'JAPAN', label: 'Jepang', destination: 'JAPAN' },
+                        { value: 'TURKEY', label: 'Turki', destination: 'TURKEY' },
                       ]}
                     />
                   </label>
@@ -1082,6 +1392,103 @@ export default function HomePage() {
             </>
           )}
 
+          {step === 5 && (
+            <>
+              <div className="intro intro-choice">
+                <h2>Informasi rekening</h2>
+                <p>Masukkan rekening pribadi dan rekening LPK mitra yang diajukan.</p>
+              </div>
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Rekening pribadi</h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Gunakan rekening atas nama Anda untuk keperluan pencatatan pengajuan.
+                  </p>
+                </div>
+                <label className="field">
+                  <span>Nama bank pribadi (wajib)</span>
+                  <input
+                    autoComplete="off"
+                    maxLength={60}
+                    value={form.personalBankName ?? ''}
+                    onChange={(event) => set('personalBankName', event.target.value)}
+                    placeholder="Contoh: BCA"
+                  />
+                </label>
+                <label className="field">
+                  <span>Nomor rekening pribadi (wajib)</span>
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={30}
+                    value={form.personalBankAccountNumber ?? ''}
+                    onChange={(event) =>
+                      set(
+                        'personalBankAccountNumber',
+                        event.target.value.replace(/\D/g, '').slice(0, 30),
+                      )
+                    }
+                    placeholder="Masukkan 6–30 digit"
+                  />
+                </label>
+                <label className="field">
+                  <span>Nama pemilik rekening pribadi (wajib)</span>
+                  <input
+                    autoComplete="off"
+                    maxLength={120}
+                    value={form.personalBankAccountName ?? ''}
+                    onChange={(event) => set('personalBankAccountName', event.target.value)}
+                    placeholder="Sesuai buku rekening"
+                  />
+                </label>
+              </section>
+              <section className="space-y-3 border-t border-slate-200 pt-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Rekening LPK mitra</h3>
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    Pastikan informasi ini telah dikonfirmasi kepada LPK mitra.
+                  </p>
+                </div>
+                <label className="field">
+                  <span>Nama bank LPK (wajib)</span>
+                  <input
+                    autoComplete="off"
+                    maxLength={60}
+                    value={form.lpkBankName ?? ''}
+                    onChange={(event) => set('lpkBankName', event.target.value)}
+                    placeholder="Contoh: BRI"
+                  />
+                </label>
+                <label className="field">
+                  <span>Nomor rekening LPK (wajib)</span>
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={30}
+                    value={form.lpkBankAccountNumber ?? ''}
+                    onChange={(event) =>
+                      set(
+                        'lpkBankAccountNumber',
+                        event.target.value.replace(/\D/g, '').slice(0, 30),
+                      )
+                    }
+                    placeholder="Masukkan 6–30 digit"
+                  />
+                </label>
+                <label className="field">
+                  <span>Nama pemilik rekening LPK (wajib)</span>
+                  <input
+                    autoComplete="off"
+                    maxLength={120}
+                    value={form.lpkBankAccountName ?? ''}
+                    onChange={(event) => set('lpkBankAccountName', event.target.value)}
+                    placeholder="Sesuai buku rekening LPK"
+                  />
+                </label>
+              </section>
+            </>
+          )}
+
           {step === 6 && (
             <>
               <div className="intro intro-choice">
@@ -1098,41 +1505,7 @@ export default function HomePage() {
                   disepakati.
                 </small>
               </section>
-              {isDeparture ? (
-                <div className="soft-note space-y-2">
-                  {estimatedMonthlyUjrah !== null &&
-                    estimatedTotalUjrah !== null &&
-                    estimatedAdminFee !== null &&
-                    estimatedCashDisbursed !== null &&
-                    estimatedFinancingTotal !== null && (
-                      <>
-                        <p>
-                          Estimasi dana cair setelah potongan admin 5%:{' '}
-                          <strong>{formatRupiah(estimatedCashDisbursed)}</strong>
-                        </p>
-                        <p>
-                          Total Ujrah (simulasi 2,4% × 12 bulan):{' '}
-                          <strong>{formatRupiah(estimatedTotalUjrah)}</strong>
-                        </p>
-                        <p>
-                          Biaya admin (5%): <strong>{formatRupiah(estimatedAdminFee)}</strong>
-                        </p>
-                        <p>
-                          Total kewajiban (simulasi):{' '}
-                          <strong>{formatRupiah(estimatedFinancingTotal)}</strong>
-                        </p>
-                        <p>
-                          Angsuran per bulan (simulasi 12 bulan):{' '}
-                          <strong>{formatRupiah(estimatedFinancingTotal / 12)}</strong>
-                        </p>
-                      </>
-                    )}
-                  <p>
-                    Nilai dana cair, total Ujrah, total kewajiban, dan angsuran di atas hanya
-                    simulasi. Rincian final menunggu verifikasi admin dan persetujuan Anda.
-                  </p>
-                </div>
-              ) : (
+              {!isDeparture && (
                 <div className="soft-note space-y-3">
                   <p className="font-semibold text-slate-800">
                     Rincian biaya Full Cover akan diisi dan diverifikasi tim VentureGo sebelum akad
@@ -1190,7 +1563,7 @@ export default function HomePage() {
                   </div>
                 </div>
               )}
-              <div className="review-list">
+              <div className="review-list compact-review-list">
                 <div>
                   <span>Nama</span>
                   <strong>{form.applicantName || 'Belum diisi'}</strong>
@@ -1198,6 +1571,19 @@ export default function HomePage() {
                 <div>
                   <span>LPK</span>
                   <strong>{form.lpkName || 'Belum diisi'}</strong>
+                </div>
+                <div>
+                  <span>Rekening pribadi</span>
+                  <strong>
+                    {form.personalBankName} · {form.personalBankAccountNumber} ·{' '}
+                    {form.personalBankAccountName}
+                  </strong>
+                </div>
+                <div>
+                  <span>Rekening LPK</span>
+                  <strong>
+                    {form.lpkBankName} · {form.lpkBankAccountNumber} · {form.lpkBankAccountName}
+                  </strong>
                 </div>
                 <div>
                   <span>Tujuan</span>
@@ -1225,6 +1611,14 @@ export default function HomePage() {
                 {isDeparture && (
                   <>
                     <div>
+                      <span>Nominal diajukan</span>
+                      <strong>
+                        {requestedFinancingAmount > 0
+                          ? formatRupiah(requestedFinancingAmount)
+                          : 'Belum diisi'}
+                      </strong>
+                    </div>
+                    <div>
                       <span>Estimasi dana cair (setelah admin 5%)</span>
                       <strong>
                         {estimatedCashDisbursed !== null
@@ -1239,11 +1633,11 @@ export default function HomePage() {
                       estimatedFinancingTotal !== null && (
                         <>
                           <div>
-                            <span>Total Ujrah (simulasi 2,4% × 12 bulan)</span>
+                            <span>Total Ujrah</span>
                             <strong>{formatRupiah(estimatedTotalUjrah)}</strong>
                           </div>
                           <div>
-                            <span>Biaya admin (5%)</span>
+                            <span>Jasa administrasi (5%)</span>
                             <strong>{formatRupiah(estimatedAdminFee)}</strong>
                           </div>
                           <div className="finance-review-total">
@@ -1251,7 +1645,7 @@ export default function HomePage() {
                             <strong>{formatRupiah(estimatedFinancingTotal)}</strong>
                           </div>
                           <div className="finance-review-total">
-                            <span>Angsuran per bulan (simulasi 12 bulan)</span>
+                            <span>Angsuran per bulan</span>
                             <strong>{formatRupiah(estimatedFinancingTotal / 12)}</strong>
                           </div>
                         </>
@@ -1265,6 +1659,12 @@ export default function HomePage() {
                   </strong>
                 </div>
               </div>
+              {isDeparture && (
+                <div className="soft-note review-simulation-note">
+                  Nilai dana cair, total Ujrah, total kewajiban, dan angsuran di atas hanya
+                  simulasi. Rincian final menunggu verifikasi admin dan LPK mitra.
+                </div>
+              )}
               <label className="consent">
                 <input
                   type="checkbox"
@@ -1285,7 +1685,10 @@ export default function HomePage() {
                   checked={form.acceptsDataProcessing}
                   onChange={(e) => set('acceptsDataProcessing', e.target.checked)}
                 />
-                <span>Saya menyetujui pemrosesan data untuk pemeriksaan pengajuan.</span>
+                <span>
+                  Saya menyetujui pemrosesan data pengajuan dan verifikasi rekening yang saya
+                  cantumkan.
+                </span>
               </label>
               {result.error && <p className="error-message">{result.error}</p>}
             </>
@@ -1313,11 +1716,7 @@ export default function HomePage() {
                 Kembali
               </Link>
             ) : (
-              <button
-                className="back-button"
-                onClick={() => (step === 6 ? setStep(4) : setStep(step - 1))}
-                type="button"
-              >
+              <button className="back-button" onClick={() => setStep(step - 1)} type="button">
                 Kembali
               </button>
             )}
@@ -1327,6 +1726,18 @@ export default function HomePage() {
               onClick={() => {
                 setStepError('')
                 if (step === 6) {
+                  if (
+                    !form.personalBankName.trim() ||
+                    !form.personalBankAccountName.trim() ||
+                    !/^\d{6,30}$/.test(form.personalBankAccountNumber) ||
+                    !form.lpkBankName.trim() ||
+                    !form.lpkBankAccountName.trim() ||
+                    !/^\d{6,30}$/.test(form.lpkBankAccountNumber)
+                  ) {
+                    setStepError('Lengkapi kembali informasi rekening pribadi dan LPK.')
+                    setStep(5)
+                    return
+                  }
                   if (!form.understandsWakalah || !form.acceptsDataProcessing) {
                     setStepError('Centang persetujuan akad dan pemrosesan data sebelum mengirim.')
                     return
@@ -1408,8 +1819,30 @@ export default function HomePage() {
                     return
                   }
                 }
+                if (step === 5) {
+                  const missing = [
+                    ['nama bank pribadi', form.personalBankName.trim()],
+                    ['nama pemilik rekening pribadi', form.personalBankAccountName.trim()],
+                    ['nama bank LPK', form.lpkBankName.trim()],
+                    ['nama pemilik rekening LPK', form.lpkBankAccountName.trim()],
+                  ]
+                    .filter(([, value]) => !value)
+                    .map(([label]) => label)
+                  if (missing.length) {
+                    setStepError(`Lengkapi ${missing.join(', ')}.`)
+                    return
+                  }
+                  if (!/^\d{6,30}$/.test(form.personalBankAccountNumber)) {
+                    setStepError('Nomor rekening pribadi harus terdiri dari 6 sampai 30 digit.')
+                    return
+                  }
+                  if (!/^\d{6,30}$/.test(form.lpkBankAccountNumber)) {
+                    setStepError('Nomor rekening LPK harus terdiri dari 6 sampai 30 digit.')
+                    return
+                  }
+                }
                 setStep3Error('')
-                setStep(step === 4 ? 6 : step + 1)
+                setStep(step + 1)
               }}
             >
               {isPending ? 'Mengirim…' : step === 6 ? 'Kirim pengajuan' : 'Lanjut'}

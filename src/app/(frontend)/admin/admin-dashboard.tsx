@@ -938,6 +938,10 @@ function ApplicationDrawerForm({
   )
 
   const personal = application.personalDetails ?? {}
+  const bankAccounts = (personal.bankAccounts ?? {}) as {
+    applicant?: Record<string, unknown>
+    lpk?: Record<string, unknown>
+  }
   const eligibility = application.eligibility ?? {}
   const fullCover = application.fullCoverDetails ?? {}
   const departure = application.departureDetails ?? {}
@@ -1432,6 +1436,32 @@ function ApplicationDrawerForm({
                     </dd>
                   </div>
                 </dl>
+                {bankAccounts.applicant || bankAccounts.lpk ? (
+                  <section className="mt-4 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Rekening yang diajukan
+                    </h4>
+                    <dl className="mt-2 grid gap-3 text-xs sm:grid-cols-2">
+                      {[
+                        ['Rekening pribadi', bankAccounts.applicant],
+                        ['Rekening LPK', bankAccounts.lpk],
+                      ].map(([label, account]) => {
+                        const details = account as Record<string, unknown> | undefined
+                        if (!details) return null
+                        return (
+                          <div className="min-w-0" key={String(label)}>
+                            <dt className="text-slate-400">{String(label)}</dt>
+                            <dd className="mt-0.5 break-words font-semibold text-slate-900">
+                              {String(details.bankName ?? '—')} ·{' '}
+                              {String(details.accountNumber ?? '—')} ·{' '}
+                              {String(details.accountName ?? '—')}
+                            </dd>
+                          </div>
+                        )
+                      })}
+                    </dl>
+                  </section>
+                ) : null}
               </div>
             </div>
 
@@ -3903,7 +3933,7 @@ function ApplicationDrawerForm({
                 </div>
               </div>
             </header>
-              <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-slate-100 p-4 sm:p-6">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-slate-100 p-4 sm:p-6">
               {akadPdfError && (
                 <p
                   className="mx-auto mb-3 max-w-4xl rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"

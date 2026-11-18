@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage() {
   return (
     <LegalPage
       title="Kebijakan Privasi"
-      effectiveDate="10 November 2026"
+      effectiveDate="18 November 2026"
       intro={
         <p>
           Kebijakan ini menjelaskan bagaimana VentureGo — layanan Vworks Student Venture (VSV) yang
@@ -31,7 +31,8 @@ export default function PrivacyPolicyPage() {
               <li>
                 <strong>Data pengajuan</strong>: nama sesuai KTP, nomor WhatsApp, agama, tempat dan
                 tanggal lahir, jenis kelamin, alamat, nama LPK, negara tujuan, kesiapan
-                keberangkatan, serta rincian kebutuhan dana.
+                keberangkatan, rincian kebutuhan dana, serta nama bank, nomor rekening, dan nama
+                pemilik rekening pribadi dan LPK mitra yang diajukan.
               </li>
               <li>
                 <strong>Dokumen</strong> yang Anda unggah, seperti KTP, Kartu Keluarga, ijazah,
@@ -55,6 +56,9 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc space-y-1 pl-5">
               <li>Memproses dan memverifikasi pengajuan pembiayaan Anda.</li>
               <li>Menyusun rincian biaya, akad Wakalah bil Ujrah, dan jadwal angsuran.</li>
+              <li>
+                Mencatat dan memverifikasi rekening pribadi serta rekening LPK mitra yang diajukan.
+              </li>
               <li>Menerima dan mencatat pembayaran angsuran.</li>
               <li>Mengirim pemberitahuan terkait pengajuan, berkas, dan jatuh tempo.</li>
               <li>Menjaga keamanan akun dan mencegah penyalahgunaan.</li>
@@ -77,7 +81,10 @@ export default function PrivacyPolicyPage() {
             <>
               <p>Data hanya dibagikan sejauh diperlukan kepada:</p>
               <ul className="list-disc space-y-1 pl-5">
-                <li>LPK mitra Anda, untuk verifikasi program dan biaya pelatihan.</li>
+                <li>
+                  LPK mitra Anda, untuk verifikasi program dan biaya pelatihan serta konfirmasi
+                  rekening LPK yang diajukan.
+                </li>
                 <li>Xendit, penyedia layanan pembayaran, untuk memproses pembayaran Anda.</li>
                 <li>
                   Penyedia infrastruktur awan (Google Cloud dan Vercel) yang menyimpan dan

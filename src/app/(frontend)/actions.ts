@@ -19,6 +19,12 @@ export type ApplicationInput = {
   guardianName: string
   phone: string
   lpkName: string
+  personalBankName: string
+  personalBankAccountNumber: string
+  personalBankAccountName: string
+  lpkBankName: string
+  lpkBankAccountNumber: string
+  lpkBankAccountName: string
   birthPlace: string
   birthDate: string
   idCardNumber: string
@@ -156,6 +162,16 @@ export async function submitFinancingApplication(request: FormData): Promise<App
   const guardianName = cleanText(input.guardianName, 100)
   const phone = cleanText(input.phone, 24)
   const lpkName = cleanText(input.lpkName, 120)
+  const personalBankName = cleanText(input.personalBankName, 60)
+  const personalBankAccountNumber =
+    typeof input.personalBankAccountNumber === 'string'
+      ? input.personalBankAccountNumber.trim()
+      : ''
+  const personalBankAccountName = cleanText(input.personalBankAccountName, 120)
+  const lpkBankName = cleanText(input.lpkBankName, 60)
+  const lpkBankAccountNumber =
+    typeof input.lpkBankAccountNumber === 'string' ? input.lpkBankAccountNumber.trim() : ''
+  const lpkBankAccountName = cleanText(input.lpkBankAccountName, 120)
   if (input.idCardNumber !== undefined && typeof input.idCardNumber !== 'string') {
     return { ok: false, message: 'NIK tidak valid. Masukkan digit saja (maksimal 20 karakter).' }
   }
@@ -168,6 +184,20 @@ export async function submitFinancingApplication(request: FormData): Promise<App
     return {
       ok: false,
       message: 'Lengkapi nama pemohon, nama orang tua/wali, nomor WhatsApp, dan nama LPK.',
+    }
+  }
+  if (
+    !personalBankName ||
+    !personalBankAccountName ||
+    !/^\d{6,30}$/.test(personalBankAccountNumber) ||
+    !lpkBankName ||
+    !lpkBankAccountName ||
+    !/^\d{6,30}$/.test(lpkBankAccountNumber)
+  ) {
+    return {
+      ok: false,
+      message:
+        'Lengkapi nama bank, nomor rekening 6–30 digit, dan nama pemilik untuk rekening pribadi serta LPK.',
     }
   }
   if (!/^(\+62|62|0)[0-9]{8,14}$/.test(phone.replace(/[\s-]/g, ''))) {
@@ -264,6 +294,18 @@ export async function submitFinancingApplication(request: FormData): Promise<App
     domicileSameAsIdCard,
     domicileAddress,
     domicilePostalCode: cleanText(input.domicilePostalCode, 10),
+    bankAccounts: {
+      applicant: {
+        bankName: personalBankName,
+        accountNumber: personalBankAccountNumber,
+        accountName: personalBankAccountName,
+      },
+      lpk: {
+        bankName: lpkBankName,
+        accountNumber: lpkBankAccountNumber,
+        accountName: lpkBankAccountName,
+      },
+    },
   }
 
   let cleanupFileIds: string[] = []

@@ -125,6 +125,16 @@ const ACTIVE_INSTALLMENT_FILTERS: {
   { id: 'CURRENT', label: 'Berjalan' },
 ]
 
+const STUDENT_DIRECTORY_FILTERS: {
+  id: 'ALL' | 'IN_PROGRESS' | 'ACTIVE' | 'ALUMNI'
+  label: string
+}[] = [
+  { id: 'ALL', label: 'Semua Siswa' },
+  { id: 'IN_PROGRESS', label: 'Dalam Proses' },
+  { id: 'ACTIVE', label: 'Siswa Aktif' },
+  { id: 'ALUMNI', label: 'Alumnus' },
+]
+
 const RELIGION_LABELS: Record<string, string> = {
   ISLAM: 'Islam',
   PROTESTANT: 'Kristen Protestan',
@@ -170,7 +180,6 @@ type MenuId =
   | 'students'
   | 'activeInstallments'
   | 'alumni'
-  | 'schedule'
   | 'vip'
   | 'audit'
 
@@ -234,15 +243,9 @@ const SIDEBAR_GROUPS: {
       },
       {
         id: 'students',
-        label: 'Data Siswa',
+        label: 'Semua Siswa',
         subtitle: 'Direktori biodata siswa, LPK mitra, kesiapan keberangkatan, & berkas',
         defaultTab: 'documents',
-      },
-      {
-        id: 'schedule',
-        label: 'Jadwal Angsuran',
-        subtitle: 'Detail jadwal cicilan, progres bayar, dan transaksi Xendit per siswa',
-        defaultTab: 'profile',
       },
     ],
   },
@@ -556,20 +559,6 @@ function MenuIcon({ id }: { id: MenuId }) {
           />
         </svg>
       )
-    case 'schedule':
-      return (
-        <svg
-          className="size-4 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <rect height="16" rx="2" width="18" x="3" y="4" />
-          <path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" />
-          <path d="M7.5 14h3M13.5 14h3M7.5 17.5h3" strokeLinecap="round" />
-        </svg>
-      )
     case 'vip':
       return (
         <svg
@@ -792,6 +781,16 @@ const isLegacyApplication = (app: FinancingApplicationRecord) =>
 
 const hasActiveInstallment = (app: FinancingApplicationRecord, summary: InstallmentSummary) =>
   !isAlumnus(app, summary) && summary.remaining > 0
+
+const getStudentDirectoryCategory = (
+  app: FinancingApplicationRecord,
+  summary: InstallmentSummary,
+): 'IN_PROGRESS' | 'ACTIVE' | 'ALUMNI' | 'CLOSED' => {
+  if (isAlumnus(app, summary)) return 'ALUMNI'
+  if (hasActiveInstallment(app, summary)) return 'ACTIVE'
+  if (app.status === 'REJECTED' || app.status === 'CANCELLED') return 'CLOSED'
+  return 'IN_PROGRESS'
+}
 
 const compareInstallmentRows = (
   a: { summary: InstallmentSummary },
@@ -4163,7 +4162,6 @@ export function AdminDashboard({
   const [dashboardRange, setDashboardRange] = useState<6 | 12>(6)
   const [drawerAppId, setDrawerAppId] = useState<string | null>(null)
   const [drawerTab, setDrawerTab] = useState<DetailTabId>('profile')
-  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(null)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [productFilter, setProductFilter] = useState<'ALL' | 'FULL_COVER' | 'DEPARTURE_BRIDGING'>(
@@ -4202,6 +4200,8 @@ export function AdminDashboard({
     'ALL' | 'OVERDUE' | 'DUE_SOON' | 'CURRENT'
   >('ALL')
   const [alumniFilter, setAlumniFilter] = useState<'ALL' | 'ON_TIME' | 'EARLY'>('ALL')
+  const [studentDirectoryFilter, setStudentDirectoryFilter] =
+    useState<(typeof STUDENT_DIRECTORY_FILTERS)[number]['id']>('ALL')
 
   const hasActiveFilter =
     searchQuery.trim() !== '' ||
@@ -4420,7 +4420,7 @@ export function AdminDashboard({
     return [...map.values()].sort((a, b) => b.count - a.count)
   }, [filteredApplications])
 
-  // Ringkasan angsuran per pengajuan (dasar menu Angsuran Aktif & Jadwal Angsuran)
+  // Ringkasan angsuran per pengajuan (dasar menu Siswa Aktif, Alumnus, dan riwayat drawer)
   const installmentSummaries = useMemo(
     () =>
       filteredApplications.map((app) => ({
@@ -4438,6 +4438,32 @@ export function AdminDashboard({
   const alumniSummaries = useMemo(
     () => installmentSummaries.filter(({ app, summary }) => isAlumnus(app, summary)),
     [installmentSummaries],
+  )
+
+  const studentDirectoryCounts = useMemo(() => {
+    const counts = {
+      ALL: installmentSummaries.length,
+      IN_PROGRESS: 0,
+      ACTIVE: 0,
+      ALUMNI: 0,
+      CLOSED: 0,
+    }
+    for (const { app, summary } of installmentSummaries) {
+      counts[getStudentDirectoryCategory(app, summary)] += 1
+    }
+    return counts
+  }, [installmentSummaries])
+
+  const visibleStudentDirectoryRows = useMemo(
+    () =>
+      installmentSummaries
+        .filter(
+          ({ app, summary }) =>
+            studentDirectoryFilter === 'ALL' ||
+            getStudentDirectoryCategory(app, summary) === studentDirectoryFilter,
+        )
+        .sort((a, b) => a.app.applicantName.localeCompare(b.app.applicantName, 'id')),
+    [installmentSummaries, studentDirectoryFilter],
   )
 
   const alumniRows = useMemo(
@@ -4508,14 +4534,6 @@ export function AdminDashboard({
         : '—',
     }
   }, [alumniRows])
-
-  const scheduleRows = useMemo(
-    () =>
-      installmentSummaries
-        .filter(({ summary }) => summary.schedule.length > 0)
-        .sort(compareInstallmentRows),
-    [installmentSummaries],
-  )
 
   const activeInstallmentMetrics = useMemo(() => {
     let overdue = 0
@@ -4853,11 +4871,6 @@ export function AdminDashboard({
     router.refresh()
   }
 
-  const openScheduleDetail = (appId: string) => {
-    setActiveMenu('schedule')
-    setExpandedScheduleId(appId)
-  }
-
   const allMenus = SIDEBAR_GROUPS.flatMap((g) => g.items)
   const activeMenuInfo = allMenus.find((m) => m.id === activeMenu) ?? allMenus[0]
 
@@ -4879,8 +4892,6 @@ export function AdminDashboard({
         return activeInstallmentMetrics.count
       case 'alumni':
         return alumniRows.length
-      case 'schedule':
-        return scheduleRows.length
       case 'audit':
         return auditEntries.length
       default:
@@ -6287,64 +6298,372 @@ export function AdminDashboard({
             </div>
           )}
           {activeMenu === 'students' && (
-            <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
-                      <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
-                      <th className="whitespace-nowrap px-4 py-3">No. WhatsApp</th>
-                      <th className="whitespace-nowrap px-4 py-3">TTL & Gender</th>
-                      <th className="whitespace-nowrap px-4 py-3">LPK & Negara</th>
-                      <th className="whitespace-nowrap px-4 py-3">Status COE / Visa</th>
-                      <th className="whitespace-nowrap px-4 py-3">Est. Keberangkatan</th>
-                      <th className="whitespace-nowrap px-4 py-3">Berkas Terunggah</th>
-                      <th className="whitespace-nowrap px-4 py-3">Diverifikasi</th>
-                      <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredApplications.map((app) => {
-                      const personal = app.personalDetails ?? {}
-                      const eligibility = app.eligibility ?? {}
-                      const uploaded = app.documents.filter((d) => Boolean(d.fileId)).length
-                      const verified = app.documents.filter((d) => d.status === 'VERIFIED').length
-                      return (
-                        <tr className="hover:bg-slate-50/80" key={app.id}>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <p className="font-semibold text-slate-900">{app.applicantName}</p>
-                            <p className="text-[11px] text-slate-400" title={app.applicationId}>
-                              {formatDisplayApplicationId(app.applicationId)}
-                            </p>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700">
-                            {app.phone}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                            {String(personal.birthPlace ?? '—')},{' '}
-                            {String(personal.birthDate ?? '—')} ·{' '}
-                            {personal.gender === 'FEMALE' ? 'P' : 'L'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                            {app.lpkName} ({app.destination === 'JAPAN' ? 'Jepang' : 'Turki'})
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                            COE: {DOC_PROGRESS_LABELS[String(eligibility.coeStatus ?? '')] ?? '—'} ·
-                            Visa: {DOC_PROGRESS_LABELS[String(eligibility.visaStatus ?? '')] ?? '—'}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                            {String(eligibility.estimatedDeparture ?? '—')}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-800">
-                            {uploaded}/{app.documents.length}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                              {verified} berkas
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-right">
-                            <div className="flex justify-end gap-1.5">
+            <div className="space-y-5">
+              <section className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-emerald-50/30 p-5 shadow-xs sm:p-6">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-12 -top-12 size-56 rounded-full bg-blue-100/50 blur-3xl"
+                />
+                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0b57d0] to-emerald-500 text-white shadow-md shadow-blue-500/20 ring-4 ring-blue-50">
+                      <svg
+                        aria-hidden="true"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m14-13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm2 4a4 4 0 0 1 4 4v2h-4m-1-14a4 4 0 0 1 0 8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h1 className="text-lg font-extrabold text-slate-900">
+                        Direktori Semua Siswa
+                      </h1>
+                      <p className="mt-0.5 max-w-2xl text-xs leading-relaxed text-slate-500">
+                        Satu direktori untuk meninjau identitas, program, kesiapan keberangkatan,
+                        berkas, dan status pembiayaan seluruh siswa.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 sm:flex sm:gap-6">
+                    {[
+                      {
+                        label: 'Total Siswa',
+                        value: studentDirectoryCounts.ALL,
+                        tone: 'text-[#0b57d0]',
+                      },
+                      {
+                        label: 'Dalam Proses',
+                        value: studentDirectoryCounts.IN_PROGRESS,
+                        tone: 'text-violet-700',
+                      },
+                      {
+                        label: 'Siswa Aktif',
+                        value: studentDirectoryCounts.ACTIVE,
+                        tone: 'text-emerald-700',
+                      },
+                      {
+                        label: 'Alumnus',
+                        value: studentDirectoryCounts.ALUMNI,
+                        tone: 'text-amber-700',
+                      },
+                    ].map((metric) => (
+                      <div className="min-w-16 text-left sm:text-center" key={metric.label}>
+                        <span className={`block text-xl font-extrabold ${metric.tone}`}>
+                          {metric.value}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] font-medium text-slate-500">
+                          {metric.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
+                  <h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                    Daftar Semua Siswa ({visibleStudentDirectoryRows.length}
+                    {studentDirectoryFilter !== 'ALL' ? ` dari ${studentDirectoryCounts.ALL}` : ''})
+                  </h2>
+                  <div className="flex flex-wrap gap-1">
+                    {STUDENT_DIRECTORY_FILTERS.map((filter) => (
+                      <button
+                        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] ${
+                          studentDirectoryFilter === filter.id
+                            ? 'bg-[#0b57d0] text-white shadow-2xs'
+                            : 'border border-slate-200/80 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                        }`}
+                        key={filter.id}
+                        onClick={() => setStudentDirectoryFilter(filter.id)}
+                        style={{ fontSize: '10px' }}
+                        type="button"
+                      >
+                        <span>{filter.label}</span>
+                        <span
+                          className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold leading-none ${
+                            studentDirectoryFilter === filter.id
+                              ? 'bg-white/20 text-white'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {studentDirectoryCounts[filter.id]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {visibleStudentDirectoryRows.length === 0 ? (
+                  <div className="px-4 py-12 text-center text-sm text-slate-500">
+                    Tidak ada siswa yang cocok dengan filter ini.
+                  </div>
+                ) : (
+                  <>
+                    <div className="hidden overflow-x-auto md:block">
+                      <table className="w-full min-w-[1160px] table-fixed text-left text-xs">
+                        <colgroup>
+                          <col className="w-[17%]" />
+                          <col className="w-[19%]" />
+                          <col className="w-[12%]" />
+                          <col className="w-[15%]" />
+                          <col className="w-[11%]" />
+                          <col className="w-[11%]" />
+                          <col className="w-[15%]" />
+                        </colgroup>
+                        <thead className="bg-white text-[10px] uppercase tracking-wider text-slate-500">
+                          <tr className="border-b border-slate-200">
+                            <th className="whitespace-nowrap px-4 py-2">Siswa</th>
+                            <th className="whitespace-nowrap px-4 py-2">Program &amp; LPK</th>
+                            <th className="whitespace-nowrap px-4 py-2">Negara &amp; Berangkat</th>
+                            <th className="whitespace-nowrap px-4 py-2">Status Program</th>
+                            <th className="whitespace-nowrap px-4 py-2">Berkas</th>
+                            <th className="whitespace-nowrap px-4 py-2">Pembiayaan</th>
+                            <th className="whitespace-nowrap px-4 py-2 text-right">Aksi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {visibleStudentDirectoryRows.map(({ app, summary }) => {
+                            const eligibility = app.eligibility ?? {}
+                            const uploaded = app.documents.filter((document) =>
+                              Boolean(document.fileId),
+                            ).length
+                            const verified = app.documents.filter(
+                              (document) => document.status === 'VERIFIED',
+                            ).length
+                            const akadDocument = app.financialPlan?.akadDocument
+                            const studentNumber =
+                              akadDocument && typeof akadDocument === 'object'
+                                ? String(
+                                    (akadDocument as Record<string, unknown>).studentNumber ?? '',
+                                  )
+                                : ''
+                            const category = getStudentDirectoryCategory(app, summary)
+                            return (
+                              <tr className="transition-colors hover:bg-emerald-50/30" key={app.id}>
+                                <td className="px-4 py-2">
+                                  <p className="font-semibold text-slate-900">
+                                    {app.applicantName}
+                                  </p>
+                                  <p className="text-[10px] font-medium text-emerald-700">
+                                    NIS {studentNumber || 'belum tersedia'}
+                                  </p>
+                                  <p
+                                    className="text-[10px] text-slate-400"
+                                    title={app.applicationId}
+                                  >
+                                    {formatDisplayApplicationId(app.applicationId)}
+                                  </p>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                                    {app.product === 'FULL_COVER'
+                                      ? 'Full Cover'
+                                      : 'Dana Keberangkatan'}
+                                  </span>
+                                  <p
+                                    className="mt-1 max-w-52 truncate text-slate-700"
+                                    title={app.lpkName}
+                                  >
+                                    {app.lpkName || 'LPK belum tersedia'}
+                                  </p>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-slate-600">
+                                  <span
+                                    aria-label={app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
+                                    className="inline-flex items-center gap-1.5"
+                                    title={app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
+                                  >
+                                    <DestinationFlag destination={app.destination} />
+                                    <span>
+                                      {formatDateShort(
+                                        eligibility.estimatedDeparture ?? app.departureDate,
+                                      ) || '—'}
+                                    </span>
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <span
+                                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${STATUS_BADGE_STYLES[app.status] ?? 'bg-slate-100 text-slate-700 ring-slate-200'}`}
+                                  >
+                                    {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ??
+                                      app.status}
+                                  </span>
+                                  <p className="mt-1 text-[10px] text-slate-500">
+                                    COE{' '}
+                                    {DOC_PROGRESS_LABELS[String(eligibility.coeStatus ?? '')] ??
+                                      '—'}
+                                    {' · '}Visa{' '}
+                                    {DOC_PROGRESS_LABELS[String(eligibility.visaStatus ?? '')] ??
+                                      '—'}
+                                  </p>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  <p className="font-semibold text-slate-800">
+                                    {uploaded}/{app.documents.length} berkas
+                                  </p>
+                                  <p className="mt-0.5 text-[10px] font-medium text-emerald-700">
+                                    {verified} sesuai
+                                  </p>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2">
+                                  {category === 'ALUMNI' ? (
+                                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                                      ✓ Lunas 100%
+                                    </span>
+                                  ) : category === 'ACTIVE' ? (
+                                    <>
+                                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                                        Angsuran aktif
+                                      </span>
+                                      <p className="mt-1 text-[10px] text-slate-500">
+                                        Sisa {formatRupiah(summary.remaining)}
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500">
+                                      {category === 'CLOSED'
+                                        ? 'Tidak aktif'
+                                        : 'Belum masuk angsuran'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-right">
+                                  <div className="flex justify-end gap-1.5">
+                                    <DrawerAction
+                                      ariaLabel={`Buka biodata ${app.applicationId}`}
+                                      label="Biodata"
+                                      onClick={() => openApplicationDrawer(app.id, 'profile')}
+                                    />
+                                    <DrawerAction
+                                      ariaLabel={`Buka berkas ${app.applicationId}`}
+                                      label="Berkas"
+                                      onClick={() => openApplicationDrawer(app.id, 'documents')}
+                                    />
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="space-y-3 p-3 md:hidden">
+                      {visibleStudentDirectoryRows.map(({ app, summary }) => {
+                        const eligibility = app.eligibility ?? {}
+                        const uploaded = app.documents.filter((document) =>
+                          Boolean(document.fileId),
+                        ).length
+                        const verified = app.documents.filter(
+                          (document) => document.status === 'VERIFIED',
+                        ).length
+                        const akadDocument = app.financialPlan?.akadDocument
+                        const studentNumber =
+                          akadDocument && typeof akadDocument === 'object'
+                            ? String((akadDocument as Record<string, unknown>).studentNumber ?? '')
+                            : ''
+                        const category = getStudentDirectoryCategory(app, summary)
+                        return (
+                          <article
+                            className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs"
+                            key={app.id}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="truncate text-sm font-bold text-slate-900">
+                                  {app.applicantName}
+                                </h3>
+                                <p className="mt-0.5 text-[10px] font-medium text-emerald-700">
+                                  NIS {studentNumber || 'belum tersedia'}
+                                </p>
+                                <p
+                                  className="truncate text-[10px] text-slate-400"
+                                  title={app.applicationId}
+                                >
+                                  {formatDisplayApplicationId(app.applicationId)}
+                                </p>
+                              </div>
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-bold ${category === 'ALUMNI' ? 'bg-emerald-50 text-emerald-700' : category === 'ACTIVE' ? 'bg-blue-50 text-blue-700' : category === 'CLOSED' ? 'bg-red-50 text-red-700' : 'bg-violet-50 text-violet-700'}`}
+                              >
+                                {category === 'ALUMNI'
+                                  ? 'Lunas 100%'
+                                  : category === 'ACTIVE'
+                                    ? 'Aktif'
+                                    : category === 'CLOSED'
+                                      ? 'Ditutup'
+                                      : 'Dalam proses'}
+                              </span>
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
+                              <div>
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400">
+                                  Program &amp; LPK
+                                </span>
+                                <p className="mt-0.5 truncate font-semibold text-slate-700">
+                                  {app.product === 'FULL_COVER'
+                                    ? 'Full Cover'
+                                    : 'Dana Keberangkatan'}
+                                </p>
+                                <p className="truncate text-slate-500">
+                                  {app.lpkName || 'LPK belum tersedia'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400">
+                                  Negara &amp; Berangkat
+                                </span>
+                                <p className="mt-0.5 font-semibold text-slate-700">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <DestinationFlag destination={app.destination} />
+                                    {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
+                                  </span>
+                                </p>
+                                <p className="text-slate-500">
+                                  {formatDateShort(
+                                    eligibility.estimatedDeparture ?? app.departureDate,
+                                  ) || 'Tanggal belum tersedia'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400">
+                                  Status Program
+                                </span>
+                                <p className="mt-0.5 font-semibold text-slate-700">
+                                  {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ??
+                                    app.status}
+                                </p>
+                                <p className="text-slate-500">
+                                  COE{' '}
+                                  {DOC_PROGRESS_LABELS[String(eligibility.coeStatus ?? '')] ?? '—'}{' '}
+                                  · Visa{' '}
+                                  {DOC_PROGRESS_LABELS[String(eligibility.visaStatus ?? '')] ?? '—'}
+                                </p>
+                              </div>
+                              <div>
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400">
+                                  Berkas
+                                </span>
+                                <p className="mt-0.5 font-semibold text-slate-700">
+                                  {uploaded}/{app.documents.length} terunggah · {verified} sesuai
+                                </p>
+                                {category === 'ACTIVE' && (
+                                  <p className="text-slate-500">
+                                    Sisa {formatRupiah(summary.remaining)}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
                               <DrawerAction
                                 ariaLabel={`Buka biodata ${app.applicationId}`}
                                 label="Biodata"
@@ -6356,14 +6675,14 @@ export function AdminDashboard({
                                 onClick={() => openApplicationDrawer(app.id, 'documents')}
                               />
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                          </article>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </section>
+            </div>
           )}
 
           {/* 4. MENU: PERSIAPAN AKAD (Financial Plan & Shariah Contract Table) */}
@@ -7356,285 +7675,6 @@ export function AdminDashboard({
                 )}
               </section>
             </div>
-          )}
-
-          {/* 7. MENU: JADWAL ANGSURAN (Per-student Schedule & Xendit Detail) */}
-          {activeMenu === 'schedule' && (
-            <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-              <header className="border-b border-slate-100 px-5 py-3.5">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Jadwal Cicilan Siswa ({scheduleRows.length})
-                </h2>
-              </header>
-              {scheduleRows.length === 0 ? (
-                <p className="px-5 py-8 text-center text-xs text-slate-400">
-                  Belum ada siswa dengan jadwal angsuran.
-                </p>
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {scheduleRows.map(({ app, summary }) => {
-                    const expanded = expandedScheduleId === app.id
-                    const rowPayments = payments.filter(
-                      (p) => p.applicationDocId === app.id || p.applicationId === app.applicationId,
-                    )
-                    const overdueDays =
-                      summary.nextDue && summary.overdueCount > 0
-                        ? getDaysBetween(summary.nextDue.dueDate, todayIso)
-                        : 0
-                    return (
-                      <li key={app.id}>
-                        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-[#0b57d0]">{app.applicationId}</span>
-                              <span className="font-semibold text-slate-900">
-                                {app.applicantName}
-                              </span>
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${
-                                  STATUS_BADGE_STYLES[app.status] ??
-                                  'bg-slate-100 text-slate-700 ring-slate-200'
-                                }`}
-                              >
-                                {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ??
-                                  app.status}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 text-[11px] text-slate-500">
-                              {app.lpkName} · {summary.schedule.length} bulan · {summary.paidCount}/
-                              {summary.schedule.length} lunas
-                              {overdueDays > 0 && (
-                                <span className="ml-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
-                                  Terlambat {overdueDays} hr
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right text-xs">
-                              <span className="block text-slate-400">Sisa Kewajiban</span>
-                              <strong className="block font-bold text-slate-900">
-                                {formatRupiah(summary.remaining)}
-                              </strong>
-                            </div>
-                            <div className="text-right text-xs">
-                              <span className="block text-slate-400">Jatuh Tempo</span>
-                              <strong className="block font-bold text-slate-900">
-                                {summary.nextDue ? formatDateShort(summary.nextDue.dueDate) : '—'}
-                              </strong>
-                            </div>
-                            <DrawerAction
-                              ariaLabel={`${expanded ? 'Tutup' : 'Buka'} detail jadwal ${app.applicationId}`}
-                              label={expanded ? 'Tutup' : 'Detail'}
-                              onClick={() => setExpandedScheduleId(expanded ? null : app.id)}
-                            />
-                          </div>
-                        </div>
-
-                        {expanded && (
-                          <div className="space-y-4 border-t border-slate-100 bg-slate-50/60 px-5 py-4">
-                            {/* KPI 4 cards */}
-                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                                <span className="text-[11px] text-slate-400">
-                                  Total Kewajiban Akad
-                                </span>
-                                <strong className="mt-1 block text-lg font-extrabold text-slate-900">
-                                  {formatRupiah(summary.obligation)}
-                                </strong>
-                              </div>
-                              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                                <span className="text-[11px] text-slate-400">Total Terbayar</span>
-                                <strong className="mt-1 block text-lg font-extrabold text-emerald-600">
-                                  {formatRupiah(summary.paidAmount)}
-                                </strong>
-                                <span className="mt-0.5 block text-[10px] text-slate-400">
-                                  {summary.paidCount} dari {summary.schedule.length} cicilan
-                                </span>
-                              </div>
-                              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                                <span className="text-[11px] text-slate-400">Sisa Kewajiban</span>
-                                <strong className="mt-1 block text-lg font-extrabold text-[#0b57d0]">
-                                  {formatRupiah(summary.remaining)}
-                                </strong>
-                              </div>
-                              <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-                                <span className="text-[11px] text-slate-400">
-                                  Cicilan Berikutnya
-                                </span>
-                                {summary.nextDue ? (
-                                  <>
-                                    <strong
-                                      className={`mt-1 block text-lg font-extrabold ${overdueDays > 0 ? 'text-red-600' : 'text-slate-900'}`}
-                                    >
-                                      {formatRupiah(summary.nextDue.remaining)}
-                                    </strong>
-                                    <span
-                                      className={`mt-0.5 block text-[10px] ${overdueDays > 0 ? 'font-bold text-red-600' : 'text-slate-400'}`}
-                                    >
-                                      {formatDateShort(summary.nextDue.dueDate)}
-                                      {overdueDays > 0 && ` · Terlambat ${overdueDays} hr`}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <strong className="mt-1 block text-lg font-extrabold text-slate-900">
-                                    —
-                                  </strong>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Tabel jadwal cicilan */}
-                            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                              <table className="w-full border-collapse text-left text-xs">
-                                <thead>
-                                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                    <th className="px-4 py-2.5">Cicilan</th>
-                                    <th className="px-4 py-2.5">Jatuh Tempo</th>
-                                    <th className="px-4 py-2.5 text-right">Nominal</th>
-                                    <th className="px-4 py-2.5 text-right">Terbayar</th>
-                                    <th className="px-4 py-2.5 text-right">Sisa</th>
-                                    <th className="px-4 py-2.5">Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {summary.rows.length === 0 ? (
-                                    <tr>
-                                      <td
-                                        className="px-4 py-4 text-center text-slate-500"
-                                        colSpan={6}
-                                      >
-                                        Belum ada rincian jadwal cicilan pada kontrak ini.
-                                      </td>
-                                    </tr>
-                                  ) : (
-                                    summary.rows.map((row) => {
-                                      const overdue =
-                                        summary.isLegacy && !row.isPaid && row.dueDate < todayIso
-                                      const status = row.isPaid
-                                        ? 'Lunas'
-                                        : row.isPartial
-                                          ? overdue
-                                            ? 'Sebagian · Terlambat'
-                                            : 'Sebagian dibayar'
-                                          : overdue
-                                            ? 'Terlambat'
-                                            : summary.isLegacy
-                                              ? 'Belum dibayar'
-                                              : 'Belum Mulai'
-                                      return (
-                                        <tr
-                                          className="border-b border-slate-100 last:border-b-0"
-                                          key={row.installment}
-                                        >
-                                          <td className="px-4 py-2.5 font-semibold text-slate-900">
-                                            {row.installment}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-slate-600">
-                                            {formatDateShort(row.dueDate)}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right text-slate-900">
-                                            {formatRupiah(row.amount)}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right text-emerald-700">
-                                            {row.appliedAmount > 0
-                                              ? formatRupiah(row.appliedAmount)
-                                              : '—'}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right text-slate-600">
-                                            {row.remaining > 0 ? formatRupiah(row.remaining) : '—'}
-                                          </td>
-                                          <td className="px-4 py-2.5">
-                                            <span
-                                              className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                                row.isPaid
-                                                  ? 'bg-emerald-50 text-emerald-700'
-                                                  : overdue
-                                                    ? 'bg-red-50 text-red-700'
-                                                    : 'bg-amber-50 text-amber-700'
-                                              }`}
-                                            >
-                                              {status}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      )
-                                    })
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-
-                            {summary.isLegacy && (
-                              <p className="text-[11px] leading-relaxed text-slate-500">
-                                Total terbayar mencakup seluruh transaksi LGC berstatus lunas.
-                                Transaksi tanpa nomor cicilan tetap masuk total, tetapi tidak
-                                dialokasikan ke baris jadwal.
-                              </p>
-                            )}
-
-                            {/* Histori pembayaran */}
-                            {rowPayments.length > 0 ? (
-                              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                                <div className="border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">
-                                  {summary.isLegacy ? 'Riwayat Pembayaran LGC' : 'Transaksi Xendit'}{' '}
-                                  ({rowPayments.length})
-                                </div>
-                                <table className="w-full border-collapse text-left text-xs">
-                                  <thead>
-                                    <tr className="border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                      <th className="px-4 py-2.5">Keterangan</th>
-                                      <th className="px-4 py-2.5 text-right">Nominal</th>
-                                      <th className="px-4 py-2.5">Status</th>
-                                      <th className="px-4 py-2.5 text-right">Dibayar</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {rowPayments.map((payment) => (
-                                      <tr
-                                        className="border-b border-slate-100 last:border-b-0"
-                                        key={payment.id}
-                                      >
-                                        <td className="px-4 py-2.5 font-medium text-slate-900">
-                                          {payment.description || 'Pembayaran'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right text-slate-900">
-                                          {formatRupiah(payment.amount)}
-                                        </td>
-                                        <td className="px-4 py-2.5">
-                                          <span
-                                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ring-1 ${
-                                              PAYMENT_BADGE_STYLES[payment.status] ??
-                                              'bg-slate-100 text-slate-700 ring-slate-200'
-                                            }`}
-                                          >
-                                            {PAYMENT_STATUS_LABELS[payment.status] ??
-                                              payment.status}
-                                          </span>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right text-slate-600">
-                                          {formatDateTime(payment.paidAt)}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <p className="text-xs text-slate-500">
-                                {summary.isLegacy
-                                  ? 'Belum ada transaksi pembayaran LGC untuk siswa ini.'
-                                  : 'Belum ada transaksi Xendit untuk siswa ini.'}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </section>
           )}
 
           {activeMenu === 'vip' && <AdminVipPanel searchQuery={searchQuery} todayIso={todayIso} />}

@@ -454,6 +454,7 @@ input[type='checkbox'] {
   z-index: 10;
   padding: 12px 20px max(16px, env(safe-area-inset-bottom));
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.97);
@@ -1257,32 +1258,69 @@ body {
 
 .step-dots {
   grid-column: 1 / -1;
-  min-height: 12px;
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 20px);
+  justify-content: center;
+  gap: 8px;
+  padding: 0 0 3px;
+}
+
+.step-item {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  color: #7a8291;
+  font-size: 9px;
+  font-weight: 600;
 }
 
-.step-dots span {
-  width: 6px;
-  height: 6px;
+.step-number {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
   border-radius: 999px;
-  background: #d9d7ff;
+  background: #edf1f8;
+  color: #667085;
   transition:
-    width 0.18s ease-out,
-    height 0.18s ease-out,
-    background-color 0.18s ease-out;
+    background-color 0.18s ease-out,
+    color 0.18s ease-out;
 }
 
-.step-dots span.completed {
-  background: #5782f6;
+.step-item.active,
+.step-item.completed {
+  color: #0b57d0;
 }
 
-.step-dots span.active {
-  width: 8px;
-  height: 8px;
-  background: #0b57d0;
+.step-item.active .step-number,
+.step-item.completed .step-number {
+  background: #e8f0fe;
+  color: #0b57d0;
+}
+
+.step-item.active .step-number {
+  box-shadow: inset 0 0 0 1px #0b57d0;
+}
+
+@media (max-width: 380px) {
+  .step-dots {
+    grid-template-columns: repeat(5, 18px);
+    gap: 6px;
+  }
+
+  .step-item {
+    font-size: 8px;
+  }
+
+  .step-number {
+    flex-basis: 18px;
+    width: 18px;
+    height: 18px;
+  }
 }
 
 .wizard-footer .primary-button,
@@ -1372,11 +1410,11 @@ body {
 }
 
 .mobile-shell:not(.choice-step) .wizard-header {
-  min-height: 124px;
-  padding: 20px 24px;
+  min-height: 88px;
+  padding: 12px 20px;
   justify-content: center;
   align-items: center;
-  border-radius: 0 0 42px 42px;
+  border-radius: 0 0 18px 18px;
   background:
     radial-gradient(circle at 18% 28%, rgba(194, 231, 255, 0.32), transparent 38%),
     linear-gradient(135deg, #1a73e8 0%, #0b57d0 100%);
@@ -1385,18 +1423,18 @@ body {
 
 .mobile-shell:not(.choice-step) .wizard-header h1 {
   max-width: none;
-  font-size: clamp(20px, 6vw, 25px);
-  line-height: 34px;
+  font-size: clamp(17px, 5vw, 20px);
+  line-height: 25px;
   font-weight: 750;
   letter-spacing: 0.025em;
   white-space: nowrap;
 }
 
 .mobile-shell:not(.choice-step) .brand-caption {
-  margin-top: 3px;
+  margin-top: 1px;
   color: #fff;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 14px;
   font-weight: 650;
   letter-spacing: 0.035em;
   text-align: right;
@@ -1744,7 +1782,7 @@ body {
 
 @media (max-width: 380px) {
   .mobile-shell:not(.choice-step) .wizard-header {
-    min-height: 158px;
+    min-height: 82px;
   }
 
   .mobile-shell:not(.choice-step) .wizard-body,
@@ -1780,7 +1818,7 @@ body {
   justify-content: center;
   gap: 14px;
   overflow: hidden;
-  border-radius: 0 0 50% 50% / 0 0 18% 18%;
+  border-radius: 0 0 18px 18px;
   background: var(--hero-gradient);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   color: #fff;
@@ -2254,11 +2292,11 @@ body {
 }
 
 .choice-step .wizard-header {
-  min-height: 140px;
-  padding: 24px;
+  min-height: 100px;
+  padding: 16px 20px;
   justify-content: center;
   align-items: center;
-  border-radius: 0 0 48px 48px;
+  border-radius: 0 0 18px 18px;
   background:
     radial-gradient(circle at 18% 28%, rgba(194, 231, 255, 0.32), transparent 38%),
     linear-gradient(135deg, #1a73e8 0%, #0b57d0 100%);
@@ -2267,18 +2305,18 @@ body {
 
 .choice-step .wizard-header h1 {
   max-width: none;
-  font-size: clamp(20px, 6vw, 26px);
-  line-height: 34px;
+  font-size: clamp(18px, 5vw, 21px);
+  line-height: 26px;
   font-weight: 750;
   letter-spacing: 0.025em;
   white-space: nowrap;
 }
 
 .choice-step .brand-caption {
-  margin-top: 4px;
+  margin-top: 1px;
   color: #fff;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 14px;
   font-weight: 650;
   letter-spacing: 0.035em;
   text-align: right;
@@ -2428,7 +2466,7 @@ body {
 
 @media (max-width: 380px) {
   .choice-step .wizard-header {
-    min-height: 130px;
+    min-height: 92px;
   }
 
   .choice-step .wizard-body,
@@ -2557,6 +2595,156 @@ body {
 .mobile-shell.application-form:not(.welcome-step) .field select {
   min-height: 40px;
   padding-inline: 11px;
+}
+
+.mobile-shell.application-form:not(.welcome-step) .field select {
+  appearance: none;
+  padding-inline: 13px 38px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background-color: #f8fafc;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 16px;
+  color: #334155;
+  font-weight: 550;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.mobile-shell.application-form:not(.welcome-step) .field select:hover {
+  border-color: #b9c9df;
+  background-color: #fff;
+}
+
+.mobile-shell.application-form:not(.welcome-step) .field select:focus {
+  border-color: #0b57d0;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.1);
+}
+
+.form-select {
+  position: relative;
+  width: 100%;
+}
+
+.form-select-trigger {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 13px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 550;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.form-select-trigger:hover,
+.form-select-trigger.is-open {
+  border-color: #b9c9df;
+  background: #fff;
+}
+
+.form-select-trigger:focus-visible {
+  border-color: #0b57d0;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.1);
+}
+
+.form-select-trigger .placeholder {
+  color: #64748b;
+  font-weight: 450;
+}
+
+.form-select-trigger svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  fill: none;
+  stroke: #64748b;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    transform 0.18s ease,
+    color 0.18s ease;
+}
+
+.form-select-trigger svg.rotate {
+  transform: rotate(180deg);
+  stroke: #0b57d0;
+}
+
+.form-select-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.12),
+    0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.form-select-option {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.form-select-option:hover,
+.form-select-option:focus-visible {
+  outline: none;
+  background: #f8fafc;
+}
+
+.form-select-option.selected {
+  background: #eff6ff;
+  color: #0b57d0;
+  font-weight: 650;
+}
+
+.form-select-check {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #0b57d0;
 }
 
 .mobile-shell.application-form:not(.welcome-step) .field textarea {

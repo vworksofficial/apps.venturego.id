@@ -367,6 +367,8 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [application, setApplication] = useState<DashboardApplication | null>(null)
   const [accountName, setAccountName] = useState('')
+  const [accountPhotoUrl, setAccountPhotoUrl] = useState('')
+  const [accountPhotoFailed, setAccountPhotoFailed] = useState(false)
   const [wallet, setWallet] = useState<{ vip: VipSummary | null; points: number } | null>(null)
   const [walletLoading, setWalletLoading] = useState(true)
 
@@ -388,6 +390,8 @@ export default function DashboardPage() {
         if (!user) {
           setApplication(null)
           setAccountName('')
+          setAccountPhotoUrl('')
+          setAccountPhotoFailed(false)
           setError('')
           setWallet(null)
           setLoading(false)
@@ -395,6 +399,8 @@ export default function DashboardPage() {
           return
         }
         setAccountName(user.displayName?.trim() ?? '')
+        setAccountPhotoUrl(user.photoURL?.startsWith('https://') ? user.photoURL : '')
+        setAccountPhotoFailed(false)
         try {
           const idToken = await user.getIdToken()
           if (!active) return
@@ -466,8 +472,20 @@ export default function DashboardPage() {
         <header className="rounded-b-[32px] brand-surface px-5 pb-24 pt-6 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="grid size-11 place-items-center rounded-full bg-white/15 ring-1 ring-white/25">
-                <Icon name="profile" className="size-6" />
+              <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-white/15 ring-1 ring-white/25">
+                {accountPhotoUrl && !accountPhotoFailed ? (
+                  <img
+                    alt={`Foto profil ${greetingName}`}
+                    className="size-full object-cover"
+                    height={44}
+                    onError={() => setAccountPhotoFailed(true)}
+                    referrerPolicy="no-referrer"
+                    src={accountPhotoUrl}
+                    width={44}
+                  />
+                ) : (
+                  <Icon name="profile" className="size-6" />
+                )}
               </span>
               <div>
                 <p className="text-xs text-blue-100">Selamat datang,</p>

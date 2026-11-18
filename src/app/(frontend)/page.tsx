@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { discardDriveUploads, submitFinancingApplication, type ApplicationInput } from './actions'
@@ -40,6 +40,32 @@ type Product = ApplicationInput['product']
 
 const formatAmountInput = (value: string) =>
   value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+const isIndonesianDate = (value: string) => {
+  const match = value.trim().match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+  if (!match) return false
+  const months: Record<string, number> = {
+    januari: 0,
+    februari: 1,
+    maret: 2,
+    april: 3,
+    mei: 4,
+    juni: 5,
+    juli: 6,
+    agustus: 7,
+    september: 8,
+    oktober: 9,
+    november: 10,
+    desember: 11,
+  }
+  const month = months[match[2].toLowerCase()]
+  if (month === undefined) return false
+  const date = new Date(Number(match[3]), month, Number(match[1]))
+  return (
+    date.getFullYear() === Number(match[3]) &&
+    date.getMonth() === month &&
+    date.getDate() === Number(match[1])
+  )
+}
 
 const FULL_COVER_NEEDS = [
   ['LANGUAGE_TRAINING', 'Biaya pelatihan bahasa'],
@@ -90,6 +116,15 @@ const initialForm: ApplicationInput = {
   acceptsDataProcessing: false,
 }
 
+const APPLICATION_DRAFT_KEY = 'venturego.application-draft.v1'
+const applicationSteps = [
+  { step: 1, label: 'Program' },
+  { step: 2, label: 'Kesiapan' },
+  { step: 3, label: 'Data diri' },
+  { step: 4, label: 'Kebutuhan' },
+  { step: 6, label: 'Tinjau' },
+]
+
 function GoogleIcon({ className = 'size-5' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
@@ -113,6 +148,75 @@ function GoogleIcon({ className = 'size-5' }: { className?: string }) {
   )
 }
 
+function FormSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  placeholder?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const selected = options.find((option) => option.value === value)
+
+  useEffect(() => {
+    if (!open) return
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    window.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => window.removeEventListener('pointerdown', closeOnOutsideClick)
+  }, [open])
+
+  return (
+    <div className="form-select" ref={rootRef}>
+      <button
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={`form-select-trigger${open ? ' is-open' : ''}`}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false)
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            setOpen(true)
+          }
+        }}
+        type="button"
+      >
+        <span className={selected ? '' : 'placeholder'}>{selected?.label ?? placeholder}</span>
+        <svg aria-hidden="true" className={open ? 'rotate' : ''} viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="form-select-menu" role="listbox">
+          {options.map((option) => (
+            <button
+              aria-selected={option.value === value}
+              className={`form-select-option${option.value === value ? ' selected' : ''}`}
+              key={option.value}
+              onClick={() => {
+                onChange(option.value)
+                setOpen(false)
+              }}
+              role="option"
+              type="button"
+            >
+              <span>{option.label}</span>
+              {option.value === value && <span className="form-select-check" aria-hidden="true" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function HomePage() {
   const router = useRouter()
   const [step, setStep] = useState(0)
@@ -125,6 +229,8 @@ export default function HomePage() {
   const [pendingSignIn, setPendingSignIn] = useState<'user' | 'admin' | 'google' | ''>('')
   const [signInError, setSignInError] = useState('')
   const [redirecting, setRedirecting] = useState(false)
+  const [draftReady, setDraftReady] = useState(false)
+  const [stepError, setStepError] = useState('')
 
   useEffect(() => {
     if (window.location.hostname === '127.0.0.1') {
@@ -136,12 +242,44 @@ export default function HomePage() {
     preloadGoogleSignIn()?.catch(() => {})
     const params = new URLSearchParams(window.location.search)
     const requestedStep = Number(params.get('step'))
+    const hasFormIntent =
+      params.has('step') || params.get('apply') === 'true' || params.get('baru') === 'true'
     if (requestedStep >= 1 && requestedStep <= 6) {
       setStep(requestedStep === 5 ? 6 : requestedStep)
     } else if (params.get('apply') === 'true' || params.get('baru') === 'true') {
       setStep(1)
+    } else if (!hasFormIntent) {
+      try {
+        const saved = sessionStorage.getItem(APPLICATION_DRAFT_KEY)
+        if (saved) {
+          const draft = JSON.parse(saved) as { form?: Partial<ApplicationInput>; step?: number }
+          if (draft.form && typeof draft.form === 'object') {
+            setForm({ ...initialForm, ...draft.form })
+            const savedStep = applicationSteps.some((item) => item.step === draft.step)
+              ? draft.step!
+              : 1
+            setStep(savedStep)
+          }
+        }
+      } catch {
+        try {
+          sessionStorage.removeItem(APPLICATION_DRAFT_KEY)
+        } catch {
+          // Ignore unavailable storage.
+        }
+      }
     }
+    setDraftReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!draftReady || step === 0) return
+    try {
+      sessionStorage.setItem(APPLICATION_DRAFT_KEY, JSON.stringify({ form, step }))
+    } catch {
+      // Storage may be unavailable or full; the in-memory form remains usable.
+    }
+  }, [draftReady, form, step])
 
   useEffect(() => {
     let active = true
@@ -194,8 +332,10 @@ export default function HomePage() {
       setPendingSignIn('')
     }
   }
-  const set = <K extends keyof ApplicationInput>(key: K, value: ApplicationInput[K]) =>
+  const set = <K extends keyof ApplicationInput>(key: K, value: ApplicationInput[K]) => {
+    setStepError('')
     setForm((current) => ({ ...current, [key]: value }))
+  }
   const isDeparture = form.product === 'DEPARTURE_BRIDGING'
   const requestedFinancingAmount = Number(form.financingAmount)
   const estimatedMonthlyUjrah =
@@ -211,8 +351,8 @@ export default function HomePage() {
     estimatedAdminFee === null ? null : requestedFinancingAmount - estimatedAdminFee
   const estimatedFinancingTotal =
     estimatedTotalUjrah === null ? null : requestedFinancingAmount + estimatedTotalUjrah
-  const visibleSteps = [1, 2, 3, 4, 6]
-  const currentStep = visibleSteps.indexOf(step) + 1
+  const visibleSteps = applicationSteps.map((item) => item.step)
+  const currentStep = Math.max(1, visibleSteps.indexOf(step) + 1)
   const toggleNeed = (need: string) =>
     set(
       'selectedNeeds',
@@ -283,6 +423,7 @@ export default function HomePage() {
         request.set('uploadToken', uploadToken)
         const response = await submitFinancingApplication(request)
         if (response.ok) {
+          sessionStorage.removeItem(APPLICATION_DRAFT_KEY)
           router.replace('/dashboard?applicationSubmitted=1')
         } else {
           await discardDriveUploads(
@@ -331,6 +472,11 @@ export default function HomePage() {
         )}
 
         <div className={`wizard-body ${step === 0 ? 'welcome-body' : ''}`}>
+          {step > 0 && stepError && (
+            <p className="error-message" role="alert">
+              {stepError}
+            </p>
+          )}
           {step === 0 && (
             <div className="welcome-copy">
               <h2>Selamat datang!</h2>
@@ -461,46 +607,47 @@ export default function HomePage() {
                 <>
                   <label className="field">
                     <span>Status COE</span>
-                    <select
+                    <FormSelect
                       value={form.coeStatus}
-                      onChange={(e) =>
-                        set('coeStatus', e.target.value as ApplicationInput['coeStatus'])
-                      }
-                    >
-                      <option value="NOT_STARTED">Belum diproses</option>
-                      <option value="IN_PROGRESS">Sedang diproses</option>
-                      <option value="ISSUED">Sudah terbit</option>
-                    </select>
+                      onChange={(value) => set('coeStatus', value as ApplicationInput['coeStatus'])}
+                      options={[
+                        { value: 'NOT_STARTED', label: 'Belum diproses' },
+                        { value: 'IN_PROGRESS', label: 'Sedang diproses' },
+                        { value: 'ISSUED', label: 'Sudah terbit' },
+                      ]}
+                    />
                   </label>
                   <label className="field">
                     <span>Status visa</span>
-                    <select
+                    <FormSelect
                       value={form.visaStatus}
-                      onChange={(e) =>
-                        set('visaStatus', e.target.value as ApplicationInput['visaStatus'])
+                      onChange={(value) =>
+                        set('visaStatus', value as ApplicationInput['visaStatus'])
                       }
-                    >
-                      <option value="NOT_STARTED">Belum diproses</option>
-                      <option value="IN_PROGRESS">Sedang diproses</option>
-                      <option value="ISSUED">Sudah terbit</option>
-                    </select>
+                      options={[
+                        { value: 'NOT_STARTED', label: 'Belum diproses' },
+                        { value: 'IN_PROGRESS', label: 'Sedang diproses' },
+                        { value: 'ISSUED', label: 'Sudah terbit' },
+                      ]}
+                    />
                   </label>
                 </>
               ) : (
                 <label className="field">
                   <span>Level bahasa Jepang saat ini</span>
-                  <select
+                  <FormSelect
                     value={form.languageLevel}
-                    onChange={(e) =>
-                      set('languageLevel', e.target.value as ApplicationInput['languageLevel'])
+                    onChange={(value) =>
+                      set('languageLevel', value as ApplicationInput['languageLevel'])
                     }
-                  >
-                    <option value="NOT_STARTED">Belum mulai</option>
-                    <option value="BASIC_N5">N5 dasar</option>
-                    <option value="N5">N5</option>
-                    <option value="N4">N4</option>
-                    <option value="N3_PLUS">N3 atau lebih tinggi</option>
-                  </select>
+                    options={[
+                      { value: 'NOT_STARTED', label: 'Belum mulai' },
+                      { value: 'BASIC_N5', label: 'N5 dasar' },
+                      { value: 'N5', label: 'N5' },
+                      { value: 'N4', label: 'N4' },
+                      { value: 'N3_PLUS', label: 'N3 atau lebih tinggi' },
+                    ]}
+                  />
                 </label>
               )}
               {isDeparture && !form.trainingCompleted && (
@@ -566,7 +713,7 @@ export default function HomePage() {
                 )}
               </div>
               <label className="field">
-                <span>Nama lengkap</span>
+                <span>Nama lengkap (wajib)</span>
                 <input
                   value={form.applicantName}
                   onChange={(e) => set('applicantName', e.target.value)}
@@ -583,7 +730,7 @@ export default function HomePage() {
                 />
               </label>
               <label className="field">
-                <span>Nomor WhatsApp</span>
+                <span>Nomor WhatsApp (wajib)</span>
                 <input
                   inputMode="tel"
                   value={form.phone}
@@ -593,20 +740,21 @@ export default function HomePage() {
               </label>
               <label className="field">
                 <span>Agama</span>
-                <select
+                <FormSelect
                   value={form.religion}
-                  onChange={(e) => set('religion', e.target.value as ApplicationInput['religion'])}
-                >
-                  <option value="ISLAM">Islam</option>
-                  <option value="PROTESTANT">Kristen Protestan</option>
-                  <option value="CATHOLIC">Katolik</option>
-                  <option value="HINDU">Hindu</option>
-                  <option value="BUDDHIST">Buddha</option>
-                  <option value="CONFUCIAN">Konghucu</option>
-                </select>
+                  onChange={(value) => set('religion', value as ApplicationInput['religion'])}
+                  options={[
+                    { value: 'ISLAM', label: 'Islam' },
+                    { value: 'PROTESTANT', label: 'Kristen Protestan' },
+                    { value: 'CATHOLIC', label: 'Katolik' },
+                    { value: 'HINDU', label: 'Hindu' },
+                    { value: 'BUDDHIST', label: 'Buddha' },
+                    { value: 'CONFUCIAN', label: 'Konghucu' },
+                  ]}
+                />
               </label>
               <label className="field">
-                <span>Tempat lahir</span>
+                <span>Tempat lahir (wajib)</span>
                 <input
                   value={form.birthPlace}
                   onChange={(e) => set('birthPlace', e.target.value)}
@@ -614,7 +762,7 @@ export default function HomePage() {
                 />
               </label>
               <label className="field">
-                <span>Tanggal lahir</span>
+                <span>Tanggal lahir (wajib)</span>
                 <input
                   value={form.birthDate}
                   onChange={(e) => set('birthDate', e.target.value)}
@@ -623,13 +771,14 @@ export default function HomePage() {
               </label>
               <label className="field">
                 <span>Jenis kelamin</span>
-                <select
+                <FormSelect
                   value={form.gender}
-                  onChange={(e) => set('gender', e.target.value as ApplicationInput['gender'])}
-                >
-                  <option value="MALE">Laki-laki</option>
-                  <option value="FEMALE">Perempuan</option>
-                </select>
+                  onChange={(value) => set('gender', value as ApplicationInput['gender'])}
+                  options={[
+                    { value: 'MALE', label: 'Laki-laki' },
+                    { value: 'FEMALE', label: 'Perempuan' },
+                  ]}
+                />
               </label>
               <label className="field">
                 <span>Alamat sesuai KTP</span>
@@ -718,15 +867,16 @@ export default function HomePage() {
                   </label>
                   <label className="field">
                     <span>Negara tujuan</span>
-                    <select
+                    <FormSelect
                       value={form.destination}
-                      onChange={(e) =>
-                        set('destination', e.target.value as ApplicationInput['destination'])
+                      onChange={(value) =>
+                        set('destination', value as ApplicationInput['destination'])
                       }
-                    >
-                      <option value="JAPAN">Jepang</option>
-                      <option value="TURKEY">Turki</option>
-                    </select>
+                      options={[
+                        { value: 'JAPAN', label: '🇯🇵 Jepang' },
+                        { value: 'TURKEY', label: '🇹🇷 Turki' },
+                      ]}
+                    />
                   </label>
                   <label className="field">
                     <span>Perkiraan tanggal keberangkatan</span>
@@ -753,17 +903,15 @@ export default function HomePage() {
                   <div className="need-section">
                     <label className="field">
                       <span>Nilai pembiayaan sebelum potongan admin</span>
-                      <select
+                      <FormSelect
                         value={form.financingAmount}
-                        onChange={(event) => set('financingAmount', event.target.value)}
-                      >
-                        <option value="">Pilih nilai pembiayaan</option>
-                        {FINANCING_OPTIONS.map((option) => (
-                          <option key={option.amount} value={String(option.amount)}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(value) => set('financingAmount', value)}
+                        placeholder="Pilih nilai pembiayaan"
+                        options={FINANCING_OPTIONS.map((option) => ({
+                          value: String(option.amount),
+                          label: option.label,
+                        }))}
+                      />
                     </label>
                     {estimatedMonthlyUjrah !== null &&
                       estimatedTotalUjrah !== null &&
@@ -833,15 +981,16 @@ export default function HomePage() {
                   </label>
                   <label className="field">
                     <span>Negara tujuan</span>
-                    <select
+                    <FormSelect
                       value={form.destination}
-                      onChange={(e) =>
-                        set('destination', e.target.value as ApplicationInput['destination'])
+                      onChange={(value) =>
+                        set('destination', value as ApplicationInput['destination'])
                       }
-                    >
-                      <option value="JAPAN">Jepang</option>
-                      <option value="TURKEY">Turki</option>
-                    </select>
+                      options={[
+                        { value: 'JAPAN', label: '🇯🇵 Jepang' },
+                        { value: 'TURKEY', label: '🇹🇷 Turki' },
+                      ]}
+                    />
                   </label>
                   <label className="field">
                     <span>Perkiraan tanggal mulai</span>
@@ -853,7 +1002,7 @@ export default function HomePage() {
                   </label>
                   <div className="field-grid">
                     <label className="field">
-                      <span>Bahasa</span>
+                      <span>Durasi pelatihan bahasa (bulan)</span>
                       <input
                         inputMode="numeric"
                         min="1"
@@ -867,7 +1016,7 @@ export default function HomePage() {
                       />
                     </label>
                     <label className="field">
-                      <span>Keterampilan</span>
+                      <span>Durasi pelatihan keterampilan (bulan)</span>
                       <input
                         inputMode="numeric"
                         min="1"
@@ -940,14 +1089,6 @@ export default function HomePage() {
               </section>
               {isDeparture ? (
                 <div className="soft-note space-y-2">
-                  <p>
-                    Estimasi dana cair setelah potongan admin 5%:{' '}
-                    <strong>
-                      {estimatedCashDisbursed !== null
-                        ? formatRupiah(estimatedCashDisbursed)
-                        : 'Belum diisi'}
-                    </strong>
-                  </p>
                   {estimatedMonthlyUjrah !== null &&
                     estimatedTotalUjrah !== null &&
                     estimatedAdminFee !== null &&
@@ -1051,6 +1192,25 @@ export default function HomePage() {
                   <span>Tujuan</span>
                   <strong>{form.destination === 'JAPAN' ? 'Jepang' : 'Turki'}</strong>
                 </div>
+                {!isDeparture && (
+                  <>
+                    <div>
+                      <span>Estimasi invoice/tagihan LPK</span>
+                      <strong>
+                        {form.fullCoverInvoiceAmount
+                          ? formatRupiah(Number(form.fullCoverInvoiceAmount))
+                          : 'Belum diisi'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Durasi pelatihan</span>
+                      <strong>
+                        Bahasa {form.languageTrainingMonths || '—'} bulan · Keterampilan{' '}
+                        {form.skillTrainingMonths || '—'} bulan
+                      </strong>
+                    </div>
+                  </>
+                )}
                 {isDeparture && (
                   <>
                     <div>
@@ -1127,13 +1287,14 @@ export default function HomePage() {
               className="step-dots"
               aria-label={`Langkah ${currentStep} dari ${visibleSteps.length}`}
             >
-              {visibleSteps.map((visibleStep) => (
+              {applicationSteps.map(({ step: visibleStep }, index) => (
                 <span
-                  className={
-                    visibleStep === step ? 'active' : visibleStep < step ? 'completed' : ''
-                  }
+                  className={`step-item ${visibleStep === step ? 'active' : visibleStep < step ? 'completed' : ''}`}
+                  aria-current={visibleStep === step ? 'step' : undefined}
                   key={visibleStep}
-                />
+                >
+                  <span className="step-number">{index + 1}</span>
+                </span>
               ))}
             </div>
             {step === 1 ? (
@@ -1153,13 +1314,88 @@ export default function HomePage() {
               className="primary-button"
               disabled={isPending}
               onClick={() => {
+                setStepError('')
                 if (step === 6) {
+                  if (!form.understandsWakalah || !form.acceptsDataProcessing) {
+                    setStepError('Centang persetujuan akad dan pemrosesan data sebelum mengirim.')
+                    return
+                  }
                   submit()
                   return
                 }
-                if (step === 3 && !ktpFile) {
-                  setStep3Error('Scan KTP wajib diunggah sebelum melanjutkan.')
+                if (step === 2 && isDeparture && !form.trainingCompleted) {
+                  setStepError('Program Dana Keberangkatan mensyaratkan pelatihan sudah selesai.')
                   return
+                }
+                if (step === 3) {
+                  const missing = [
+                    ['Nama lengkap', form.applicantName.trim()],
+                    ['Nama orang tua/wali', form.guardianName.trim()],
+                    ['Nomor WhatsApp', form.phone.trim()],
+                    ['Tempat lahir', form.birthPlace.trim()],
+                    ['Tanggal lahir', form.birthDate.trim()],
+                    ['Alamat sesuai KTP', form.idCardAddress.trim()],
+                    [
+                      'Alamat korespondensi',
+                      (form.domicileSameAsIdCard
+                        ? form.idCardAddress
+                        : form.domicileAddress
+                      ).trim(),
+                    ],
+                  ]
+                    .filter(([, value]) => !value)
+                    .map(([label]) => label)
+                  if (missing.length) {
+                    setStepError(`Lengkapi data berikut: ${missing.join(', ')}.`)
+                    return
+                  }
+                  if (!/^([+]?62|0)[0-9]{8,14}$/.test(form.phone.replace(/[\s-]/g, ''))) {
+                    setStepError(
+                      'Masukkan nomor WhatsApp Indonesia yang valid, misalnya 08xxxxxxxxxx.',
+                    )
+                    return
+                  }
+                  if (!isIndonesianDate(form.birthDate)) {
+                    setStepError(
+                      'Isi tanggal lahir dengan tanggal yang valid, misalnya 12 Februari 2000.',
+                    )
+                    return
+                  }
+                  if (ktpIndex >= 0 && !ktpFile) {
+                    setStep3Error('Scan KTP wajib diunggah sebelum melanjutkan.')
+                    setStepError('Unggah scan KTP untuk melanjutkan.')
+                    return
+                  }
+                  setStep3Error('')
+                }
+                if (step === 4) {
+                  if (!form.lpkName.trim()) {
+                    setStepError('Isi nama LPK terlebih dahulu.')
+                    return
+                  }
+                  if (isDeparture && (!form.financingAmount || Number(form.financingAmount) <= 0)) {
+                    setStepError('Pilih nilai pembiayaan yang diajukan.')
+                    return
+                  }
+                  if (
+                    !isDeparture &&
+                    (!form.fullCoverInvoiceAmount || Number(form.fullCoverInvoiceAmount) <= 0)
+                  ) {
+                    setStepError('Isi estimasi invoice/tagihan LPK dengan nominal yang valid.')
+                    return
+                  }
+                  if (
+                    !isDeparture &&
+                    ![form.languageTrainingMonths, form.skillTrainingMonths].every(
+                      (value) =>
+                        /^\d{1,2}$/.test(value) && Number(value) >= 1 && Number(value) <= 60,
+                    )
+                  ) {
+                    setStepError(
+                      'Isi durasi pelatihan bahasa dan keterampilan antara 1 sampai 60 bulan.',
+                    )
+                    return
+                  }
                 }
                 setStep3Error('')
                 setStep(step === 4 ? 6 : step + 1)

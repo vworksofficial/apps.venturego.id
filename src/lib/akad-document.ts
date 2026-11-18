@@ -13,6 +13,7 @@ import {
   type FinancingCostLine,
 } from './departure-financing'
 import { terbilang } from './terbilang'
+import { calculateFullCoverBudget, normalizeFullCoverBudget } from './full-cover-budget'
 
 export type AkadTemplateKind = 'WAKALAH' | 'JUALAH'
 
@@ -493,23 +494,20 @@ const applyFullCoverCostTable = (xml: string, values: ResolvedValues): string =>
 
   const rebuiltRows = [
     header,
-    replaceTableRowCells(itemTemplate, [
-      '1',
-      'Invoice tagihan LPK',
-      values.lpkMitra ? `LPK ${values.lpkMitra}` : 'LPK mitra',
-      `Rp${rp(values.hppInvoiceAmount)}`,
-      'Nafaqah (HPP)',
-    ]),
-    replaceTableRowCells(itemTemplate, [
-      '2',
-      'Uang saku siswa',
-      'PIHAK KEDUA',
-      `Rp${rp(values.hppPocketMoneyAmount)}`,
-      'Nafaqah (HPP)',
-    ]),
+    ...values.fullCoverCostLines.map((line, index) =>
+      replaceTableRowCells(itemTemplate, [
+        String(index + 1),
+        line.note ? `${line.label} — ${line.note}` : line.label,
+        line.recipient === 'LPK mitra' && values.lpkMitra
+          ? `LPK ${values.lpkMitra}`
+          : line.recipient,
+        `Rp${rp(line.amount)}`,
+        'Nafaqah (HPP)',
+      ]),
+    ),
     fillAmountCell(nafaqahSubtotal, values.nafaqahTotal) as string,
     replaceTableRowCells(ujrahTemplate, [
-      '3',
+      String(values.fullCoverCostLines.length + 1),
       'Jasa perwakilan (Wakalah bil Ujrah)',
       'PIHAK PERTAMA',
       `Rp${rp(values.ujrahTotal)}`,
@@ -517,7 +515,7 @@ const applyFullCoverCostTable = (xml: string, values: ResolvedValues): string =>
     ]),
     fillAmountCell(ujrahSubtotal, values.ujrahTotal) as string,
     replaceTableRowCells(jualaTemplate, [
-      '4',
+      String(values.fullCoverCostLines.length + 2),
       "Imbalan penempatan (Ju'alah)",
       'PIHAK PERTAMA',
       `Rp${rp(values.jualaTotal)}`,
@@ -600,6 +598,7 @@ type ResolvedValues = {
   lpkMitra: string | null
   hppInvoiceAmount: number
   hppPocketMoneyAmount: number
+  fullCoverCostLines: { label: string; recipient: string; amount: number; note?: string }[]
   languageAllowanceMonthly: number
   skillAllowanceMonthly: number
   departureAllowanceAmount: number
@@ -869,6 +868,8 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
   const lpkWitnessName = readText(plan.lpkWitnessName) || null
 
   if (product === 'FULL_COVER') {
+    const fullCoverBudget = normalizeFullCoverBudget(plan.fullCoverBudget)
+    const budgetTotals = fullCoverBudget ? calculateFullCoverBudget(fullCoverBudget) : null
     const nafaqahTotal = readNumber(plan.nafaqahTotal)
     const ujrahTotal = readNumber(plan.ujrahTotal)
     const jualaTotal = readNumber(plan.jualaTotal)
@@ -880,12 +881,12 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
     const monthlyAfterCoe =
       readNumber(plan.monthlyInstallmentAfterCoe) || Math.floor(totalIfCoe / tenorMonths)
     const languageMonths =
-      readNumber(fullCover.languageTrainingMonths) > 0
-        ? String(readNumber(fullCover.languageTrainingMonths))
+      readNumber(fullCoverBudget?.languageMonths ?? fullCover.languageTrainingMonths) > 0
+        ? String(readNumber(fullCoverBudget?.languageMonths ?? fullCover.languageTrainingMonths))
         : null
     const skillMonths =
-      readNumber(fullCover.skillTrainingMonths) > 0
-        ? String(readNumber(fullCover.skillTrainingMonths))
+      readNumber(fullCoverBudget?.skillMonths ?? fullCover.skillTrainingMonths) > 0
+        ? String(readNumber(fullCoverBudget?.skillMonths ?? fullCover.skillTrainingMonths))
         : null
     return {
       studentSequence: '',
@@ -914,6 +915,18 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
       hppInvoiceAmount:
         readNumber(plan.hppLpkInvoiceAmount) || readNumber(fullCover.lpkInvoiceAmount),
       hppPocketMoneyAmount: readNumber(plan.hppPocketMoneyAmount),
+      fullCoverCostLines: budgetTotals?.lines ?? [
+        {
+          label: 'Invoice tagihan LPK',
+          recipient: lpkMitra ? `LPK ${lpkMitra}` : 'LPK mitra',
+          amount: readNumber(plan.hppLpkInvoiceAmount) || readNumber(fullCover.lpkInvoiceAmount),
+        },
+        {
+          label: 'Uang saku siswa',
+          recipient: 'Siswa',
+          amount: readNumber(plan.hppPocketMoneyAmount),
+        },
+      ],
       languageAllowanceMonthly: readNumber(plan.languageAllowanceMonthly),
       skillAllowanceMonthly: readNumber(plan.skillAllowanceMonthly),
       departureAllowanceAmount: readNumber(plan.departureAllowanceAmount),
@@ -998,6 +1011,7 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
     hppPocketMoneyAmount: derived.valid
       ? derived.pocketMoney
       : readNumber(plan.hppPocketMoneyAmount),
+    fullCoverCostLines: [],
     languageAllowanceMonthly: readNumber(plan.languageAllowanceMonthly),
     skillAllowanceMonthly: readNumber(plan.skillAllowanceMonthly),
     departureAllowanceAmount: readNumber(plan.departureAllowanceAmount),

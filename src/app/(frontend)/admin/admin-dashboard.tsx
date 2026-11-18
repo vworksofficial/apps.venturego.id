@@ -27,6 +27,8 @@ import {
 } from './actions'
 import { AdminVipPanel } from './vip-panel'
 import { FinanceTermsFields } from './finance-terms-fields'
+import { FullCoverBudgetFields } from './full-cover-budget-fields'
+import { validateFullCoverBudget } from '@/lib/full-cover-budget'
 
 const STATUS_LABELS: Record<(typeof APPLICATION_STATUSES)[number], string> = {
   SUBMITTED: 'Terkirim',
@@ -892,6 +894,7 @@ function ApplicationDrawerForm({
 }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [showNominalInput, setShowNominalInput] = useState(false)
+  const [fullCoverBudgetDirty, setFullCoverBudgetDirty] = useState(false)
   const [newNominal, setNewNominal] = useState('')
   const [workflowStatus, setWorkflowStatus] = useState(application.status)
   const [workflowNotes, setWorkflowNotes] = useState(application.internalNotes ?? '')
@@ -909,6 +912,10 @@ function ApplicationDrawerForm({
   const [akadPreviewError, setAkadPreviewError] = useState('')
 
   const router = useRouter()
+
+  useEffect(() => {
+    setFullCoverBudgetDirty(false)
+  }, [application.id, application.financialPlan?.fullCoverBudget])
 
   const definitions =
     DOCUMENT_DEFINITIONS[application.product] ?? DOCUMENT_DEFINITIONS.DEPARTURE_BRIDGING
@@ -1248,7 +1255,13 @@ function ApplicationDrawerForm({
                 type="button"
               >
                 <TabIcon id={tab.id} />
-                <span className="text-xs leading-none">{tab.label}</span>
+                <span className="text-xs leading-none">
+                  {application.product === 'FULL_COVER' && tab.id === 'nominal' ? (
+                    <em>Budgeting</em>
+                  ) : (
+                    tab.label
+                  )}
+                </span>
                 {badge && (
                   <span
                     className={`text-xs font-normal ${
@@ -1453,6 +1466,22 @@ function ApplicationDrawerForm({
 
         {/* TAB: NOMINAL PENGAJUAN */}
         <div className={activeTab === 'nominal' ? 'block space-y-4' : 'hidden'}>
+          {application.product === 'FULL_COVER' && (
+            <FullCoverBudgetFields
+              fullCoverDetails={application.fullCoverDetails}
+              financialPlan={application.financialPlan ?? {}}
+              key={JSON.stringify([
+                application.financialPlan?.fullCoverBudget ?? null,
+                application.fullCoverDetails?.languageTrainingMonths,
+                application.fullCoverDetails?.skillTrainingMonths,
+              ])}
+              lpkName={application.lpkName}
+              disabled={akadIssued}
+              onDirtyChange={setFullCoverBudgetDirty}
+              onPreview={openAkadPreview}
+              pending={pending}
+            />
+          )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <span className="text-[11px] font-medium text-slate-500">
@@ -1463,16 +1492,20 @@ function ApplicationDrawerForm({
               <strong className="mt-1 block text-xl font-extrabold text-[#0b57d0]">
                 {application.product === 'DEPARTURE_BRIDGING'
                   ? formatRupiah(departure.requestedFinancingAmount)
-                  : planNafaqah > 0 && planUjrah > 0
+                  : application.financialPlan?.fullCoverBudget
                     ? formatRupiah(planNafaqah + planUjrah)
-                    : 'Menunggu rincian'}
+                    : planNafaqah > 0 && planUjrah > 0
+                      ? formatRupiah(planNafaqah + planUjrah)
+                      : 'Menunggu rincian'}
               </strong>
               <span className="mt-1 block text-[11px] text-slate-400">
                 {application.product === 'DEPARTURE_BRIDGING'
                   ? 'Plafon maksimum persetujuan staf'
-                  : planNafaqah > 0 && planUjrah > 0
-                    ? 'Nilai berdasarkan rincian biaya saat ini'
-                    : 'Nilai tampil setelah Nafaqah dan Ujrah diisi di Draft Akad'}
+                  : application.financialPlan?.fullCoverBudget
+                    ? 'Total kebutuhan + Ujrah, sebelum Ju’alah bersyarat COE'
+                    : planNafaqah > 0 && planUjrah > 0
+                      ? 'Nilai berdasarkan rincian biaya saat ini'
+                      : 'Nilai tampil setelah Nafaqah dan Ujrah diisi di Draft Akad'}
               </span>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -1597,9 +1630,20 @@ function ApplicationDrawerForm({
                   </div>
                   <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
                     {pricingStatus === 'ESTIMATED'
-                      ? 'Persetujuan nominal pembiayaan siswa. Pilih "Setujui" untuk menyetujui sesuai nominal yang diajukan, atau "Setujui dengan Nominal Baru" untuk menetapkan plafon lain. Setelah disetujui, siswa otomatis berpindah ke halaman Persiapan Akad.'
+                      ? application.product === 'FULL_COVER'
+                        ? 'Simpan rincian kebutuhan, lengkapi Ujrah, Ju’alah, tenor, dan ketentuan akad pada Draft Akad, lalu tinjau pratinjau sebelum menyetujui.'
+                        : 'Persetujuan nominal pembiayaan siswa. Pilih "Setujui" untuk menyetujui sesuai nominal yang diajukan, atau "Setujui dengan Nominal Baru" untuk menetapkan plafon lain. Setelah disetujui, siswa otomatis berpindah ke halaman Persiapan Akad.'
                       : 'Nominal pembiayaan telah disetujui dan pengajuan pemohon telah dipindahkan ke menu Persiapan Akad.'}
                   </p>
+                  {application.product === 'FULL_COVER' && (
+                    <button
+                      className="mt-2 text-xs font-semibold text-[#0b57d0] hover:underline"
+                      onClick={() => setActiveTab('pricing')}
+                      type="button"
+                    >
+                      Lengkapi ketentuan Draft Akad →
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1607,16 +1651,31 @@ function ApplicationDrawerForm({
               {pricingStatus === 'ESTIMATED' ? (
                 <>
                   <DrawerAction
-                    disabled={pending}
-                    label={pending ? 'Menyimpan…' : 'Setujui'}
+                    label={
+                      pending
+                        ? 'Menyimpan…'
+                        : application.product === 'FULL_COVER'
+                          ? 'Setujui Rincian'
+                          : 'Setujui'
+                    }
                     onClick={() => onApprovePricing(application.id, null)}
+                    disabled={
+                      pending ||
+                      (application.product === 'FULL_COVER' &&
+                        (!application.financialPlan?.fullCoverBudget ||
+                          fullCoverBudgetDirty ||
+                          validateFullCoverBudget(application.financialPlan?.fullCoverBudget) !==
+                            null))
+                    }
                     variant="primary"
                   />
-                  <DrawerAction
-                    disabled={pending}
-                    label="Setujui dengan Nominal Baru"
-                    onClick={() => setShowNominalInput(true)}
-                  />
+                  {application.product === 'DEPARTURE_BRIDGING' && (
+                    <DrawerAction
+                      disabled={pending}
+                      label="Setujui dengan Nominal Baru"
+                      onClick={() => setShowNominalInput(true)}
+                    />
+                  )}
                 </>
               ) : (
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -1636,7 +1695,7 @@ function ApplicationDrawerForm({
                     </svg>
                     Nominal telah disetujui — siswa berada di menu Persiapan Akad
                   </span>
-                  {!akadIssued && (
+                  {!akadIssued && application.product === 'DEPARTURE_BRIDGING' && (
                     <DrawerAction
                       disabled={pending}
                       label="Setujui dengan Nominal Baru"
@@ -4736,6 +4795,7 @@ export function AdminDashboard({
         departureAllowanceAmount: String(formData.get('departureAllowanceAmount') ?? ''),
         commitmentCompensationAmount: String(formData.get('commitmentCompensationAmount') ?? ''),
         commitmentSettlementDays: String(formData.get('commitmentSettlementDays') ?? ''),
+        fullCoverBudget: String(formData.get('fullCoverBudget') ?? ''),
         wakalahOtherUjrahService: String(
           formData.get('wakalahOtherUjrahService') ??
             application.financialPlan?.wakalahOtherUjrahService ??

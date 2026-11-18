@@ -21,6 +21,12 @@ import { getFirebaseFirestore } from '@/lib/firebase-admin'
 import { getStaffSession } from '@/lib/firebase-session'
 import { ensureStudentNumber, studentNumberSequence } from '@/lib/student-number'
 import { FINANCING_OPTIONS } from '@/lib/financing-plan'
+import {
+  calculateFullCoverBudget,
+  normalizeFullCoverBudget,
+  validateFullCoverBudget,
+  type FullCoverBudget,
+} from '@/lib/full-cover-budget'
 
 type ActionResult = { ok: true } | { ok: false; message: string }
 
@@ -134,20 +140,29 @@ const validateFullCoverApproval = (
     return 'Akad contoh hanya menetapkan Ju’alah untuk Jepang; konfirmasi ketentuan negara tujuan terlebih dahulu.'
   }
   const { nafaqahTotal, ujrahTotal, jualaTotal, tenorMonths } = plan as Record<string, number>
+  const budget = normalizeFullCoverBudget(plan.fullCoverBudget) ?? undefined
   const hppInvoice = Number(plan.hppLpkInvoiceAmount)
   const hppPocketMoney = Number(plan.hppPocketMoneyAmount)
   const fullCoverDetails = (applicationData.fullCoverDetails ?? {}) as Record<string, unknown>
-  const languageMonths = Number(fullCoverDetails.languageTrainingMonths)
-  const skillMonths = Number(fullCoverDetails.skillTrainingMonths)
+  const languageMonths = Number(budget?.languageMonths ?? fullCoverDetails.languageTrainingMonths)
+  const skillMonths = Number(budget?.skillMonths ?? fullCoverDetails.skillTrainingMonths)
   const commitmentAmount = Number(plan.commitmentCompensationAmount)
   const commitmentDays = Number(plan.commitmentSettlementDays)
   const firstPaymentDate = String(plan.firstPaymentDate ?? '')
+  const budgetError = budget ? validateFullCoverBudget(budget) : null
+  const budgetTotals = budget ? calculateFullCoverBudget(budget) : null
+  const allocationMismatch = budgetTotals
+    ? hppInvoice !== budgetTotals.providerTotal ||
+      hppPocketMoney !== budgetTotals.studentAllowanceTotal ||
+      budgetTotals.nafaqahTotal !== nafaqahTotal
+    : hppInvoice + hppPocketMoney !== nafaqahTotal
   if (
+    budgetError ||
     !Number.isSafeInteger(hppInvoice) ||
     hppInvoice < 0 ||
     !Number.isSafeInteger(hppPocketMoney) ||
     hppPocketMoney < 0 ||
-    hppInvoice + hppPocketMoney !== nafaqahTotal ||
+    allocationMismatch ||
     !Number.isInteger(languageMonths) ||
     languageMonths < 1 ||
     languageMonths > 60 ||
@@ -167,7 +182,10 @@ const validateFullCoverApproval = (
     commitmentDays > 90 ||
     !calculateInstallmentSchedule(0, 1, firstPaymentDate)
   ) {
-    return 'Lengkapi durasi, uang saku, biaya komitmen, dan hari pelunasan Draft 2; total invoice LPK + uang saku juga harus sama dengan Nafaqah.'
+    return (
+      budgetError ??
+      'Rincian kebutuhan pada tab Nominal Pengajuan harus sama dengan Nafaqah di Draft Akad.'
+    )
   }
   if (
     ![nafaqahTotal, ujrahTotal, jualaTotal, tenorMonths].every(Number.isFinite) ||
@@ -287,6 +305,7 @@ export async function saveFinancialPlan(
     'wakalahMediator',
     'wakalahDisputeInstitution',
     'lpkWitnessName',
+    'fullCoverBudget',
   ] as const
   if (textFields.some((field) => typeof financialValues?.[field] !== 'string')) {
     return { ok: false, message: 'Rincian akad atau penyelesaian tidak valid.' }
@@ -310,6 +329,7 @@ export async function saveFinancialPlan(
     (financialValues.wakalahMediator?.length ?? 0) > 200 ||
     (financialValues.wakalahDisputeInstitution?.length ?? 0) > 200 ||
     financialValues.lpkWitnessName.length > 120 ||
+    financialValues.fullCoverBudget.length > 8_000 ||
     (refundValue !== '' && !/^\d+$/.test(refundValue))
   ) {
     return { ok: false, message: 'Rincian akad atau penyelesaian tidak valid.' }
@@ -338,6 +358,21 @@ export async function saveFinancialPlan(
     }
     const applicationProduct = applicationData.product
     const existingFinancialPlan = applicationData.financialPlan ?? {}
+    const rawFullCoverBudget = financialValues.fullCoverBudget.trim()
+    let fullCoverBudget: FullCoverBudget | null = null
+    if (rawFullCoverBudget) {
+      if (applicationProduct !== 'FULL_COVER') {
+        return { ok: false, message: 'Rincian anggaran ini hanya berlaku untuk Full Cover.' }
+      }
+      try {
+        const parsed = JSON.parse(rawFullCoverBudget) as unknown
+        const budgetError = validateFullCoverBudget(parsed, false)
+        if (budgetError) return { ok: false, message: budgetError }
+        fullCoverBudget = normalizeFullCoverBudget(parsed)
+      } catch {
+        return { ok: false, message: 'Rincian nominal Full Cover tidak valid.' }
+      }
+    }
     const effectiveFirstPaymentDate =
       applicationProduct === 'DEPARTURE_BRIDGING'
         ? firstPaymentDate ||
@@ -357,7 +392,34 @@ export async function saveFinancialPlan(
       firstPaymentDate: effectiveFirstPaymentDate,
       lpkWitnessName: financialValues.lpkWitnessName.trim(),
     }
+    if (fullCoverBudget) {
+      const totals = calculateFullCoverBudget(fullCoverBudget)
+      const totalObligation = totals.nafaqahTotal + (Number(nextFinancialPlan.ujrahTotal) || 0)
+      const jualaTotal = Number(nextFinancialPlan.jualaTotal) || 0
+      const tenorMonths = Number(nextFinancialPlan.tenorMonths) || 0
+      Object.assign(nextFinancialPlan, {
+        fullCoverBudget,
+        hppLpkInvoiceAmount: totals.providerTotal,
+        hppPocketMoneyAmount: totals.studentAllowanceTotal,
+        languageAllowanceMonthly: fullCoverBudget.languageAllowanceMonthly,
+        skillAllowanceMonthly: fullCoverBudget.skillAllowanceMonthly,
+        departureAllowanceAmount: fullCoverBudget.departureAllowanceAmount,
+        nafaqahTotal: totals.nafaqahTotal,
+        totalObligation,
+        ...(tenorMonths >= 1 && tenorMonths <= 36
+          ? {
+              totalObligationIfCoe: totalObligation + jualaTotal,
+              monthlyInstallmentAfterCoe: Math.floor((totalObligation + jualaTotal) / tenorMonths),
+              finalInstallmentAfterCoe:
+                totalObligation +
+                jualaTotal -
+                Math.floor((totalObligation + jualaTotal) / tenorMonths) * (tenorMonths - 1),
+            }
+          : {}),
+      })
+    }
     let updateValues: Record<string, unknown> = {}
+    let fullCoverNextPricingStatus = currentPricingStatus
     if (applicationProduct === 'DEPARTURE_BRIDGING') {
       const requestedAmount =
         Number(applicationData.departureDetails?.requestedFinancingAmount) || 0
@@ -517,6 +579,9 @@ export async function saveFinancialPlan(
         ujrahTotal: Number(nextFinancialPlan.ujrahTotal) || 0,
         jualaTotal: Number(nextFinancialPlan.jualaTotal) || 0,
         tenorMonths: Number(nextFinancialPlan.tenorMonths) || 0,
+        ...(nextFinancialPlan.fullCoverBudget
+          ? { fullCoverBudget: nextFinancialPlan.fullCoverBudget }
+          : {}),
       }
       for (const key of derivedKeys) {
         if (Number.isFinite(Number(nextFinancialPlan[key]))) {
@@ -529,17 +594,27 @@ export async function saveFinancialPlan(
       if (offerChanged) {
         updateValues.userFinancingAcceptance = FieldValue.delete()
       }
+      const nextPricingStatus =
+        currentPricingStatus === 'AGREED' && offerChanged ? 'VERIFIED' : currentPricingStatus
+      fullCoverNextPricingStatus = nextPricingStatus
+      if (currentPricingStatus === 'AGREED' && offerChanged) {
+        nextFinancialPlan.finalAgreementReference = ''
+      }
       updateValues.financialPlanHistory = appendFinancialHistory(applicationData, {
         changedAt: new Date().toISOString(),
         changedBy: staff?.email ?? staff?.uid,
         financialPlan: fcSnapshot,
-        pricingStatus: currentPricingStatus,
+        pricingStatus: nextPricingStatus,
         finalAgreementReference: String(nextFinancialPlan.finalAgreementReference ?? ''),
         settlementNotes: String(nextFinancialPlan.settlementNotes ?? ''),
       })
     }
     await applicationRef.update({
-      financialPlan: { ...nextFinancialPlan, pricingStatus: currentPricingStatus },
+      financialPlan: {
+        ...nextFinancialPlan,
+        pricingStatus:
+          applicationProduct === 'FULL_COVER' ? fullCoverNextPricingStatus : currentPricingStatus,
+      },
       ...updateValues,
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: staff?.email ?? staff?.uid,
@@ -927,6 +1002,13 @@ export async function approveApplicationPricing(
     }
 
     if (product === 'FULL_COVER') {
+      if (newNominal !== null) {
+        return {
+          ok: false,
+          message:
+            'Untuk Full Cover, ubah nominal pada komponen kebutuhan di tab Nominal Pengajuan.',
+        }
+      }
       let nafaqahTotal = Number(plan.nafaqahTotal)
       let ujrahTotal = Number(plan.ujrahTotal)
       const jualaTotal = Number(plan.jualaTotal)
@@ -938,22 +1020,14 @@ export async function approveApplicationPricing(
             'Lengkapi Nafaqah, Ujrah, Ju’alah, dan tenor pada tab Draft Akad sebelum menyetujui.',
         }
       }
-      if (newNominal !== null) {
-        const base = nafaqahTotal + ujrahTotal
-        if (base <= 0) {
-          return {
-            ok: false,
-            message: 'Total Nafaqah dan Ujrah masih nol. Isi rincian pada tab Draft Akad.',
-          }
+      const budget = normalizeFullCoverBudget(plan.fullCoverBudget) ?? undefined
+      const budgetTotals = budget ? calculateFullCoverBudget(budget) : null
+      if (!budgetTotals || budgetTotals.nafaqahTotal !== nafaqahTotal) {
+        return {
+          ok: false,
+          message:
+            'Simpan rincian kebutuhan Full Cover pada tab Nominal Pengajuan terlebih dahulu.',
         }
-        const factor = newNominal / base
-        const scaledNafaqah = Math.max(1, Math.round(nafaqahTotal * factor))
-        const scaledUjrah = newNominal - scaledNafaqah
-        if (scaledUjrah < 1) {
-          return { ok: false, message: 'Nominal baru tidak dapat dibagi ke Nafaqah dan Ujrah.' }
-        }
-        nafaqahTotal = scaledNafaqah
-        ujrahTotal = scaledUjrah
       }
       const approvalError = validateFullCoverApproval(applicationData, {
         ...plan,
@@ -967,6 +1041,7 @@ export async function approveApplicationPricing(
       const totalObligationIfCoe = totalObligation + jualaTotal
       const monthlyInstallmentAfterCoe = Math.floor(totalObligationIfCoe / tenorMonths)
       offerSnapshot = {
+        fullCoverBudget: budget,
         nafaqahTotal,
         ujrahTotal,
         jualaTotal,

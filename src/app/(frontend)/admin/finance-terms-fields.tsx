@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { deriveDepartureFinancials, QARDH_LABEL } from '@/lib/departure-financing'
 import type { ApplicationProduct } from '@/lib/firebase-data'
+import { calculateFullCoverBudget, normalizeFullCoverBudget } from '@/lib/full-cover-budget'
 
 const amountLabel = (amount: number) => `Rp${amount.toLocaleString('id-ID')}`
 const formatThousandsInput = (value: string) =>
@@ -39,6 +40,8 @@ export function FinanceTermsFields({
 }) {
   const requestedAmount = Number(departureDetails?.requestedFinancingAmount) || 0
   const savedInvoice = Number(financialPlan.hppLpkInvoiceAmount) || 0
+  const fullCoverBudget = normalizeFullCoverBudget(financialPlan.fullCoverBudget)
+  const fullCoverBudgetTotals = fullCoverBudget ? calculateFullCoverBudget(fullCoverBudget) : null
   const defaultInvoice =
     savedInvoice ||
     Number(departureDetails?.outstandingLPKAmount ?? fullCoverDetails?.lpkInvoiceAmount) ||
@@ -349,19 +352,65 @@ export function FinanceTermsFields({
     return (
       <div className="flex flex-col gap-6">
         {identityEditor}
-        {hppEditor}
+        {fullCoverBudgetTotals ? (
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                  Sinkron dari Nominal Pengajuan
+                </span>
+                <h3 className="mt-1 text-base font-bold text-slate-900">
+                  Kebutuhan Full Cover tersimpan
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-600">
+                  Rincian dan nominal uang saku dikelola pada tab Nominal Pengajuan. Angka berikut
+                  menjadi nilai Nafaqah dan baris lampiran pada pratinjau akad.
+                </p>
+              </div>
+              <strong className="rounded-lg bg-white px-3 py-2 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-200">
+                {amountLabel(fullCoverBudgetTotals.nafaqahTotal)}
+              </strong>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg bg-white px-3 py-2 text-xs">
+                <span className="text-slate-500">Pembayaran ke klinik/LPK</span>
+                <strong className="mt-0.5 block text-slate-900">
+                  {amountLabel(fullCoverBudgetTotals.providerTotal)}
+                </strong>
+              </div>
+              <div className="rounded-lg bg-white px-3 py-2 text-xs">
+                <span className="text-slate-500">Total uang saku siswa</span>
+                <strong className="mt-0.5 block text-slate-900">
+                  {amountLabel(fullCoverBudgetTotals.studentAllowanceTotal)}
+                </strong>
+              </div>
+            </div>
+            <input
+              name="hppLpkInvoiceAmount"
+              type="hidden"
+              value={fullCoverBudgetTotals.providerTotal}
+            />
+            <input
+              name="hppPocketMoneyAmount"
+              type="hidden"
+              value={fullCoverBudgetTotals.studentAllowanceTotal}
+            />
+          </section>
+        ) : (
+          <section className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-xs leading-5 text-amber-900">
+            Rincian kebutuhan Full Cover belum disusun. Isi dan simpan enam komponen pada tab
+            Nominal Pengajuan agar nilai Nafaqah dan lampiran akad terisi dari sumber yang sama.
+          </section>
+        )}
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="text-sm font-bold text-slate-900">Nominal dan jangka waktu Draft 2</h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">
-            Masa pelatihan diambil dari isian siswa. Lengkapi nominal uang saku dan biaya komitmen
-            yang akan dicantumkan dalam akad.
+            Durasi pelatihan dan nominal uang saku dikelola pada tab Budgeting. Lengkapi biaya
+            komitmen dan ketentuan Draft Akad di sini.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(
               [
-                ['languageAllowanceMonthly', 'Uang saku bahasa per bulan (Rp)'],
-                ['skillAllowanceMonthly', 'Uang saku skill per bulan (Rp)'],
-                ['departureAllowanceAmount', 'Uang saku keberangkatan (Rp)'],
                 ['commitmentCompensationAmount', 'Biaya komitmen / ta’widh (Rp)'],
                 ['commitmentSettlementDays', 'Hari pelunasan biaya komitmen'],
               ] as const
@@ -372,14 +421,7 @@ export function FinanceTermsFields({
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
                   min={0}
                   name={name}
-                  defaultValue={String(
-                    financialPlan[name] ??
-                      (name === 'languageAllowanceMonthly' ||
-                      name === 'skillAllowanceMonthly' ||
-                      name === 'departureAllowanceAmount'
-                        ? 0
-                        : ''),
-                  )}
+                  defaultValue={String(financialPlan[name] ?? '')}
                   step={1}
                   type="number"
                 />
@@ -396,6 +438,40 @@ export function FinanceTermsFields({
               />
             </label>
           </div>
+          {fullCoverBudget && (
+            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              Uang saku yang dicantumkan di akad: Bahasa{' '}
+              {amountLabel(fullCoverBudget.languageAllowanceMonthly)}/bulan, Skill{' '}
+              {amountLabel(fullCoverBudget.skillAllowanceMonthly)}/bulan, dan keberangkatan{' '}
+              {amountLabel(fullCoverBudget.departureAllowanceAmount)} setelah COE. Ubah nominalnya
+              di tab Nominal Pengajuan.
+            </div>
+          )}
+          <input
+            name="languageAllowanceMonthly"
+            type="hidden"
+            value={String(
+              fullCoverBudget?.languageAllowanceMonthly ??
+                financialPlan.languageAllowanceMonthly ??
+                0,
+            )}
+          />
+          <input
+            name="skillAllowanceMonthly"
+            type="hidden"
+            value={String(
+              fullCoverBudget?.skillAllowanceMonthly ?? financialPlan.skillAllowanceMonthly ?? 0,
+            )}
+          />
+          <input
+            name="departureAllowanceAmount"
+            type="hidden"
+            value={String(
+              fullCoverBudget?.departureAllowanceAmount ??
+                financialPlan.departureAllowanceAmount ??
+                0,
+            )}
+          />
         </section>
         <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
           {(
@@ -410,7 +486,12 @@ export function FinanceTermsFields({
               <span>{label}</span>
               <input
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                defaultValue={String(financialPlan[name] ?? '')}
+                defaultValue={String(
+                  name === 'nafaqahTotal' && fullCoverBudgetTotals
+                    ? fullCoverBudgetTotals.nafaqahTotal
+                    : (financialPlan[name] ?? ''),
+                )}
+                readOnly={name === 'nafaqahTotal' && Boolean(fullCoverBudgetTotals)}
                 min={name === 'tenorMonths' ? 1 : 0}
                 max={name === 'tenorMonths' ? 36 : undefined}
                 name={name}

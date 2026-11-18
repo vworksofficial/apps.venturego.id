@@ -988,6 +988,7 @@ function ApplicationDrawerForm({
   onUploadAgreement: (applicationId: string, file: File) => Promise<void>
   onClose: () => void
 }) {
+  const [visitedTabs, setVisitedTabs] = useState<Set<DetailTabId>>(() => new Set([activeTab]))
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [showNominalInput, setShowNominalInput] = useState(false)
   const [fullCoverBudgetDirty, setFullCoverBudgetDirty] = useState(false)
@@ -1015,6 +1016,14 @@ function ApplicationDrawerForm({
   useEffect(() => {
     setFullCoverBudgetDirty(false)
   }, [application.id, application.financialPlan?.fullCoverBudget])
+
+  useEffect(() => {
+    setVisitedTabs((current) =>
+      current.has(activeTab) ? current : new Set([...current, activeTab]),
+    )
+  }, [activeTab])
+
+  const shouldRenderTab = (tab: DetailTabId) => activeTab === tab || visitedTabs.has(tab)
 
   const definitions =
     DOCUMENT_DEFINITIONS[application.product] ?? DOCUMENT_DEFINITIONS.DEPARTURE_BRIDGING
@@ -1101,58 +1110,45 @@ function ApplicationDrawerForm({
     fileName?: string
   } | null
   const akadIssued = Boolean(akadMeta)
+  const financeTermsKey = useMemo(
+    () => JSON.stringify(application.financialPlan ?? {}),
+    [application.financialPlan],
+  )
 
   const downloadAkadPreviewPdf = async () => {
-    const frame = akadPreviewFrameRef.current
-    const previewDocument = frame?.contentDocument
-    if (!previewDocument || !akadPreviewHtml || akadPdfSaving) return
-
-    const programLabel =
-      application.product === 'FULL_COVER'
-        ? "Program Full Cover - Wakalah bil Ujrah + Ju'alah"
-        : 'Program Dana Keberangkatan - Wakalah bil Ujrah'
-    const safeApplicantName = application.applicantName
-      .replace(/[\\/:*?"<>|]/g, '-')
-      .trim()
-      .replace(/[. ]+$/, '')
-    const fileName = `Draft Akad VSV - ${safeApplicantName} (${programLabel}).pdf`
+    if (!akadPreviewHtml || akadPdfSaving) return
 
     setAkadPdfSaving(true)
     setAkadPdfError('')
     try {
-      await previewDocument.fonts?.ready
-      const pages = Array.from(previewDocument.querySelectorAll<HTMLElement>('.a4-page'))
-      if (!pages.length) throw new Error('Halaman akad belum siap untuk dijadikan PDF.')
-
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ])
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true })
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-
-      for (const [index, page] of pages.entries()) {
-        const previousShadow = page.style.boxShadow
-        page.style.boxShadow = 'none'
-        try {
-          const canvas = await html2canvas(page, {
-            backgroundColor: '#ffffff',
-            imageTimeout: 15000,
-            logging: false,
-            scale: 2,
-            useCORS: true,
-          })
-          if (index > 0) pdf.addPage('a4', 'portrait')
-          pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, pageWidth, pageHeight)
-          canvas.width = 0
-          canvas.height = 0
-        } finally {
-          page.style.boxShadow = previousShadow
-        }
+      const response = await fetch(`/api/admin/applications/${application.id}/akad?mode=pdf`, {
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as { message?: string } | null
+        throw new Error(result?.message || 'PDF belum dapat dibuat. Silakan coba lagi.')
       }
 
-      pdf.save(fileName)
+      const blob = await response.blob()
+      const signature = await blob.slice(0, 5).text()
+      if (blob.type !== 'application/pdf' || signature !== '%PDF-') {
+        throw new Error('Server tidak mengembalikan file PDF yang valid. Silakan coba lagi.')
+      }
+
+      const disposition = response.headers.get('Content-Disposition') ?? ''
+      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+      const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+      const fileName = encodedName
+        ? decodeURIComponent(encodedName)
+        : plainName || `Draft Akad VSV - ${application.applicantName}.pdf`
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = fileName
+      document.body.append(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
     } catch (error) {
       setAkadPdfError(
         error instanceof Error ? error.message : 'PDF belum dapat dibuat. Silakan coba lagi.',
@@ -2192,7 +2188,7 @@ function ApplicationDrawerForm({
               personalDetails={application.personalDetails}
               phone={application.phone}
               issuedAkad={akadMeta}
-              key={JSON.stringify(application.financialPlan ?? {})}
+              key={financeTermsKey}
               lpkName={application.lpkName}
               product={application.product}
             />

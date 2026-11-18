@@ -1709,6 +1709,7 @@ th { font-weight: 700; }
   .viewer { padding: 0; gap: 0; }
   #loading { display: none; }
   .a4-page { box-shadow: none; page-break-after: always; }
+  .a4-page:last-of-type { page-break-after: auto; break-after: auto; }
   @page { size: A4 portrait; margin: 0; }
 }
 `

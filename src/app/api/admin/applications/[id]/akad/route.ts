@@ -1,4 +1,5 @@
 import { renderAkadPreviewHtml } from '@/lib/akad-preview'
+import { renderAkadPdf } from '@/lib/akad-pdf'
 import { NextResponse } from 'next/server'
 import { buildAkadDocument, refreshAkadPreviewHeader } from '@/lib/akad-document'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
@@ -13,6 +14,8 @@ import {
 const APPLICATION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+export const runtime = 'nodejs'
 
 const errorResponse = (message: string, status = 400) =>
   NextResponse.json({ ok: false, message }, { status })
@@ -79,6 +82,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     bytes = await refreshAkadPreviewHeader(bytes)
     const previewHtml = await renderAkadPreviewHtml(bytes, { draft: draftBuild })
+    if (mode === 'pdf') {
+      const applicantName =
+        typeof applicationData.applicantName === 'string' ? applicationData.applicantName : 'Siswa'
+      const productLabel =
+        applicationData.product === 'FULL_COVER'
+          ? "Program Full Cover - Wakalah bil Ujrah + Ju'alah"
+          : 'Program Dana Keberangkatan - Wakalah bil Ujrah'
+      const pdfFileName = safeFileName(`Draft Akad VSV - ${applicantName} (${productLabel}).pdf`)
+      const asciiFileName = pdfFileName.replace(/[^\x20-\x7e]/g, '_')
+      const pdf = await renderAkadPdf(previewHtml)
+      return new Response(new Uint8Array(pdf), {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${asciiFileName}"; filename*=UTF-8''${encodeURIComponent(pdfFileName)}`,
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    }
+
     return new Response(previewHtml, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',

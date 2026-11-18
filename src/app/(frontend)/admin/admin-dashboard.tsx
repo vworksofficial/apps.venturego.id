@@ -1326,7 +1326,7 @@ function ApplicationDrawerForm({
   return (
     <form
       action={(formData) => onSave(application, formData)}
-      className="relative flex h-full flex-col bg-white"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-white"
     >
       {/* Drawer Header: identity + close */}
       <div className="relative overflow-hidden border-b border-blue-800/20 bg-gradient-to-br from-[#0b57d0] to-[#0842a0] px-6 py-4 text-white">
@@ -1389,7 +1389,7 @@ function ApplicationDrawerForm({
       </div>
 
       {/* Drawer Navigation Tabs — solid pill tab bar */}
-      <div className="border-b border-slate-200 bg-white px-6 py-3">
+      <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
         <div
           aria-label="Tab detail pengajuan"
           className="flex items-center gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -1437,7 +1437,7 @@ function ApplicationDrawerForm({
       </div>
 
       {/* Scrollable Drawer Body */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6">
         {/* TAB: PROFILE */}
         <div className={activeTab === 'profile' ? 'block' : 'hidden'}>
           <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -2058,7 +2058,7 @@ function ApplicationDrawerForm({
                 {/* Decorative background glow */}
                 <div
                   aria-hidden="true"
-                  className={`pointer-events-none absolute -right-10 -top-10 size-56 rounded-full blur-3xl ${isFullCover ? 'bg-amber-100/45' : 'bg-blue-100/40'}`}
+                  className={`pointer-events-none absolute -right-10 -top-10 size-56 rounded-full blur-xl ${isFullCover ? 'bg-amber-100/45' : 'bg-blue-100/40'}`}
                 />
                 <div
                   aria-hidden="true"
@@ -2119,7 +2119,7 @@ function ApplicationDrawerForm({
                   </div>
 
                   {/* Deskripsi Karakteristik Syariah & Dinamika Akad */}
-                  <div className="rounded-xl border border-blue-100/80 bg-white/90 p-4 shadow-2xs backdrop-blur-xs">
+                  <div className="rounded-xl border border-blue-100/80 bg-white/90 p-4 shadow-2xs">
                     <div className="flex items-start gap-2.5">
                       <svg
                         aria-hidden="true"
@@ -2199,7 +2199,7 @@ function ApplicationDrawerForm({
           >
             <div
               aria-hidden="true"
-              className={`pointer-events-none absolute -right-10 -top-12 size-48 rounded-full blur-3xl ${application.product === 'FULL_COVER' ? 'bg-emerald-100/50' : 'bg-blue-100/50'}`}
+              className={`pointer-events-none absolute -right-10 -top-12 size-48 rounded-full blur-xl ${application.product === 'FULL_COVER' ? 'bg-emerald-100/50' : 'bg-blue-100/50'}`}
             />
             <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/60 px-5 py-4">
               <div className="flex items-start gap-3">
@@ -8198,8 +8198,8 @@ export function AdminDashboard({
 
       {/* SLIDE-OVER DRAWER FOR APPLICATION MANAGEMENT */}
       {drawerApplication && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-[1px]">
-          <div className="h-dvh w-full max-w-6xl shadow-2xl">
+        <div className="fixed inset-0 z-50 flex justify-end overflow-hidden bg-slate-900/40">
+          <div className="flex h-dvh min-h-0 w-full max-w-6xl flex-col overflow-hidden shadow-2xl">
             <ApplicationDrawerForm
               activeTab={drawerTab}
               approvalSaving={approvalSavingId === drawerApplication.id}

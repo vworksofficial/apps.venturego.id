@@ -761,7 +761,7 @@ export default function DashboardPage() {
                       <>
                         <div className="mb-5 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 ring-1 ring-blue-100">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                            <p className="text-[10px] font-bold tracking-[0.02em] text-slate-500">
                               Status pembiayaan
                             </p>
                             <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--primary)] ring-1 ring-blue-100">
@@ -985,10 +985,22 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <Link
-                  className="shrink-0 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-sm transition hover:bg-amber-300 active:scale-95"
+                  aria-label={application ? 'Ajukan pembiayaan baru' : 'Mulai pengajuan pembiayaan'}
+                  className="grid size-12 shrink-0 place-items-center rounded-xl bg-amber-400 text-slate-950 shadow-sm transition hover:bg-amber-300 active:scale-95"
                   href="/?step=1"
+                  title={application ? 'Ajukan pembiayaan baru' : 'Mulai pengajuan pembiayaan'}
                 >
-                  {application ? 'Ajukan' : 'Mulai'}
+                  <svg
+                    aria-hidden="true"
+                    className="size-6"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
                 </Link>
               </div>
               <div className="pointer-events-none absolute -bottom-8 -right-8 size-32 rounded-full bg-white/10 blur-xl" />

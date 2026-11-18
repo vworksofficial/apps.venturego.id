@@ -12,6 +12,7 @@ const MARGIN_BOTTOM_PT = 1500 * TW // 75
 const MARGIN_LEFT_PT = 1134 * TW // 56.7
 const HEADER_TOP_PT = 300 * TW // 15
 const FOOTER_BOTTOM_PT = 400 * TW // 20
+const HEADER_FOOTER_SIDE_PT = 567 * TW // 28.35 (10 mm)
 const CONTENT_W_PT = 9638 * TW // 481.9
 const CONTENT_H_PT = 13338 * TW // 666.9
 
@@ -1635,8 +1636,8 @@ th { font-weight: 700; }
 .doc-header {
   position: absolute;
   top: ${HEADER_TOP_PT}pt;
-  left: calc(${MARGIN_LEFT_PT}pt - 11pt);
-  width: calc(${CONTENT_W_PT}pt + 22pt);
+  left: ${HEADER_FOOTER_SIDE_PT}pt;
+  width: calc(${PAGE_W_PT}pt - ${HEADER_FOOTER_SIDE_PT * 2}pt);
   z-index: 3;
 }
 .doc-header p { margin: 0; }
@@ -1646,7 +1647,7 @@ th { font-weight: 700; }
   justify-content: space-between;
   width: 100%;
   min-height: 34pt;
-  font-family: "Google Sans", Arial, sans-serif;
+  font-family: "Google Sans", Inter, sans-serif;
 }
 .akad-preview-brand { display: flex; align-items: center; gap: 2pt; transform: translateY(2pt); }
 .akad-preview-logo { display: block; width: 96pt; height: 32pt; object-fit: contain; }
@@ -1672,10 +1673,12 @@ th { font-weight: 700; }
 .doc-footer {
   position: absolute;
   bottom: ${FOOTER_BOTTOM_PT}pt;
-  left: ${MARGIN_LEFT_PT}pt;
-  width: ${CONTENT_W_PT}pt;
+  left: ${HEADER_FOOTER_SIDE_PT}pt;
+  width: calc(${PAGE_W_PT}pt - ${HEADER_FOOTER_SIDE_PT * 2}pt);
   z-index: 3;
 }
+.doc-footer > table { width: 100% !important; }
+.doc-footer > table > colgroup > col { width: auto !important; }
 .doc-watermark {
   position: absolute;
   top: 50%;
@@ -1788,6 +1791,7 @@ export async function renderAkadPreviewHtml(
 <title>Pratinjau Dokumen Akad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
 <link href="https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet" />
 <style>${buildCss()}</style>
 </head>

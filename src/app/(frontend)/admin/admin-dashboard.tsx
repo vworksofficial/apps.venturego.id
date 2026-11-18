@@ -1481,73 +1481,62 @@ function ApplicationDrawerForm({
               pending={pending}
             />
           )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <span className="text-[11px] font-medium text-slate-500">
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? 'Nominal Diajukan'
-                  : 'Total Nafaqah + Ujrah'}
-              </span>
-              <strong className="mt-1 block text-xl font-extrabold text-[#0b57d0]">
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? formatRupiah(departure.requestedFinancingAmount)
-                  : application.financialPlan?.fullCoverBudget
-                    ? formatRupiah(planNafaqah + planUjrah)
-                    : planNafaqah > 0 && planUjrah > 0
+          {application.product === 'DEPARTURE_BRIDGING' && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <span className="text-[11px] font-medium text-slate-500">
+                  {application.product === 'DEPARTURE_BRIDGING'
+                    ? 'Nominal Diajukan'
+                    : 'Total Nafaqah + Ujrah'}
+                </span>
+                <strong className="mt-1 block text-xl font-extrabold text-[#0b57d0]">
+                  {application.product === 'DEPARTURE_BRIDGING'
+                    ? formatRupiah(departure.requestedFinancingAmount)
+                    : application.financialPlan?.fullCoverBudget
                       ? formatRupiah(planNafaqah + planUjrah)
-                      : 'Menunggu rincian'}
-              </strong>
-              <span className="mt-1 block text-[11px] text-slate-400">
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? 'Plafon maksimum persetujuan staf'
-                  : application.financialPlan?.fullCoverBudget
-                    ? 'Total kebutuhan + Ujrah, sebelum Ju’alah bersyarat COE'
-                    : planNafaqah > 0 && planUjrah > 0
-                      ? 'Nilai berdasarkan rincian biaya saat ini'
-                      : 'Nilai tampil setelah Nafaqah dan Ujrah diisi di Draft Akad'}
-              </span>
+                      : planNafaqah > 0 && planUjrah > 0
+                        ? formatRupiah(planNafaqah + planUjrah)
+                        : 'Menunggu rincian'}
+                </strong>
+                <span className="mt-1 block text-[11px] text-slate-400">
+                  {application.product === 'DEPARTURE_BRIDGING'
+                    ? 'Plafon maksimum persetujuan staf'
+                    : application.financialPlan?.fullCoverBudget
+                      ? 'Total kebutuhan + Ujrah, sebelum Ju’alah bersyarat COE'
+                      : planNafaqah > 0 && planUjrah > 0
+                        ? 'Nilai berdasarkan rincian biaya saat ini'
+                        : 'Nilai tampil setelah Nafaqah dan Ujrah diisi di Draft Akad'}
+                </span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <span className="text-[11px] font-medium text-slate-500">
+                  {application.product === 'DEPARTURE_BRIDGING'
+                    ? 'Sisa Kewajiban LPK'
+                    : 'Status Biaya'}
+                </span>
+                <strong
+                  className={`mt-1 block text-xl font-extrabold ${
+                    application.product === 'DEPARTURE_BRIDGING'
+                      ? 'text-slate-900'
+                      : pricingStatus === 'AGREED'
+                        ? 'text-emerald-700'
+                        : pricingStatus === 'VERIFIED'
+                          ? 'text-amber-700'
+                          : 'text-slate-700'
+                  }`}
+                >
+                  {application.product === 'DEPARTURE_BRIDGING'
+                    ? formatRupiah(departure.outstandingLPKAmount)
+                    : pricingStatusLabel}
+                </strong>
+                <span className="mt-1 block text-[11px] text-slate-400">
+                  {application.product === 'DEPARTURE_BRIDGING'
+                    ? 'Tagihan yang belum ditutup LPK'
+                    : 'Tahap verifikasi rincian biaya'}
+                </span>
+              </div>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <span className="text-[11px] font-medium text-slate-500">
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? 'Sisa Kewajiban LPK'
-                  : 'Status Biaya'}
-              </span>
-              <strong
-                className={`mt-1 block text-xl font-extrabold ${
-                  application.product === 'DEPARTURE_BRIDGING'
-                    ? 'text-slate-900'
-                    : pricingStatus === 'AGREED'
-                      ? 'text-emerald-700'
-                      : pricingStatus === 'VERIFIED'
-                        ? 'text-amber-700'
-                        : 'text-slate-700'
-                }`}
-              >
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? formatRupiah(departure.outstandingLPKAmount)
-                  : pricingStatusLabel}
-              </strong>
-              <span className="mt-1 block text-[11px] text-slate-400">
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? 'Tagihan yang belum ditutup LPK'
-                  : 'Tahap verifikasi rincian biaya'}
-              </span>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <span className="text-[11px] font-medium text-slate-500">Total Kewajiban Akad</span>
-              <strong className="mt-1 block text-xl font-extrabold text-slate-900">
-                {formatRupiah(application.financialPlan?.totalObligation ?? null)}
-              </strong>
-              <span className="mt-1 block text-[11px] text-slate-400">
-                {application.product === 'DEPARTURE_BRIDGING'
-                  ? `Sesuai rincian saat ini · ${String(
-                      application.financialPlan?.installmentCount ?? '—',
-                    )} angsuran`
-                  : 'Nafaqah + Ujrah (di luar Ju’alah)'}
-              </span>
-            </div>
-          </div>
+          )}
 
           {application.product === 'DEPARTURE_BRIDGING' && (
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -1593,14 +1582,14 @@ function ApplicationDrawerForm({
 
           <section
             aria-labelledby="pricing-approval-title"
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-blue-50/60 shadow-sm"
+            className="overflow-hidden rounded-2xl border border-blue-200/80 bg-gradient-to-br from-white via-blue-50/40 to-emerald-50/40 shadow-sm ring-1 ring-blue-900/5"
           >
-            <div className="border-b border-blue-100/70 bg-white/70 px-5 py-4">
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f0fe] text-[#0b57d0]">
+            <div className="border-b border-blue-100/80 bg-white/75 px-5 py-4 sm:px-6">
+              <div className="flex items-start gap-3.5">
+                <span className="mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0b57d0] to-emerald-600 text-white shadow-sm shadow-blue-900/15">
                   <svg
                     aria-hidden="true"
-                    className="size-4"
+                    className="size-[18px]"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={1.8}
@@ -1616,18 +1605,21 @@ function ApplicationDrawerForm({
                 </span>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900" id="pricing-approval-title">
+                    <h3
+                      className="text-[15px] font-bold tracking-tight text-slate-900"
+                      id="pricing-approval-title"
+                    >
                       Persetujuan Biaya
                     </h3>
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ring-1 ring-inset ${
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ${
                         PRICING_BADGE_STYLES[pricingStatus] ?? 'bg-slate-100 text-slate-700'
                       } ring-slate-200`}
                     >
                       {pricingStatusLabel}
                     </span>
                   </div>
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                  <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-600">
                     {pricingStatus === 'ESTIMATED'
                       ? application.product === 'FULL_COVER'
                         ? 'Simpan rincian kebutuhan, lengkapi Ujrah, Ju’alah, tenor, dan ketentuan akad pada Draft Akad, lalu tinjau pratinjau sebelum menyetujui.'
@@ -1636,7 +1628,7 @@ function ApplicationDrawerForm({
                   </p>
                   {application.product === 'FULL_COVER' && (
                     <button
-                      className="mt-2 text-xs font-semibold text-[#0b57d0] hover:underline"
+                      className="mt-2 inline-flex items-center rounded-md text-xs font-semibold text-[#0b57d0] transition hover:text-emerald-700 hover:underline"
                       onClick={() => setActiveTab('pricing')}
                       type="button"
                     >
@@ -1646,7 +1638,7 @@ function ApplicationDrawerForm({
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2.5 px-5 py-4">
+            <div className="flex flex-wrap items-center gap-2.5 bg-white/55 px-5 py-4 sm:px-6">
               {pricingStatus === 'ESTIMATED' ? (
                 <>
                   <DrawerAction

@@ -23,6 +23,7 @@ import { ensureStudentNumber, studentNumberSequence } from '@/lib/student-number
 import { FINANCING_OPTIONS } from '@/lib/financing-plan'
 import {
   calculateFullCoverBudget,
+  calculateFullCoverCharges,
   normalizeFullCoverBudget,
   validateFullCoverBudget,
   type FullCoverBudget,
@@ -151,6 +152,13 @@ const validateFullCoverApproval = (
   const firstPaymentDate = String(plan.firstPaymentDate ?? '')
   const budgetError = budget ? validateFullCoverBudget(budget) : null
   const budgetTotals = budget ? calculateFullCoverBudget(budget) : null
+  const expectedCharges = budgetTotals ? calculateFullCoverCharges(budgetTotals.nafaqahTotal) : null
+  if (
+    expectedCharges &&
+    (ujrahTotal !== expectedCharges.ujrahTotal || jualaTotal !== expectedCharges.jualaTotal)
+  ) {
+    return 'Simpan Budgeting terlebih dahulu agar Ujrah Wakalah dan Ju’alah mengikuti alokasi pembiayaan terbaru.'
+  }
   const allocationMismatch = budgetTotals
     ? hppInvoice !== budgetTotals.providerTotal ||
       hppPocketMoney !== budgetTotals.studentAllowanceTotal ||
@@ -306,6 +314,7 @@ export async function saveFinancialPlan(
     'wakalahDisputeInstitution',
     'lpkWitnessName',
     'fullCoverBudget',
+    'fullCoverRepaymentMonths',
   ] as const
   if (textFields.some((field) => typeof financialValues?.[field] !== 'string')) {
     return { ok: false, message: 'Rincian akad atau penyelesaian tidak valid.' }
@@ -330,6 +339,7 @@ export async function saveFinancialPlan(
     (financialValues.wakalahDisputeInstitution?.length ?? 0) > 200 ||
     financialValues.lpkWitnessName.length > 120 ||
     financialValues.fullCoverBudget.length > 8_000 ||
+    financialValues.fullCoverRepaymentMonths.length > 3 ||
     (refundValue !== '' && !/^\d+$/.test(refundValue))
   ) {
     return { ok: false, message: 'Rincian akad atau penyelesaian tidak valid.' }
@@ -394,11 +404,26 @@ export async function saveFinancialPlan(
     }
     if (fullCoverBudget) {
       const totals = calculateFullCoverBudget(fullCoverBudget)
-      const totalObligation = totals.nafaqahTotal + (Number(nextFinancialPlan.ujrahTotal) || 0)
-      const jualaTotal = Number(nextFinancialPlan.jualaTotal) || 0
-      const tenorMonths = Number(nextFinancialPlan.tenorMonths) || 0
+      const charges = calculateFullCoverCharges(totals.nafaqahTotal)
+      const submittedRepaymentMonths = financialValues.fullCoverRepaymentMonths.trim()
+      const storedRepaymentMonths = Number(existingFinancialPlan.tenorMonths)
+      const tenorMonths = submittedRepaymentMonths
+        ? Number(submittedRepaymentMonths)
+        : Number.isInteger(storedRepaymentMonths) &&
+            storedRepaymentMonths >= 1 &&
+            storedRepaymentMonths <= 36
+          ? storedRepaymentMonths
+          : 18
+      if (!Number.isInteger(tenorMonths) || tenorMonths < 1 || tenorMonths > 36) {
+        return { ok: false, message: 'Lama angsuran harus antara 1 dan 36 bulan.' }
+      }
+      const totalObligation = totals.nafaqahTotal + charges.ujrahTotal
+      const jualaTotal = charges.jualaTotal
       Object.assign(nextFinancialPlan, {
         fullCoverBudget,
+        ujrahTotal: charges.ujrahTotal,
+        jualaTotal,
+        tenorMonths,
         hppLpkInvoiceAmount: totals.providerTotal,
         hppPocketMoneyAmount: totals.studentAllowanceTotal,
         languageAllowanceMonthly: fullCoverBudget.languageAllowanceMonthly,

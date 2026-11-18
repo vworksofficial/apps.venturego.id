@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   calculateFullCoverBudget,
+  calculateFullCoverCharges,
   createFullCoverBudget,
   FULL_COVER_BUDGET_DEFAULTS,
   formatRupiah,
@@ -69,17 +70,45 @@ export function FullCoverBudgetFields({
     },
   )
   const [budget, setBudget] = useState<FullCoverBudget>(initialBudget)
+  const savedRepaymentMonths = Number(financialPlan.tenorMonths)
+  const [repaymentMonths, setRepaymentMonths] = useState(
+    Number.isInteger(savedRepaymentMonths) &&
+      savedRepaymentMonths >= 1 &&
+      savedRepaymentMonths <= 36
+      ? savedRepaymentMonths
+      : 18,
+  )
+  const hasSavedRepaymentMonths =
+    Number.isInteger(savedRepaymentMonths) &&
+    savedRepaymentMonths >= 1 &&
+    savedRepaymentMonths <= 36
   const [started, setStarted] = useState(Boolean(savedBudget))
   const [touched, setTouched] = useState(false)
   const languageMonths = budget.languageMonths
   const skillMonths = budget.skillMonths
   const savedJson = savedBudget ? JSON.stringify(savedBudget) : ''
   const currentJson = JSON.stringify(budget)
-  const isDirty = savedBudget
-    ? (savedBudgetRaw as Record<string, unknown>)?.version !== 2 || currentJson !== savedJson
-    : touched && currentJson !== savedJson
   const totals = useMemo(() => calculateFullCoverBudget(budget), [budget])
+  const charges = calculateFullCoverCharges(totals.nafaqahTotal)
+  const savedChargesMatch =
+    Number(financialPlan.ujrahTotal) === charges.ujrahTotal &&
+    Number(financialPlan.jualaTotal) === charges.jualaTotal
+  const isDirty = savedBudget
+    ? (savedBudgetRaw as Record<string, unknown>)?.version !== 2 ||
+      currentJson !== savedJson ||
+      !hasSavedRepaymentMonths ||
+      repaymentMonths !== savedRepaymentMonths ||
+      !savedChargesMatch
+    : (touched && currentJson !== savedJson) || repaymentMonths !== 18
+  const monthlyAfterCoe =
+    repaymentMonths > 0
+      ? Math.floor(
+          (totals.nafaqahTotal + charges.ujrahTotal + charges.jualaTotal) / repaymentMonths,
+        )
+      : 0
   const budgetValidationMessage = validateFullCoverBudget(budget)
+  const repaymentValid =
+    Number.isInteger(repaymentMonths) && repaymentMonths >= 1 && repaymentMonths <= 36
   const durationValid =
     Number.isInteger(languageMonths) &&
     languageMonths >= 1 &&
@@ -214,6 +243,7 @@ export function FullCoverBudgetFields({
         </div>
 
         <input name="fullCoverBudget" type="hidden" value={started ? currentJson : ''} />
+        <input name="fullCoverRepaymentMonths" type="hidden" value={repaymentMonths} />
 
         <div className="border-t border-amber-100/80 bg-white/70 px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -224,7 +254,7 @@ export function FullCoverBudgetFields({
             <div className="flex flex-wrap gap-2">
               <button
                 className="inline-flex items-center rounded-lg bg-[#0b57d0] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#0842a0] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={disabled || !isDirty || pending || !durationValid}
+                disabled={disabled || !isDirty || pending || !durationValid || !repaymentValid}
                 formNoValidate
                 type="submit"
               >
@@ -232,10 +262,11 @@ export function FullCoverBudgetFields({
               </button>
             </div>
           </div>
-          {!durationValid && (
+          {(!durationValid || !repaymentValid) && (
             <p className="mt-2 text-xs font-medium text-amber-800">
-              Durasi pelatihan belum lengkap. Perbaiki data pelatihan siswa sebelum menyimpan
-              rincian.
+              {!durationValid
+                ? 'Durasi pelatihan belum lengkap. Perbaiki data pelatihan siswa sebelum menyimpan rincian.'
+                : 'Lama angsuran harus antara 1 dan 36 bulan.'}
             </p>
           )}
           {isDirty && (
@@ -246,9 +277,19 @@ export function FullCoverBudgetFields({
         </div>
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 className="text-sm font-bold text-slate-900">Ringkasan Alokasi Pembiayaan</h3>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+        <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-100 px-4 py-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Ringkasan Alokasi Pembiayaan</h3>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Rincian kebutuhan, biaya akad, dan estimasi tenor.
+            </p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-blue-700">
+            Full Cover
+          </span>
+        </div>
+        <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
           {[
             ['Tahap 1 · Pendidikan', totals.languageTuitionTotal],
             ['Tahap 1 · Uang saku', totals.languageAllowanceTotal],
@@ -257,27 +298,79 @@ export function FullCoverBudgetFields({
             ['Pendaftaran & MCU', budget.registrationMcuAmount],
             ['Keberangkatan setelah COE', budget.departureAllowanceAmount],
           ].map(([label, amount]) => (
-            <div className="rounded-lg bg-slate-50 px-3 py-2" key={String(label)}>
-              <span className="block text-[10px] font-medium text-slate-500">{label}</span>
-              <strong className="mt-0.5 block text-xs font-bold text-slate-900">
+            <div
+              className="rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5"
+              key={String(label)}
+            >
+              <span className="block min-h-7 text-[10px] font-medium leading-4 text-slate-500">
+                {label}
+              </span>
+              <strong className="mt-0.5 block text-sm font-bold tabular-nums text-slate-900">
                 {formatRupiah(Number(amount))}
               </strong>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5">
-          <span className="text-xs font-semibold text-blue-900">
-            Total kebutuhan (Nafaqah) ·{' '}
-            {durationValid ? `${languageMonths} + ${skillMonths} bulan` : 'durasi belum valid'}
-          </span>
-          <strong className="text-sm font-extrabold text-[#0b57d0]">
-            {formatRupiah(totals.nafaqahTotal)}
-          </strong>
+        <div className="grid gap-2 border-t border-slate-100 bg-slate-50/60 p-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-blue-100 bg-white px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+              Total Nafaqah
+            </span>
+            <strong className="mt-1 block text-base font-extrabold tabular-nums text-[#0b57d0]">
+              {formatRupiah(totals.nafaqahTotal)}
+            </strong>
+            <span className="mt-0.5 block text-[10px] text-slate-500">
+              Biaya kebutuhan dan uang saku
+            </span>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Ujrah Wakalah
+            </span>
+            <strong className="mt-1 block text-base font-bold tabular-nums text-slate-900">
+              {formatRupiah(charges.ujrahTotal)}
+            </strong>
+            <span className="mt-0.5 block text-[10px] text-slate-500">Biaya jasa wakalah</span>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Ju’alah
+            </span>
+            <strong className="mt-1 block text-base font-bold tabular-nums text-slate-900">
+              {formatRupiah(charges.jualaTotal)}
+            </strong>
+            <span className="mt-0.5 block text-[10px] text-slate-500">
+              Dibayarkan setelah COE terbit
+            </span>
+          </div>
+          <label className="block rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+            <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Lama mengangsur
+            </span>
+            <span className="mt-1 flex items-center gap-2">
+              <input
+                className="w-full min-w-0 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-semibold tabular-nums text-slate-900 outline-none focus:border-[#0b57d0] focus:ring-2 focus:ring-[#0b57d0]/15"
+                disabled={disabled}
+                max={36}
+                min={1}
+                onChange={(event) => {
+                  setRepaymentMonths(Number(event.target.value) || 0)
+                  setStarted(true)
+                }}
+                type="number"
+                value={repaymentMonths || ''}
+              />
+              <span className="text-xs text-slate-500">bulan</span>
+            </span>
+            <span className="mt-1 block text-[10px] text-slate-500">
+              Angsuran ± {formatRupiah(monthlyAfterCoe)} / bulan
+            </span>
+          </label>
         </div>
-        <p className="mt-2 text-[11px] leading-4 text-slate-500">
+        <p className="px-4 pb-3 text-[11px] leading-4 text-slate-500">
           Total di atas mencakup biaya pihak ketiga dan seluruh uang saku, termasuk alokasi
-          keberangkatan. Ujrah dan Ju’alah dihitung terpisah pada Draft Akad; Ju’alah tetap
-          bersyarat COE.
+          keberangkatan. Nilai akad dan tenor tersimpan bersama Budgeting untuk digunakan pada Draft
+          Akad.
         </p>
         {savedBudget && budgetValidationMessage && (
           <p className="mt-2 text-xs font-medium text-amber-800">{budgetValidationMessage}</p>

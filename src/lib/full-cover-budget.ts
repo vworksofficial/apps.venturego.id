@@ -25,6 +25,11 @@ export type FullCoverBudgetTotals = {
   lines: { label: string; recipient: string; amount: number; note?: string }[]
 }
 
+export const calculateFullCoverCharges = (nafaqahTotal: number) => ({
+  ujrahTotal: Math.round(nafaqahTotal * 0.1),
+  jualaTotal: Math.round(nafaqahTotal * 0.5),
+})
+
 export const FULL_COVER_BUDGET_DEFAULTS = {
   languageAllowanceMonthly: 1_000_000,
   skillAllowanceMonthly: 1_000_000,

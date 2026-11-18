@@ -4795,6 +4795,7 @@ export function AdminDashboard({
         commitmentCompensationAmount: String(formData.get('commitmentCompensationAmount') ?? ''),
         commitmentSettlementDays: String(formData.get('commitmentSettlementDays') ?? ''),
         fullCoverBudget: String(formData.get('fullCoverBudget') ?? ''),
+        fullCoverRepaymentMonths: String(formData.get('fullCoverRepaymentMonths') ?? ''),
         wakalahOtherUjrahService: String(
           formData.get('wakalahOtherUjrahService') ??
             application.financialPlan?.wakalahOtherUjrahService ??

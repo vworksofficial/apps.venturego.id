@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
   },
   turbopack: { root: path.resolve(dirname) },
   experimental: {
+    agentUpgrade: 'security',
     cpus: 2,
     serverActions: { bodySizeLimit: '1mb' },
   },

@@ -271,7 +271,7 @@ export function FullCoverBudgetFields({
           )}
           {isDirty && (
             <p className="mt-2 text-xs font-medium text-amber-800">
-              Simpan perubahan dan tinjau pratinjau akad sebelum menyetujui rincian biaya.
+              Simpan perubahan agar rincian terbaru digunakan pada Draft Akad.
             </p>
           )}
         </div>

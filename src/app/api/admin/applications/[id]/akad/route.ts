@@ -1,6 +1,6 @@
 import { renderAkadPreviewHtml } from '@/lib/akad-preview'
 import { NextResponse } from 'next/server'
-import { buildAkadDocument } from '@/lib/akad-document'
+import { buildAkadDocument, refreshAkadPreviewHeader } from '@/lib/akad-document'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
 import { getStaffSession } from '@/lib/firebase-session'
 import { downloadDriveFile } from '@/lib/gdrive'
@@ -77,6 +77,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       })
     }
 
+    bytes = await refreshAkadPreviewHeader(bytes)
     const previewHtml = await renderAkadPreviewHtml(bytes, { draft: draftBuild })
     return new Response(previewHtml, {
       headers: {

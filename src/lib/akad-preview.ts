@@ -218,6 +218,7 @@ type RunFmt = {
   underline?: boolean
   color?: string
   size?: number // half-points
+  fontFamily?: string
 }
 
 const mergeIndent = (base: Indent | undefined, over: Indent | undefined): Indent | undefined => {
@@ -350,6 +351,9 @@ const parseRunFmt = (rpr: XmlEl | undefined): RunFmt => {
     const val = numAttr(size, 'val')
     if (val !== undefined) out.size = val
   }
+  const fonts = kidOf(rpr, 'rFonts')
+  const fontFamily = fonts ? (attrOf(fonts, 'ascii') ?? attrOf(fonts, 'hAnsi')) : undefined
+  if (fontFamily) out.fontFamily = fontFamily
   return out
 }
 
@@ -523,6 +527,7 @@ const toRoman = (value: number): string => {
 // ---------------------------------------------------------------------------
 const runCss = (fmt: RunFmt, baseSizePt: number): string => {
   const parts: string[] = []
+  if (fmt.fontFamily) parts.push(`font-family:${JSON.stringify(fmt.fontFamily)},Arial,sans-serif`)
   if (fmt.bold) parts.push('font-weight:700')
   if (fmt.italic) parts.push('font-style:italic')
   if (fmt.underline) parts.push('text-decoration:underline')
@@ -580,7 +585,10 @@ const renderRuns = (
     for (const child of node.children) {
       const name = localName(child.name)
       if (name === 'r') emitRun(child)
-      else if (
+      else if (name === 'fldSimple' && /\bPAGE\b/i.test(attrOf(child, 'instr') ?? '')) {
+        const pageResult = findDescendant(child, 't')
+        html += `<span class="page-number-field">${escapeHtml(pageResult ? textOf(pageResult) : '1')}</span>`
+      } else if (
         name === 'hyperlink' ||
         name === 'ins' ||
         name === 'smartTag' ||
@@ -815,8 +823,23 @@ const renderTableCell = (
   if (span > 1) attrs.push(`colspan="${span}"`)
 
   const content = tc.children
-    .filter((child) => localName(child.name) === 'p')
-    .map((p) => renderParagraph(ctx, p, { inTable: true }))
+    .map((child) => {
+      if (localName(child.name) === 'p') {
+        const paragraph = renderParagraph(ctx, child, { inTable: true })
+        const inline = findDescendant(child, 'inline')
+        const extent = inline ? kidOf(inline, 'extent') : undefined
+        const blip = inline ? findDescendant(inline, 'blip') : null
+        const embed = blip ? attrOf(blip, 'embed') : undefined
+        const src = embed ? ctx.images.get(embed) : undefined
+        const cx = extent ? numAttr(extent, 'cx') : undefined
+        const cy = extent ? numAttr(extent, 'cy') : undefined
+        if (!inline || !src || cx === undefined || cy === undefined) return paragraph
+        const inner = paragraph.replace(/^<p(?:\s[^>]*)?>/, '').replace(/<\/p>$/, '')
+        return `<p style="display:flex;align-items:center;gap:2pt;margin:0"><img src="${src}" alt="" style="width:${emuPt(cx)};height:${emuPt(cy)}" />${inner}</p>`
+      }
+      if (localName(child.name) === 'tbl') return renderTable(ctx, child)
+      return ''
+    })
     .join('')
 
   return `<td ${attrs.join(' ')}>${content || '<p style="margin:0">&nbsp;</p>'}</td>`
@@ -957,6 +980,20 @@ const renderHeaderFooterPart = async (
     return uri
   }
 
+  const imageIds = new Set<string>()
+  const collectImageIds = (node: XmlEl) => {
+    if (localName(node.name) === 'blip') {
+      const embed = attrOf(node, 'embed')
+      if (embed) imageIds.add(embed)
+    }
+    for (const child of node.children) collectImageIds(child)
+  }
+  collectImageIds(partEl)
+  for (const imageId of imageIds) {
+    const imageUri = await resolveImage(imageId)
+    if (imageUri) ctx.images.set(imageId, imageUri)
+  }
+
   const blocks: string[] = []
   for (const node of partEl.children) {
     if (localName(node.name) === 'tbl') {
@@ -998,7 +1035,7 @@ const renderHeaderFooterPart = async (
           )
           .join('')
         blocks.push(
-          `<p style="display:flex;align-items:center;gap:18pt;${style.join(';')}">${imgs}${textHtml}</p>`,
+          `<p style="display:flex;align-items:center;gap:2pt;${style.join(';')}">${imgs}${textHtml}</p>`,
         )
       } else {
         for (const img of images) {
@@ -1153,10 +1190,13 @@ const PAGINATION_SCRIPT = String.raw`
   var shell = document.getElementById('page-shell');
 
   function finishWithPages(pages) {
-    pages.forEach(function (group) {
+    pages.forEach(function (group, pageIndex) {
       var page = shell.content.firstElementChild.cloneNode(true);
       var body = page.querySelector('.a4-body');
       group.forEach(function (el) { body.appendChild(el); });
+      Array.prototype.forEach.call(page.querySelectorAll('.page-number-field'), function (field) {
+        field.textContent = String(pageIndex + 1);
+      });
       viewer.appendChild(page);
     });
     if (flow.parentNode) flow.parentNode.removeChild(flow);
@@ -1429,6 +1469,11 @@ const PAGINATION_SCRIPT = String.raw`
         var h = heightOf(chunk.el);
         if (used + h > LIMIT + TOLERANCE) {
           if (moved === 0) {
+            if (current.length > 0) {
+              chunk.body.removeChild(row);
+              newPage();
+              continue;
+            }
             moved = 1;
             index += 1;
             break;

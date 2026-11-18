@@ -136,6 +136,7 @@ const validateDepartureApproval = (
 const validateFullCoverApproval = (
   applicationData: DocumentData,
   plan: Record<string, unknown>,
+  options: { requireAkadTerms?: boolean } = {},
 ): string | null => {
   if (applicationData.destination !== 'JAPAN') {
     return 'Akad contoh hanya menetapkan Ju’alah untuk Jepang; konfirmasi ketentuan negara tujuan terlebih dahulu.'
@@ -148,29 +149,34 @@ const validateFullCoverApproval = (
   const languageMonths = Number(budget?.languageMonths ?? fullCoverDetails.languageTrainingMonths)
   const skillMonths = Number(budget?.skillMonths ?? fullCoverDetails.skillTrainingMonths)
   const commitmentAmount = Number(plan.commitmentCompensationAmount)
-  const commitmentDays = Number(plan.commitmentSettlementDays)
-  const firstPaymentDate = String(plan.firstPaymentDate ?? '')
+  const commitmentDays = Number(plan.commitmentSettlementDays ?? 30)
+  const installmentPaymentDay = Number(plan.installmentPaymentDay ?? 28)
   const budgetError = budget ? validateFullCoverBudget(budget) : null
   const budgetTotals = budget ? calculateFullCoverBudget(budget) : null
   const expectedCharges = budgetTotals ? calculateFullCoverCharges(budgetTotals.nafaqahTotal) : null
+  if (budgetError) return budgetError
+  if (!budget || !budgetTotals) {
+    return 'Simpan rincian kebutuhan Full Cover pada tab Budgeting terlebih dahulu.'
+  }
   if (
     expectedCharges &&
     (ujrahTotal !== expectedCharges.ujrahTotal || jualaTotal !== expectedCharges.jualaTotal)
   ) {
     return 'Simpan Budgeting terlebih dahulu agar Ujrah Wakalah dan Ju’alah mengikuti alokasi pembiayaan terbaru.'
   }
-  const allocationMismatch = budgetTotals
-    ? hppInvoice !== budgetTotals.providerTotal ||
-      hppPocketMoney !== budgetTotals.studentAllowanceTotal ||
-      budgetTotals.nafaqahTotal !== nafaqahTotal
-    : hppInvoice + hppPocketMoney !== nafaqahTotal
+  if (!Number.isSafeInteger(hppInvoice) || !Number.isSafeInteger(hppPocketMoney)) {
+    return 'Simpan ulang rincian Budgeting agar alokasi dana ke LPK dan uang saku tersimpan.'
+  }
   if (
-    budgetError ||
-    !Number.isSafeInteger(hppInvoice) ||
-    hppInvoice < 0 ||
-    !Number.isSafeInteger(hppPocketMoney) ||
-    hppPocketMoney < 0 ||
-    allocationMismatch ||
+    hppInvoice !== budgetTotals.providerTotal ||
+    hppPocketMoney !== budgetTotals.studentAllowanceTotal
+  ) {
+    return 'Alokasi dana ke LPK atau uang saku berbeda dari rincian Budgeting. Simpan ulang Budgeting.'
+  }
+  if (budgetTotals.nafaqahTotal !== nafaqahTotal) {
+    return 'Total Nafaqah harus berasal dari penjumlahan seluruh komponen pada Budgeting.'
+  }
+  if (
     !Number.isInteger(languageMonths) ||
     languageMonths < 1 ||
     languageMonths > 60 ||
@@ -182,18 +188,9 @@ const validateFullCoverApproval = (
     !Number.isSafeInteger(Number(plan.skillAllowanceMonthly)) ||
     Number(plan.skillAllowanceMonthly) < 0 ||
     !Number.isSafeInteger(Number(plan.departureAllowanceAmount)) ||
-    Number(plan.departureAllowanceAmount) < 0 ||
-    !Number.isSafeInteger(commitmentAmount) ||
-    commitmentAmount <= 0 ||
-    !Number.isInteger(commitmentDays) ||
-    commitmentDays < 1 ||
-    commitmentDays > 90 ||
-    !calculateInstallmentSchedule(0, 1, firstPaymentDate)
+    Number(plan.departureAllowanceAmount) < 0
   ) {
-    return (
-      budgetError ??
-      'Rincian kebutuhan pada tab Nominal Pengajuan harus sama dengan Nafaqah di Draft Akad.'
-    )
+    return 'Periksa durasi pelatihan dan rincian uang saku pada Budgeting.'
   }
   if (
     ![nafaqahTotal, ujrahTotal, jualaTotal, tenorMonths].every(Number.isFinite) ||
@@ -201,6 +198,22 @@ const validateFullCoverApproval = (
     tenorMonths > 36
   ) {
     return 'Isi dan verifikasi Nafaqah, Ujrah, Ju’alah, serta tenor sebelum menyetujui biaya.'
+  }
+  if (options.requireAkadTerms) {
+    const expectedCommitmentAmount = Math.round(budgetTotals.nafaqahTotal * 0.2)
+    if (!Number.isSafeInteger(commitmentAmount) || commitmentAmount !== expectedCommitmentAmount) {
+      return 'Simpan Draft Akad agar biaya komitmen mengikuti Total Nafaqah.'
+    }
+    if (!Number.isInteger(commitmentDays) || commitmentDays < 1 || commitmentDays > 90) {
+      return 'Lengkapi tenggat penyelesaian komitmen (1–90 hari) pada tab Draft Akad.'
+    }
+    if (
+      !Number.isInteger(installmentPaymentDay) ||
+      installmentPaymentDay < 1 ||
+      installmentPaymentDay > 31
+    ) {
+      return 'Isi tanggal pembayaran angsuran antara 1 dan 31 pada tab Draft Akad.'
+    }
   }
   return null
 }
@@ -275,6 +288,7 @@ export async function saveFinancialPlan(
     'departureAllowanceAmount',
     'commitmentCompensationAmount',
     'commitmentSettlementDays',
+    'installmentPaymentDay',
   ] as const
   const financialNumbers: Partial<Record<(typeof financialFields)[number], number>> = {}
   for (const field of financialFields) {
@@ -298,6 +312,14 @@ export async function saveFinancialPlan(
       financialNumbers.tenorMonths > 36)
   ) {
     return { ok: false, message: 'Tenor harus antara 1 dan 36 bulan.' }
+  }
+  if (
+    financialNumbers.installmentPaymentDay !== undefined &&
+    (!Number.isInteger(financialNumbers.installmentPaymentDay) ||
+      financialNumbers.installmentPaymentDay < 1 ||
+      financialNumbers.installmentPaymentDay > 31)
+  ) {
+    return { ok: false, message: 'Tanggal pembayaran angsuran harus antara 1 dan 31.' }
   }
   const textFields = [
     'nafaqahItems',
@@ -405,6 +427,14 @@ export async function saveFinancialPlan(
     if (fullCoverBudget) {
       const totals = calculateFullCoverBudget(fullCoverBudget)
       const charges = calculateFullCoverCharges(totals.nafaqahTotal)
+      const storedCommitmentDays = Number(existingFinancialPlan.commitmentSettlementDays)
+      const commitmentSettlementDays =
+        financialNumbers.commitmentSettlementDays ??
+        (Number.isInteger(storedCommitmentDays) &&
+        storedCommitmentDays >= 1 &&
+        storedCommitmentDays <= 90
+          ? storedCommitmentDays
+          : 30)
       const submittedRepaymentMonths = financialValues.fullCoverRepaymentMonths.trim()
       const storedRepaymentMonths = Number(existingFinancialPlan.tenorMonths)
       const tenorMonths = submittedRepaymentMonths
@@ -421,6 +451,8 @@ export async function saveFinancialPlan(
       const jualaTotal = charges.jualaTotal
       Object.assign(nextFinancialPlan, {
         fullCoverBudget,
+        commitmentCompensationAmount: Math.round(totals.nafaqahTotal * 0.2),
+        commitmentSettlementDays,
         ujrahTotal: charges.ujrahTotal,
         jualaTotal,
         tenorMonths,
@@ -1034,32 +1066,36 @@ export async function approveApplicationPricing(
             'Untuk Full Cover, ubah nominal pada komponen kebutuhan di tab Nominal Pengajuan.',
         }
       }
-      let nafaqahTotal = Number(plan.nafaqahTotal)
-      let ujrahTotal = Number(plan.ujrahTotal)
-      const jualaTotal = Number(plan.jualaTotal)
-      const tenorMonths = Number(plan.tenorMonths)
-      if (![nafaqahTotal, ujrahTotal, jualaTotal, tenorMonths].every(Number.isFinite)) {
-        return {
-          ok: false,
-          message:
-            'Lengkapi Nafaqah, Ujrah, Ju’alah, dan tenor pada tab Draft Akad sebelum menyetujui.',
-        }
-      }
       const budget = normalizeFullCoverBudget(plan.fullCoverBudget) ?? undefined
       const budgetTotals = budget ? calculateFullCoverBudget(budget) : null
-      if (!budgetTotals || budgetTotals.nafaqahTotal !== nafaqahTotal) {
+      const budgetError = budget ? validateFullCoverBudget(budget) : null
+      if (!budget || !budgetTotals || budgetError) {
         return {
           ok: false,
           message:
-            'Simpan rincian kebutuhan Full Cover pada tab Nominal Pengajuan terlebih dahulu.',
+            budgetError ??
+            'Simpan rincian kebutuhan Full Cover pada tab Budgeting terlebih dahulu.',
         }
       }
-      const approvalError = validateFullCoverApproval(applicationData, {
+      const nafaqahTotal = budgetTotals.nafaqahTotal
+      const { ujrahTotal, jualaTotal } = calculateFullCoverCharges(nafaqahTotal)
+      const savedTenor = Number(plan.tenorMonths)
+      const tenorMonths =
+        Number.isInteger(savedTenor) && savedTenor >= 1 && savedTenor <= 36 ? savedTenor : 18
+      const fullCoverApprovalPlan = {
         ...plan,
         nafaqahTotal,
         ujrahTotal,
         jualaTotal,
         tenorMonths,
+        hppLpkInvoiceAmount: budgetTotals.providerTotal,
+        hppPocketMoneyAmount: budgetTotals.studentAllowanceTotal,
+        languageAllowanceMonthly: budget.languageAllowanceMonthly,
+        skillAllowanceMonthly: budget.skillAllowanceMonthly,
+        departureAllowanceAmount: budget.departureAllowanceAmount,
+      }
+      const approvalError = validateFullCoverApproval(applicationData, fullCoverApprovalPlan, {
+        requireAkadTerms: false,
       })
       if (approvalError) return { ok: false, message: approvalError }
       const totalObligation = nafaqahTotal + ujrahTotal

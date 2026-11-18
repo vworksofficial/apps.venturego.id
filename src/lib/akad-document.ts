@@ -1,6 +1,7 @@
 import 'server-only'
 
 import JSZip from 'jszip'
+import sharp from 'sharp'
 import { AKAD_TEMPLATE_BASE64 as JUALAH_TEMPLATE_BASE64 } from './akad-templates/jualah'
 import { AKAD_TEMPLATE_BASE64 as WAKALAH_TEMPLATE_BASE64 } from './akad-templates/wakalah'
 import {
@@ -13,7 +14,11 @@ import {
   type FinancingCostLine,
 } from './departure-financing'
 import { terbilang } from './terbilang'
-import { calculateFullCoverBudget, normalizeFullCoverBudget } from './full-cover-budget'
+import {
+  calculateFullCoverBudget,
+  calculateFullCoverCharges,
+  normalizeFullCoverBudget,
+} from './full-cover-budget'
 
 export type AkadTemplateKind = 'WAKALAH' | 'JUALAH'
 
@@ -37,6 +42,150 @@ const RELIGION_LABELS: Record<string, string> = {
 const ROMAN_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII']
 
 const TEMPLATE_ERROR = 'Template dokumen akad tidak sesuai versi aplikasi.'
+
+const recolorHeaderLogo = async (zip: JSZip): Promise<void> => {
+  const header = await zip.file('word/header1.xml')?.async('string')
+  const rels = await zip.file('word/_rels/header1.xml.rels')?.async('string')
+  if (!header || !rels) return
+  const relationshipId = /<a:blip\b[^>]*r:embed="([^"]+)"/.exec(header)?.[1]
+  if (!relationshipId) return
+  const target = new RegExp(
+    `<Relationship\\b(?=[^>]*\\bId="${relationshipId}")[^>]*\\bTarget="([^"]+)"`,
+  ).exec(rels)?.[1]
+  if (!target) return
+  const logoPath = `word/${target.replace(/^\.\//, '')}`
+  const logoFile = zip.file(logoPath)
+  if (!logoFile) return
+
+  const original = await logoFile.async('nodebuffer')
+  const { data, info } = await sharp(original)
+    .removeAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+  const originalBlue = [26, 70, 145]
+  const brandBlue = [11, 87, 208]
+  for (let index = 0; index < data.length; index += info.channels) {
+    const whiteMix = Math.min(
+      1,
+      Math.max(
+        0,
+        [0, 1, 2].reduce((sum, channel) => {
+          return (
+            sum + (data[index + channel] - originalBlue[channel]) / (255 - originalBlue[channel])
+          )
+        }, 0) / 3,
+      ),
+    )
+    for (let channel = 0; channel < 3; channel += 1) {
+      data[index + channel] = Math.round(brandBlue[channel] + (255 - brandBlue[channel]) * whiteMix)
+    }
+  }
+  const recolored = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels },
+  })
+    .png()
+    .toBuffer()
+  zip.file(logoPath, recolored)
+
+  const tightHeader = header.replace(
+    '<w:tab w:val="left" w:pos="2600"/>',
+    '<w:tab w:val="left" w:pos="2300"/>',
+  )
+  if (tightHeader !== header) zip.file('word/header1.xml', tightHeader)
+}
+
+const setHeaderCompanyIdentity = async (zip: JSZip): Promise<void> => {
+  const headerFile = zip.file('word/header1.xml')
+  if (!headerFile) return
+  const header = await headerFile.async('string')
+  const existingCompanyTable = header.includes('PT VWORKS KOLABORASI BERSAMA')
+    ? /<w:tbl>[\s\S]*?<\/w:tbl>/.exec(header)?.[0]
+    : undefined
+  const logoParagraph = existingCompanyTable
+    ? /<w:p>[\s\S]*?<\/w:p>/.exec(existingCompanyTable)?.[0]
+    : /<w:p>[\s\S]*?<\/w:p>/.exec(header)?.[0]
+  if (!logoParagraph) return
+
+  const leftParagraph = logoParagraph
+    .replace(
+      /<w:pPr>[\s\S]*?<\/w:pPr>/,
+      '<w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>',
+    )
+    .replace('<w:r><w:tab/></w:r>', '<w:r><w:t xml:space="preserve"> </w:t></w:r>')
+    .replaceAll('1866900', '1225296')
+    .replaceAll('619125', '406400')
+    .replaceAll('<w:sz w:val="24"/>', '<w:sz w:val="26"/>')
+    .replaceAll('<w:szCs w:val="24"/>', '<w:szCs w:val="26"/>')
+    .replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (_match, properties: string) => {
+      const brandProperties = properties
+        .replace(/<w:color\b[^>]*\/>/g, '')
+        .replace(/<w:bCs?\b[^>]*\/>/g, '')
+      return `<w:rPr>${brandProperties}<w:b/><w:bCs/><w:color w:val="0B57D0"/></w:rPr>`
+    })
+
+  const cellMargins =
+    '<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tcMar>'
+  const noBorders = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
+    .map((side) => `<w:${side} w:val="nil"/>`)
+    .join('')
+  const companyRun = (
+    text: string,
+    options: { size: number; bold?: boolean; italic?: boolean; color: string },
+  ) =>
+    `<w:r><w:rPr><w:rFonts w:ascii="Google Sans" w:hAnsi="Google Sans" w:eastAsia="Google Sans"/>${options.bold ? '<w:b/><w:bCs/>' : ''}${options.italic ? '<w:i/><w:iCs/>' : ''}<w:color w:val="${options.color}"/><w:sz w:val="${options.size}"/><w:szCs w:val="${options.size}"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`
+  const companyLine = (
+    text: string,
+    options: { size: number; bold?: boolean; italic?: boolean; color: string },
+  ) =>
+    `<w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="0" w:after="0" w:line="220" w:lineRule="auto"/></w:pPr>${companyRun(text, options)}</w:p>`
+  const companyParagraphs = [
+    companyLine('PT VWORKS KOLABORASI BERSAMA', { size: 18, bold: true, color: '0B57D0' }),
+    companyLine('Your Partner to Leap Together', { size: 16, bold: true, color: '0B57D0' }),
+    companyLine('Perum Bumi Dieng Indah 2, Blok G5 No. 2 & 3, RW 4', {
+      size: 12,
+      color: '000000',
+    }),
+    companyLine('Andongsili, Kec. Mojotengah, Kabupaten Wonosobo, Jawa Tengah 56351', {
+      size: 12,
+      color: '000000',
+    }),
+    companyLine('082213072665', { size: 12, color: '000000' }),
+  ].join('')
+  const leftCell = `<w:tc><w:tcPr><w:tcW w:w="5438" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${leftParagraph}</w:tc>`
+  const rightCell = `<w:tc><w:tcPr><w:tcW w:w="4200" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${companyParagraphs}</w:tc>`
+  const headerTable = `<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${noBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="5438"/><w:gridCol w:w="4200"/></w:tblGrid><w:tr>${leftCell}${rightCell}</w:tr></w:tbl>`
+  const previousHeaderContent = existingCompanyTable ?? logoParagraph
+  zip.file('word/header1.xml', header.replace(previousHeaderContent, headerTable))
+}
+
+export const refreshAkadPreviewHeader = async (bytes: Uint8Array): Promise<Uint8Array> => {
+  const zip = await JSZip.loadAsync(bytes)
+  const header = await zip.file('word/header1.xml')?.async('string')
+  if (!header) return bytes
+
+  if (!header.includes('PT VWORKS KOLABORASI BERSAMA')) await recolorHeaderLogo(zip)
+  await setHeaderCompanyIdentity(zip)
+  return zip.generateAsync({ type: 'uint8array' })
+}
+
+const setProgramFooter = async (zip: JSZip, programName: string): Promise<void> => {
+  const footerFile = zip.file('word/footer1.xml')
+  if (!footerFile) return
+  const footer = await footerFile.async('string')
+  const parafTable = /<w:tbl>[\s\S]*?<\/w:tbl>/.exec(footer)?.[0]
+  if (!parafTable) return
+
+  const cellMargins =
+    '<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tcMar>'
+  const outerBorders = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
+    .map((side) => `<w:${side} w:val="nil"/>`)
+    .join('')
+  const leftProgramCell = `<w:tc><w:tcPr><w:tcW w:w="3213" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:rPr><w:color w:val="94A3B8"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t xml:space="preserve">Program </w:t></w:r><w:r><w:rPr><w:i/><w:iCs/><w:color w:val="94A3B8"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>${escapeXml(programName)}</w:t></w:r></w:p></w:tc>`
+  const pageNumberCell = `<w:tc><w:tcPr><w:tcW w:w="3212" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:fldSimple w:instr=" PAGE " w:dirty="true"><w:r><w:rPr><w:color w:val="64748B"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple></w:p></w:tc>`
+  const rightParafCell = `<w:tc><w:tcPr><w:tcW w:w="3213" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>${parafTable}<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p></w:tc>`
+  const footerLayout = `<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${outerBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="3213"/><w:gridCol w:w="3212"/><w:gridCol w:w="3213"/></w:tblGrid><w:tr>${leftProgramCell}${pageNumberCell}${rightParafCell}</w:tr></w:tbl>`
+  zip.file('word/footer1.xml', footer.replace(parafTable, footerLayout))
+}
 
 const DRAFT_WATERMARK_VML =
   '<w:p><w:pPr><w:spacing w:line="20" w:lineRule="exact"/></w:pPr><w:r><w:pict>' +
@@ -604,6 +753,7 @@ type ResolvedValues = {
   departureAllowanceAmount: number
   commitmentCompensationAmount: number
   commitmentSettlementDays: number
+  installmentPaymentDay: number
   wakalahDocumentReturnBusinessDays: number
   wakalahWrittenWarningCount: number
   wakalahGraceDays: number
@@ -870,16 +1020,24 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
   if (product === 'FULL_COVER') {
     const fullCoverBudget = normalizeFullCoverBudget(plan.fullCoverBudget)
     const budgetTotals = fullCoverBudget ? calculateFullCoverBudget(fullCoverBudget) : null
-    const nafaqahTotal = readNumber(plan.nafaqahTotal)
-    const ujrahTotal = readNumber(plan.ujrahTotal)
-    const jualaTotal = readNumber(plan.jualaTotal)
+    const nafaqahTotal = budgetTotals?.nafaqahTotal ?? readNumber(plan.nafaqahTotal)
+    const calculatedCharges = budgetTotals
+      ? calculateFullCoverCharges(budgetTotals.nafaqahTotal)
+      : null
+    const ujrahTotal = calculatedCharges?.ujrahTotal ?? readNumber(plan.ujrahTotal)
+    const jualaTotal = calculatedCharges?.jualaTotal ?? readNumber(plan.jualaTotal)
     const tenorRaw = readNumber(plan.tenorMonths)
     const tenorMonths =
-      Number.isInteger(tenorRaw) && tenorRaw >= 1 && tenorRaw <= 36 ? tenorRaw : 12
-    const totalObligation = readNumber(plan.totalObligation) || nafaqahTotal + ujrahTotal
-    const totalIfCoe = readNumber(plan.totalObligationIfCoe) || totalObligation + jualaTotal
-    const monthlyAfterCoe =
-      readNumber(plan.monthlyInstallmentAfterCoe) || Math.floor(totalIfCoe / tenorMonths)
+      Number.isInteger(tenorRaw) && tenorRaw >= 1 && tenorRaw <= 36 ? tenorRaw : 18
+    const totalObligation =
+      calculatedCharges !== null
+        ? nafaqahTotal + ujrahTotal
+        : readNumber(plan.totalObligation) || nafaqahTotal + ujrahTotal
+    const totalIfCoe =
+      calculatedCharges !== null
+        ? totalObligation + jualaTotal
+        : readNumber(plan.totalObligationIfCoe) || totalObligation + jualaTotal
+    const monthlyAfterCoe = Math.floor(totalIfCoe / tenorMonths)
     const languageMonths =
       readNumber(fullCoverBudget?.languageMonths ?? fullCover.languageTrainingMonths) > 0
         ? String(readNumber(fullCoverBudget?.languageMonths ?? fullCover.languageTrainingMonths))
@@ -930,8 +1088,14 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
       languageAllowanceMonthly: readNumber(plan.languageAllowanceMonthly),
       skillAllowanceMonthly: readNumber(plan.skillAllowanceMonthly),
       departureAllowanceAmount: readNumber(plan.departureAllowanceAmount),
-      commitmentCompensationAmount: readNumber(plan.commitmentCompensationAmount),
-      commitmentSettlementDays: readNumber(plan.commitmentSettlementDays),
+      commitmentCompensationAmount: Math.round(nafaqahTotal * 0.2),
+      commitmentSettlementDays: readNumber(plan.commitmentSettlementDays) || 30,
+      installmentPaymentDay:
+        Number.isInteger(readNumber(plan.installmentPaymentDay)) &&
+        readNumber(plan.installmentPaymentDay) >= 1 &&
+        readNumber(plan.installmentPaymentDay) <= 31
+          ? readNumber(plan.installmentPaymentDay)
+          : 28,
       wakalahDocumentReturnBusinessDays: readNumber(plan.wakalahDocumentReturnBusinessDays),
       wakalahWrittenWarningCount: readNumber(plan.wakalahWrittenWarningCount),
       wakalahGraceDays: readNumber(plan.wakalahGraceDays),
@@ -1017,6 +1181,7 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
     departureAllowanceAmount: readNumber(plan.departureAllowanceAmount),
     commitmentCompensationAmount: readNumber(plan.commitmentCompensationAmount),
     commitmentSettlementDays: readNumber(plan.commitmentSettlementDays),
+    installmentPaymentDay: 28,
     wakalahDocumentReturnBusinessDays: readNumber(plan.wakalahDocumentReturnBusinessDays),
     wakalahWrittenWarningCount: readNumber(plan.wakalahWrittenWarningCount),
     wakalahGraceDays: readNumber(plan.wakalahGraceDays),
@@ -1053,6 +1218,9 @@ export const buildAkadDocument = async (options: {
   const base64 = template === 'JUALAH' ? JUALAH_TEMPLATE_BASE64 : WAKALAH_TEMPLATE_BASE64
 
   const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'))
+  await recolorHeaderLogo(zip)
+  await setHeaderCompanyIdentity(zip)
+  await setProgramFooter(zip, template === 'JUALAH' ? 'Full Cover' : 'Dana Keberangkatan')
   const documentFile = zip.file('word/document.xml')
   if (!documentFile) throw new Error(TEMPLATE_ERROR)
   let xml = await documentFile.async('string')
@@ -1085,7 +1253,9 @@ export const buildAkadDocument = async (options: {
   xml = updateParagraphContaining(
     xml,
     'bulan pertama setelah keberangkatan ke Jepang',
-    'mulai dibayar ketika siswa sudah menerima gaji kedua di negara tujuan',
+    template === 'JUALAH'
+      ? `angsuran dibayar setiap tanggal ${values.installmentPaymentDay}, dimulai pada bulan siswa mulai bekerja dan menerima penghasilan di negara tujuan`
+      : 'mulai dibayar ketika siswa sudah menerima gaji kedua di negara tujuan',
   )
 
   assertTokenCount(xml, '[nomor kontrak]', 1)

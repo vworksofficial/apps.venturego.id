@@ -3,7 +3,11 @@
 import { useState } from 'react'
 import { deriveDepartureFinancials, QARDH_LABEL } from '@/lib/departure-financing'
 import type { ApplicationProduct } from '@/lib/firebase-data'
-import { calculateFullCoverBudget, normalizeFullCoverBudget } from '@/lib/full-cover-budget'
+import {
+  calculateFullCoverBudget,
+  calculateFullCoverCharges,
+  normalizeFullCoverBudget,
+} from '@/lib/full-cover-budget'
 
 const amountLabel = (amount: number) => `Rp${amount.toLocaleString('id-ID')}`
 const formatThousandsInput = (value: string) =>
@@ -308,15 +312,28 @@ export function FinanceTermsFields({
           />
         </label>
         {identityFields.map(([label, value]) => (
-          <label className="space-y-1 text-xs font-semibold text-slate-600" key={label}>
+          <label
+            className={`space-y-1 text-xs font-semibold text-slate-600 ${label === 'Alamat sesuai KTP' ? 'lg:row-span-2' : ''}`}
+            key={label}
+          >
             <span>{label}</span>
-            <input
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-normal text-slate-700"
-              readOnly
-              value={
-                typeof value === 'string' && value.trim() ? value : 'Belum diisi pada pengajuan'
-              }
-            />
+            {label === 'Alamat sesuai KTP' ? (
+              <textarea
+                className="min-h-24 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 font-normal text-slate-700"
+                readOnly
+                value={
+                  typeof value === 'string' && value.trim() ? value : 'Belum diisi pada pengajuan'
+                }
+              />
+            ) : (
+              <input
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-normal text-slate-700"
+                readOnly
+                value={
+                  typeof value === 'string' && value.trim() ? value : 'Belum diisi pada pengajuan'
+                }
+              />
+            )}
           </label>
         ))}
         <label className="space-y-1 text-xs font-semibold text-slate-600">
@@ -349,40 +366,119 @@ export function FinanceTermsFields({
   )
 
   if (product === 'FULL_COVER') {
+    const nafaqahTotal = fullCoverBudgetTotals?.nafaqahTotal ?? 0
+    const charges = calculateFullCoverCharges(nafaqahTotal)
+    const storedTenor = Number(financialPlan.tenorMonths)
+    const tenorMonths =
+      Number.isInteger(storedTenor) && storedTenor >= 1 && storedTenor <= 36 ? storedTenor : 18
+    const commitmentCompensationAmount = Math.round(nafaqahTotal * 0.2)
+    const totalObligation = nafaqahTotal + charges.ujrahTotal
+    const totalObligationIfCoe = totalObligation + charges.jualaTotal
+    const monthlyInstallmentAfterCoe = Math.floor(totalObligationIfCoe / tenorMonths)
+    const finalInstallmentAfterCoe =
+      totalObligationIfCoe - monthlyInstallmentAfterCoe * (tenorMonths - 1)
     return (
-      <div className="flex flex-col gap-6">
-        {identityEditor}
+      <div className="flex flex-col gap-4">
         {fullCoverBudgetTotals ? (
-          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <section className="overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-white via-amber-50/25 to-emerald-50/30 shadow-xs">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-amber-100/80 px-4 py-3.5 sm:px-5">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-700">
-                  Sinkron dari Nominal Pengajuan
+                  Sumber: Budgeting
                 </span>
-                <h3 className="mt-1 text-base font-bold text-slate-900">
-                  Kebutuhan Full Cover tersimpan
-                </h3>
+                <h3 className="mt-1 text-sm font-bold text-slate-900">Ringkasan nilai akad</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Rincian dan nominal uang saku dikelola pada tab Nominal Pengajuan. Angka berikut
-                  menjadi nilai Nafaqah dan baris lampiran pada pratinjau akad.
+                  Nilai pembiayaan dan tenor mengikuti Budgeting tersimpan. Perubahannya dilakukan
+                  dari tab Budgeting.
                 </p>
               </div>
-              <strong className="rounded-lg bg-white px-3 py-2 text-sm font-extrabold text-emerald-800 ring-1 ring-emerald-200">
-                {amountLabel(fullCoverBudgetTotals.nafaqahTotal)}
-              </strong>
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold text-emerald-800">
+                Tersinkron
+              </span>
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-lg bg-white px-3 py-2 text-xs">
-                <span className="text-slate-500">Pembayaran ke klinik/LPK</span>
-                <strong className="mt-0.5 block text-slate-900">
-                  {amountLabel(fullCoverBudgetTotals.providerTotal)}
-                </strong>
-              </div>
-              <div className="rounded-lg bg-white px-3 py-2 text-xs">
-                <span className="text-slate-500">Total uang saku siswa</span>
-                <strong className="mt-0.5 block text-slate-900">
-                  {amountLabel(fullCoverBudgetTotals.studentAllowanceTotal)}
-                </strong>
+            <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ['Total Nafaqah', amountLabel(nafaqahTotal), 'Kebutuhan dan uang saku'],
+                ['Ujrah Wakalah', amountLabel(charges.ujrahTotal), 'Jasa pengurusan'],
+                ['Ju’alah', amountLabel(charges.jualaTotal), 'Jika COE terbit'],
+                ['Lama angsuran', `${tenorMonths} bulan`, 'Diatur di Budgeting'],
+              ].map(([label, value, note]) => (
+                <div
+                  className="rounded-xl border border-slate-100 bg-white/90 px-3 py-2.5"
+                  key={label}
+                >
+                  <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    {label}
+                  </span>
+                  <strong className="mt-1 block text-sm font-bold tabular-nums text-slate-900">
+                    {value}
+                  </strong>
+                  <span className="mt-0.5 block text-[10px] text-slate-500">{note}</span>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-2 border-t border-amber-100/80 bg-white/65 p-3 sm:grid-cols-3">
+              {[
+                ['Total kewajiban tanpa Ju’alah', totalObligation],
+                ['Total kewajiban jika COE terbit', totalObligationIfCoe],
+                ['Angsuran per bulan setelah COE', monthlyInstallmentAfterCoe],
+              ].map(([label, amount]) => (
+                <div
+                  className="rounded-xl border border-slate-100 bg-white px-3 py-2.5"
+                  key={String(label)}
+                >
+                  <span className="block text-[10px] font-medium leading-4 text-slate-500">
+                    {label}
+                  </span>
+                  <strong className="mt-1 block text-sm font-bold tabular-nums text-[#0b57d0]">
+                    {amountLabel(Number(amount))}
+                  </strong>
+                </div>
+              ))}
+              <p className="px-1 text-[10px] leading-4 text-slate-500 sm:col-span-3">
+                Tenor {tenorMonths} bulan. Angsuran terakhir {amountLabel(finalInstallmentAfterCoe)}
+                {finalInstallmentAfterCoe !== monthlyInstallmentAfterCoe
+                  ? ' menyesuaikan sisa pembulatan.'
+                  : '.'}
+              </p>
+            </div>
+            <div className="border-t border-amber-100/80 px-4 py-3 sm:px-5">
+              <h4 className="text-xs font-bold text-slate-800">Rincian kebutuhan dari Budgeting</h4>
+              <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200 bg-white/95">
+                <table className="w-full min-w-[560px] border-collapse text-left text-[11px]">
+                  <thead className="bg-slate-50 text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Komponen kebutuhan</th>
+                      <th className="px-3 py-2">Penerima</th>
+                      <th className="px-3 py-2">Keterangan</th>
+                      <th className="px-3 py-2 text-right">Nominal</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {fullCoverBudgetTotals.lines.map((line) => (
+                      <tr className="align-top" key={line.label}>
+                        <th className="px-3 py-2.5 font-semibold leading-4 text-slate-700">
+                          {line.label}
+                        </th>
+                        <td className="px-3 py-2.5 leading-4 text-slate-600">{line.recipient}</td>
+                        <td className="px-3 py-2.5 leading-4 text-slate-500">{line.note || '—'}</td>
+                        <td className="px-3 py-2.5 text-right font-bold tabular-nums whitespace-nowrap text-slate-900">
+                          {amountLabel(line.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t border-slate-200 bg-slate-50/80 text-[10px]">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-600" colSpan={3}>
+                        Total Nafaqah
+                      </th>
+                      <td className="px-3 py-2 text-right font-bold tabular-nums whitespace-nowrap text-slate-800">
+                        {amountLabel(fullCoverBudgetTotals.nafaqahTotal)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
             <input
@@ -397,56 +493,81 @@ export function FinanceTermsFields({
             />
           </section>
         ) : (
-          <section className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-xs leading-5 text-amber-900">
-            Rincian kebutuhan Full Cover belum disusun. Isi dan simpan enam komponen pada tab
-            Nominal Pengajuan agar nilai Nafaqah dan lampiran akad terisi dari sumber yang sama.
+          <section className="rounded-2xl border border-amber-200 bg-gradient-to-br from-white via-amber-50/50 to-emerald-50/40 p-5 text-xs leading-5 text-amber-950 shadow-xs">
+            <h3 className="text-sm font-bold">Budgeting belum tersimpan</h3>
+            <p className="mt-1">
+              Susun dan simpan enam komponen pada tab Budgeting. Ringkasan nilai akad dan rincian
+              lampiran akan tampil dari data tersimpan.
+            </p>
           </section>
         )}
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-bold text-slate-900">Nominal dan jangka waktu Draft 2</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Durasi pelatihan dan nominal uang saku dikelola pada tab Budgeting. Lengkapi biaya
-            komitmen dan ketentuan Draft Akad di sini.
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(
-              [
-                ['commitmentCompensationAmount', 'Biaya komitmen / ta’widh (Rp)'],
-                ['commitmentSettlementDays', 'Hari pelunasan biaya komitmen'],
-              ] as const
-            ).map(([name, label]) => (
-              <label className="space-y-1 text-xs font-semibold text-slate-600" key={name}>
-                <span>{label}</span>
-                <input
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                  min={0}
-                  name={name}
-                  defaultValue={String(financialPlan[name] ?? '')}
-                  step={1}
-                  type="number"
-                />
-              </label>
-            ))}
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3.5 sm:px-5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-700">
+              Isian manual
+            </span>
+            <h3 className="mt-1 text-sm font-bold text-slate-900">Ketentuan akad</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Nominal ta’widh mengikuti Total Nafaqah. Atur tenggat pelunasannya dan tanggal
+              pembayaran bulanan.
+            </p>
+          </div>
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
             <label className="space-y-1 text-xs font-semibold text-slate-600">
-              <span>Tanggal mulai angsuran</span>
+              <span>Biaya komitmen / ta’widh</span>
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-normal text-slate-900">
+                <span className="mr-2 text-slate-500">Rp</span>
+                <input
+                  aria-label="Biaya komitmen dihitung otomatis"
+                  className="w-full bg-transparent font-semibold tabular-nums outline-none"
+                  readOnly
+                  type="text"
+                  value={commitmentCompensationAmount.toLocaleString('id-ID')}
+                />
+              </div>
               <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                defaultValue={String(financialPlan.firstPaymentDate ?? '')}
-                name="firstPaymentDate"
-                required
-                type="date"
+                name="commitmentCompensationAmount"
+                type="hidden"
+                value={commitmentCompensationAmount}
               />
+              <span className="block text-[10px] font-normal text-slate-500">
+                Terhitung otomatis sebesar 20% dari Total Nafaqah.
+              </span>
+            </label>
+            <label className="space-y-1 text-xs font-semibold text-slate-600">
+              <span>Batas pelunasan biaya komitmen (hari)</span>
+              <input
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0b57d0] focus:ring-2 focus:ring-[#0b57d0]/15"
+                inputMode="numeric"
+                min={1}
+                max={90}
+                name="commitmentSettlementDays"
+                defaultValue={String(financialPlan.commitmentSettlementDays ?? 30)}
+                required
+                type="number"
+              />
+              <span className="block text-[10px] font-normal text-slate-500">
+                Tenggat untuk melunasi ta’widh setelah kewajiban itu ditagihkan. Contoh: 30 hari.
+              </span>
+            </label>
+            <label className="space-y-1 text-xs font-semibold text-slate-600">
+              <span>Tanggal pembayaran angsuran bulanan</span>
+              <input
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 outline-none focus:border-[#0b57d0] focus:ring-2 focus:ring-[#0b57d0]/15"
+                inputMode="numeric"
+                min={1}
+                max={31}
+                name="installmentPaymentDay"
+                defaultValue={String(financialPlan.installmentPaymentDay ?? 28)}
+                required
+                type="number"
+              />
+              <span className="block text-[10px] font-normal text-slate-500">
+                Bawaan tanggal 28, setiap bulan mulai saat siswa bekerja dan menerima penghasilan di
+                negara tujuan. Bulan dan tahun mengikuti waktu mulai bekerja.
+              </span>
             </label>
           </div>
-          {fullCoverBudget && (
-            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              Uang saku yang dicantumkan di akad: Bahasa{' '}
-              {amountLabel(fullCoverBudget.languageAllowanceMonthly)}/bulan, Skill{' '}
-              {amountLabel(fullCoverBudget.skillAllowanceMonthly)}/bulan, dan keberangkatan{' '}
-              {amountLabel(fullCoverBudget.departureAllowanceAmount)} setelah COE. Ubah nominalnya
-              di tab Nominal Pengajuan.
-            </div>
-          )}
           <input
             name="languageAllowanceMonthly"
             type="hidden"
@@ -473,56 +594,14 @@ export function FinanceTermsFields({
             )}
           />
         </section>
-        <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
-          {(
-            [
-              ['nafaqahTotal', 'Nafaqah (Rp)'],
-              ['ujrahTotal', 'Ujrah (Rp)'],
-              ['jualaTotal', 'Ju’alah jika COE terbit (Rp)'],
-              ['tenorMonths', 'Tenor setelah keberangkatan (1–36 bulan)'],
-            ] as const
-          ).map(([name, label]) => (
-            <label className="space-y-1.5 text-xs font-semibold text-slate-700" key={name}>
-              <span>{label}</span>
-              <input
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                defaultValue={String(
-                  name === 'nafaqahTotal' && fullCoverBudgetTotals
-                    ? fullCoverBudgetTotals.nafaqahTotal
-                    : (financialPlan[name] ?? ''),
-                )}
-                readOnly={name === 'nafaqahTotal' && Boolean(fullCoverBudgetTotals)}
-                min={name === 'tenorMonths' ? 1 : 0}
-                max={name === 'tenorMonths' ? 36 : undefined}
-                name={name}
-                onChange={
-                  name === 'nafaqahTotal'
-                    ? (event) => setFullCoverNafaqah(Number(event.target.value) || 0)
-                    : undefined
-                }
-                step={1}
-                type="number"
-              />
-            </label>
-          ))}
-        </div>
-        {Number.isFinite(financialPlan.totalObligationIfCoe) && (
-          <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4 text-xs leading-5 text-[#0b57d0]">
-            <strong>Ringkasan Full Cover tersimpan:</strong> Nafaqah + Ujrah (di luar Ju’alah):{' '}
-            <strong>Rp{Number(financialPlan.totalObligation).toLocaleString('id-ID')}</strong>. Jika
-            COE terbit:{' '}
-            <strong>Rp{Number(financialPlan.totalObligationIfCoe).toLocaleString('id-ID')}</strong>,
-            angsuran sekitar{' '}
-            <strong>
-              Rp{Number(financialPlan.monthlyInstallmentAfterCoe).toLocaleString('id-ID')}
-            </strong>
-            {financialPlan.finalInstallmentAfterCoe !== financialPlan.monthlyInstallmentAfterCoe &&
-              ` (angsuran terakhir Rp${Number(
-                financialPlan.finalInstallmentAfterCoe,
-              ).toLocaleString('id-ID')})`}
-            .
-          </div>
-        )}
+        <input name="nafaqahTotal" type="hidden" value={nafaqahTotal} />
+        <input name="ujrahTotal" type="hidden" value={charges.ujrahTotal} />
+        <input name="jualaTotal" type="hidden" value={charges.jualaTotal} />
+        <input name="tenorMonths" type="hidden" value={tenorMonths} />
+        <input name="totalObligation" type="hidden" value={totalObligation} />
+        <input name="monthlyInstallment" type="hidden" value={monthlyInstallmentAfterCoe} />
+        <input name="installmentCount" type="hidden" value={tenorMonths} />
+        {identityEditor}
       </div>
     )
   }

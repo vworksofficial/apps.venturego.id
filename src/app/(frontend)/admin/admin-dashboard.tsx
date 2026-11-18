@@ -848,11 +848,106 @@ function DrawerAction({
   )
 }
 
+function SwipeToApprove({ disabled, onConfirm }: { disabled: boolean; onConfirm: () => void }) {
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [offset, setOffset] = useState(0)
+  const dragStart = useRef<{ pointerX: number; offset: number } | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
+  const progress = (() => {
+    const trackWidth = trackRef.current?.clientWidth ?? 0
+    const maxOffset = Math.max(trackWidth - 152, 1)
+    return Math.min(offset / maxOffset, 1)
+  })()
+  const finishDrag = () => {
+    dragStart.current = null
+    if (progress >= 0.95) {
+      setOffset(Math.max((trackRef.current?.clientWidth ?? 152) - 152, 0))
+      setConfirmed(true)
+      onConfirm()
+      return
+    }
+    setOffset(0)
+  }
+
+  return (
+    <div
+      aria-label="Geser dan tahan hingga ujung untuk Setujui Rincian"
+      className={`relative h-12 w-full touch-pan-y overflow-hidden rounded-xl border transition-colors ${
+        disabled ? 'border-slate-200 bg-slate-100' : 'border-emerald-200 bg-emerald-50/80'
+      }`}
+      ref={trackRef}
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 grid place-items-center"
+      >
+        <span
+          className={`whitespace-nowrap text-[11px] font-semibold italic text-emerald-900/70 transition-opacity ${progress > 0.04 ? 'opacity-100' : 'opacity-0'}`}
+          style={{ clipPath: `inset(0 ${Math.max(0, 100 - progress * 100)}% 0 0)` }}
+        >
+          <em>Bismillah</em> Semoga Lancar &amp; Berkah
+        </span>
+      </div>
+      <button
+        aria-label="Geser untuk Setujui Rincian"
+        className={`absolute left-0 top-0 z-10 flex h-full w-[152px] touch-none items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold text-white shadow-md transition-[transform,background-color] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-400 ${
+          disabled ? 'bg-slate-400' : 'bg-gradient-to-br from-emerald-500 to-emerald-700'
+        }`}
+        disabled={disabled}
+        onKeyDown={(event) => {
+          if (event.key === 'End' || event.key === 'ArrowRight') {
+            event.preventDefault()
+            setOffset(Math.max((trackRef.current?.clientWidth ?? 152) - 152, 0))
+          }
+          if (event.key === 'Enter' && progress >= 0.82) finishDrag()
+        }}
+        onPointerDown={(event) => {
+          if (disabled) return
+          event.currentTarget.setPointerCapture(event.pointerId)
+          dragStart.current = { pointerX: event.clientX, offset }
+        }}
+        onPointerMove={(event) => {
+          if (!dragStart.current || disabled) return
+          const maxOffset = Math.max((trackRef.current?.clientWidth ?? 152) - 152, 0)
+          setOffset(
+            Math.max(
+              0,
+              Math.min(
+                maxOffset,
+                dragStart.current.offset + event.clientX - dragStart.current.pointerX,
+              ),
+            ),
+          )
+        }}
+        onPointerUp={finishDrag}
+        onPointerCancel={() => {
+          dragStart.current = null
+          setOffset(0)
+        }}
+        style={{ transform: `translateX(${offset}px)` }}
+        type="button"
+      >
+        <span>{confirmed ? 'Menyimpan…' : 'Geser & Tahan'}</span>
+        <svg aria-hidden="true" className="size-5" fill="none" viewBox="0 0 24 24">
+          <path
+            d="M5 12h13m-5-5 5 5-5 5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+          />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 function ApplicationDrawerForm({
   application,
   activeTab,
   setActiveTab,
   pending,
+  approvalSaving,
   error,
   savedNotice,
   onDismissError,
@@ -874,6 +969,7 @@ function ApplicationDrawerForm({
   activeTab: DetailTabId
   setActiveTab: (tab: DetailTabId) => void
   pending: boolean
+  approvalSaving: boolean
   error: string
   savedNotice: string
   onDismissError: () => void
@@ -910,6 +1006,7 @@ function ApplicationDrawerForm({
   const [akadPreviewHtml, setAkadPreviewHtml] = useState<string | null>(null)
   const [akadPreviewLoading, setAkadPreviewLoading] = useState(false)
   const [akadPreviewError, setAkadPreviewError] = useState('')
+  const akadPreviewFrameRef = useRef<HTMLIFrameElement>(null)
 
   const router = useRouter()
 
@@ -1002,6 +1099,23 @@ function ApplicationDrawerForm({
     fileName?: string
   } | null
   const akadIssued = Boolean(akadMeta)
+
+  const printAkadPreview = () => {
+    const frame = akadPreviewFrameRef.current
+    const printWindow = frame?.contentWindow
+    if (!frame || !printWindow || !akadPreviewHtml) return
+
+    const programLabel =
+      application.product === 'FULL_COVER'
+        ? "Program Full Cover - Wakalah bil Ujrah + Ju'alah"
+        : 'Program Dana Keberangkatan - Wakalah bil Ujrah'
+    const safeApplicantName = application.applicantName.replace(/[\\/:*?"<>|]/g, '-').trim()
+    const documentTitle = `Draft Akad VSV - ${safeApplicantName} (${programLabel})`
+
+    if (frame.contentDocument) frame.contentDocument.title = documentTitle
+    printWindow.focus()
+    printWindow.print()
+  }
   const akadGateOpen = pricingStatus === 'VERIFIED' || pricingStatus === 'AGREED' || akadIssued
 
   const openAkadPreview = async () => {
@@ -1057,7 +1171,10 @@ function ApplicationDrawerForm({
 
   const planNafaqah = Number(application.financialPlan?.nafaqahTotal) || 0
   const planUjrah = Number(application.financialPlan?.ujrahTotal) || 0
+  const planJuala = Number(application.financialPlan?.jualaTotal) || 0
   const planTotal = Number(application.financialPlan?.totalObligation) || 0
+  const planTotalAfterCoe =
+    Number(application.financialPlan?.totalObligationIfCoe) || planTotal + planJuala
   const planPrincipalRaw = Number(application.financialPlan?.principal)
   const planPrincipal =
     Number.isSafeInteger(planPrincipalRaw) && planPrincipalRaw > 0
@@ -1085,6 +1202,7 @@ function ApplicationDrawerForm({
         : '—',
     ],
     ['Total kewajiban (di luar Ju’alah)', formatRupiah(application.financialPlan?.totalObligation)],
+    ['Total kewajiban jika COE terbit (termasuk Ju’alah)', formatRupiah(planTotalAfterCoe)],
     [
       'Angsuran per bulan (setelah COE)',
       formatRupiah(application.financialPlan?.monthlyInstallmentAfterCoe),
@@ -1167,7 +1285,7 @@ function ApplicationDrawerForm({
   return (
     <form
       action={(formData) => onSave(application, formData)}
-      className="flex h-full flex-col bg-white"
+      className="relative flex h-full flex-col bg-white"
     >
       {/* Drawer Header: identity + close */}
       <div className="relative overflow-hidden border-b border-blue-800/20 bg-gradient-to-br from-[#0b57d0] to-[#0842a0] px-6 py-4 text-white">
@@ -1472,6 +1590,9 @@ function ApplicationDrawerForm({
               financialPlan={application.financialPlan ?? {}}
               key={JSON.stringify([
                 application.financialPlan?.fullCoverBudget ?? null,
+                application.financialPlan?.tenorMonths ?? null,
+                application.financialPlan?.ujrahTotal ?? null,
+                application.financialPlan?.jualaTotal ?? null,
                 application.fullCoverDetails?.languageTrainingMonths,
                 application.fullCoverDetails?.skillTrainingMonths,
               ])}
@@ -1622,44 +1743,34 @@ function ApplicationDrawerForm({
                   <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-600">
                     {pricingStatus === 'ESTIMATED'
                       ? application.product === 'FULL_COVER'
-                        ? 'Simpan rincian kebutuhan, lengkapi Ujrah, Ju’alah, tenor, dan ketentuan akad pada Draft Akad, lalu tinjau pratinjau sebelum menyetujui.'
+                        ? 'Simpan rincian pada Budgeting. Nafaqah, Ujrah Wakalah, Ju’alah, dan tenor dihitung otomatis dari alokasi tersimpan. Lengkapi ketentuan akad yang masih diperlukan pada Draft Akad sebelum menerbitkan dokumen akad.'
                         : 'Persetujuan nominal pembiayaan siswa. Pilih "Setujui" untuk menyetujui sesuai nominal yang diajukan, atau "Setujui dengan Nominal Baru" untuk menetapkan plafon lain. Setelah disetujui, siswa otomatis berpindah ke halaman Persiapan Akad.'
                       : 'Nominal pembiayaan telah disetujui dan pengajuan pemohon telah dipindahkan ke menu Persiapan Akad.'}
                   </p>
-                  {application.product === 'FULL_COVER' && (
-                    <button
-                      className="mt-2 inline-flex items-center rounded-md text-xs font-semibold text-[#0b57d0] transition hover:text-emerald-700 hover:underline"
-                      onClick={() => setActiveTab('pricing')}
-                      type="button"
-                    >
-                      Lengkapi ketentuan Draft Akad →
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2.5 bg-white/55 px-5 py-4 sm:px-6">
               {pricingStatus === 'ESTIMATED' ? (
                 <>
-                  <DrawerAction
-                    label={
-                      pending
-                        ? 'Menyimpan…'
-                        : application.product === 'FULL_COVER'
-                          ? 'Setujui Rincian'
-                          : 'Setujui'
-                    }
-                    onClick={() => onApprovePricing(application.id, null)}
-                    disabled={
-                      pending ||
-                      (application.product === 'FULL_COVER' &&
-                        (!application.financialPlan?.fullCoverBudget ||
-                          fullCoverBudgetDirty ||
-                          validateFullCoverBudget(application.financialPlan?.fullCoverBudget) !==
-                            null))
-                    }
-                    variant="primary"
-                  />
+                  {application.product === 'FULL_COVER' ? (
+                    <SwipeToApprove
+                      disabled={
+                        pending ||
+                        !application.financialPlan?.fullCoverBudget ||
+                        fullCoverBudgetDirty ||
+                        validateFullCoverBudget(application.financialPlan?.fullCoverBudget) !== null
+                      }
+                      onConfirm={() => onApprovePricing(application.id, null)}
+                    />
+                  ) : (
+                    <DrawerAction
+                      label={pending ? 'Menyimpan…' : 'Setujui'}
+                      onClick={() => onApprovePricing(application.id, null)}
+                      disabled={pending}
+                      variant="primary"
+                    />
+                  )}
                   {application.product === 'DEPARTURE_BRIDGING' && (
                     <DrawerAction
                       disabled={pending}
@@ -1892,79 +2003,33 @@ function ApplicationDrawerForm({
           {/* EXECUTIVE HERO: PROGRAM & JENIS AKAD SUMMARY */}
           {(() => {
             const isFullCover = application.product === 'FULL_COVER'
-            const programName = isFullCover ? 'VSV Full Cover' : 'VSV Dana Keberangkatan'
             const programSubtitle = isFullCover
               ? 'Program Pembiayaan Pelatihan Bahasa, Skill, & Penempatan Kerja'
               : 'Program Pembiayaan Dana Talang Tiket & Persiapan Berangkat'
-            const destinationLabel = application.destination === 'JAPAN' ? 'Jepang' : 'Turki'
-            const akadName = isFullCover
-              ? application.contractScheme === 'WAKALAH'
-                ? 'Akad Wakalah bil Ujrah'
-                : 'Akad Wakalah bil Ujrah + Ju’alah'
-              : 'Akad Wakalah bil Ujrah'
             const akadDescription = isFullCover
               ? 'Skema pembiayaan terpadu yang memadukan pelimpahan kuasa pengurusan pendidikan bahasa/skill (Wakalah bil Ujrah) serta komitmen imbalan atas pencapaian keberhasilan penempatan kerja ke luar negeri (Ju’alah). Hak dan kewajiban diselaraskan secara transparan pasca siswa resmi bekerja dan memperoleh penghasilan di negara tujuan.'
               : 'Siswa (Muwakkil) memberikan pelimpahan kuasa penuh kepada VentureGo (Wakil) untuk mengurus, membiayai, dan menyelesaikan kewajiban persiapan keberangkatan siswa ke negara tujuan dengan imbalan jasa (Ujrah) yang disepakati secara transparan dan proporsional tanpa bunga/riba. Biaya pokok (Nafaqah) disalurkan langsung kepada pihak LPK mitra dan maskapai.'
 
             return (
-              <section className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-blue-50/25 to-slate-50 p-5 shadow-xs">
+              <section
+                className={`relative overflow-hidden rounded-2xl border p-5 shadow-xs ${isFullCover ? 'border-amber-200/70 bg-gradient-to-br from-white via-amber-50/25 to-emerald-50/25' : 'border-slate-200/90 bg-gradient-to-br from-white via-blue-50/25 to-slate-50'}`}
+              >
                 {/* Decorative background glow */}
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-10 -top-10 size-56 rounded-full bg-blue-100/40 blur-3xl"
+                  className={`pointer-events-none absolute -right-10 -top-10 size-56 rounded-full blur-3xl ${isFullCover ? 'bg-amber-100/45' : 'bg-blue-100/40'}`}
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full bg-indigo-50/50 blur-2xl"
+                  className={`pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full blur-2xl ${isFullCover ? 'bg-emerald-100/40' : 'bg-indigo-50/50'}`}
                 />
 
                 <div className="relative space-y-4">
-                  {/* Top Bar: Program Badges & Destination */}
-                  <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#0b57d0] ring-1 ring-inset ring-blue-200/70">
-                        <span className="size-1.5 rounded-full bg-[#0b57d0]" />
-                        {programName}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200/70">
-                        {akadName}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                        <DestinationFlag destination={application.destination} />
-                        Tujuan {destinationLabel}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {akadIssued ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-300">
-                          <svg
-                            className="size-3 text-emerald-600"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={2.5}
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 12.75l6 6 9-13.5"
-                            />
-                          </svg>
-                          Naskah Akad Terbit
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
-                          <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-                          Fase Penyusunan Draft
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
                   {/* Main Header with Glowing Icon */}
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#0b57d0] to-[#4285f4] text-white shadow-md shadow-blue-500/20 ring-4 ring-blue-50">
+                    <div
+                      className={`flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr text-white shadow-md ring-4 ${isFullCover ? 'from-amber-500 to-emerald-600 shadow-emerald-500/20 ring-amber-50' : 'from-[#0b57d0] to-[#4285f4] shadow-blue-500/20 ring-blue-50'}`}
+                    >
                       <svg
                         aria-hidden="true"
                         className="size-5.5"
@@ -1982,12 +2047,31 @@ function ApplicationDrawerForm({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="text-base font-bold text-slate-900 sm:text-lg">
-                          Penyusunan Naskah Akad: {akadName}
+                          Penyusunan Naskah Akad
                         </h2>
-                        <span className="text-xs text-slate-400">·</span>
-                        <span className="text-xs font-semibold text-slate-600">
-                          {application.applicantName} ({application.lpkName})
-                        </span>
+                        {akadIssued ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-emerald-300">
+                            <svg
+                              className="size-3 text-emerald-600"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2.5}
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M4.5 12.75l6 6 9-13.5"
+                              />
+                            </svg>
+                            Naskah Akad Terbit
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-200">
+                            <span className="size-1.5 animate-pulse rounded-full bg-amber-500" />
+                            Fase Penyusunan Draft
+                          </span>
+                        )}
                       </div>
                       <p className="mt-0.5 text-xs text-slate-500">{programSubtitle}</p>
                     </div>
@@ -2069,13 +2153,21 @@ function ApplicationDrawerForm({
             />
           </fieldset>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
-            <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+          <section
+            className={`relative overflow-hidden rounded-2xl border shadow-sm ${application.product === 'FULL_COVER' ? 'border-amber-200/80 bg-gradient-to-br from-white via-amber-50/25 to-emerald-50/30' : 'border-blue-200/80 bg-gradient-to-br from-white via-blue-50/25 to-slate-50'}`}
+          >
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none absolute -right-10 -top-12 size-48 rounded-full blur-3xl ${application.product === 'FULL_COVER' ? 'bg-emerald-100/50' : 'bg-blue-100/50'}`}
+            />
+            <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/60 px-5 py-4">
               <div className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#0b57d0] ring-1 ring-blue-100">
+                <span
+                  className={`mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm ${application.product === 'FULL_COVER' ? 'bg-gradient-to-br from-amber-500 to-emerald-600' : 'bg-gradient-to-br from-[#0b57d0] to-[#4285f4]'}`}
+                >
                   <svg
                     aria-hidden="true"
-                    className="size-4"
+                    className="size-5"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth={1.8}
@@ -2089,24 +2181,27 @@ function ApplicationDrawerForm({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-bold text-slate-900">Dokumen Akad</h3>
-                    {akadIssued && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                        Dokumen akad telah terbit
-                      </span>
-                    )}
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ring-1 ring-inset ${akadIssued ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-800 ring-amber-200'}`}
+                    >
+                      <span
+                        className={`size-1.5 rounded-full ${akadIssued ? 'bg-emerald-500' : 'animate-pulse bg-amber-500'}`}
+                      />
+                      {akadIssued ? 'Telah diterbitkan' : 'Siap ditinjau'}
+                    </span>
                   </div>
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-600">
                     {akadIssued
-                      ? 'Dokumen akad final tersimpan di penyimpanan berkas dan tidak dapat diubah lagi.'
-                      : 'Susun dokumen akad dari template resmi VSV dengan data pengajuan ini.'}
+                      ? 'Dokumen final tersimpan dan rincian akad telah dikunci.'
+                      : 'Pratinjau naskah dari data Draft Akad yang sudah disimpan sebelum diterbitkan.'}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3 px-5 py-4">
+            <div className="relative space-y-4 px-5 py-4">
               {akadIssued && akadMeta ? (
-                <div className="grid gap-3 rounded-xl bg-emerald-50/70 p-4 ring-1 ring-inset ring-emerald-200 sm:grid-cols-3">
+                <div className="grid gap-3 rounded-xl border border-emerald-200 bg-white/85 p-4 sm:grid-cols-3">
                   <div>
                     <dt className="text-[11px] font-semibold text-emerald-700">Nomor Dokumen</dt>
                     <dd className="mt-0.5 text-sm font-bold text-emerald-950">
@@ -2127,10 +2222,31 @@ function ApplicationDrawerForm({
                   </div>
                 </div>
               ) : (
-                <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-                  Nomor dokumen mengikuti urutan NIS pemohon. Status biaya harus Terverifikasi
-                  sebelum dokumen dapat diterbitkan.
-                </p>
+                <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-white/80 p-3.5">
+                  <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                    <svg
+                      aria-hidden="true"
+                      className="size-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M12 8v4m0 4h.01M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3l-7.5-13.1a2 2 0 0 0-3.4 0Z"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-800">Belum diterbitkan</p>
+                    <p className="mt-0.5 text-[11px] leading-5 text-slate-500">
+                      Nomor dokumen mengikuti urutan NIS. Status biaya harus Terverifikasi sebelum
+                      akad dapat diterbitkan.
+                    </p>
+                  </div>
+                </div>
               )}
 
               {!akadIssued && application.product === 'DEPARTURE_BRIDGING' && (
@@ -2152,9 +2268,9 @@ function ApplicationDrawerForm({
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3">
                 <button
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
                   disabled={akadPreviewLoading}
                   onClick={openAkadPreview}
                   type="button"
@@ -2163,14 +2279,14 @@ function ApplicationDrawerForm({
                 </button>
                 {akadIssued ? (
                   <a
-                    className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
                     href={`/api/admin/applications/${application.id}/akad?mode=docx`}
                   >
                     Unduh .docx
                   </a>
                 ) : (
                   <button
-                    className="rounded-lg bg-[#0b57d0] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-60"
+                    className={`rounded-lg px-4 py-2.5 text-xs font-semibold text-white transition focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 ${application.product === 'FULL_COVER' ? 'bg-gradient-to-r from-amber-600 to-emerald-700 hover:from-amber-700 hover:to-emerald-800 focus-visible:outline-emerald-700' : 'bg-[#0b57d0] hover:bg-[#0842a0] focus-visible:outline-[#0b57d0]'}`}
                     disabled={!akadGateOpen || pending || akadIssuing}
                     onClick={issueAkad}
                     type="button"
@@ -2188,13 +2304,17 @@ function ApplicationDrawerForm({
           </section>
 
           {!akadIssued && (
-            <div className="flex justify-end border-t border-slate-100 pt-4">
+            <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-xl text-[11px] leading-5 text-slate-500">
+                Simpan perubahan Draft Akad agar pratinjau dan penerbitan dokumen memakai data
+                terbaru. Tombol ini menyimpan draft, bukan menerbitkan akad.
+              </p>
               <button
-                className="rounded-lg bg-[#0b57d0] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-60"
+                className="shrink-0 rounded-lg bg-[#0b57d0] px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:opacity-60"
                 disabled={pending}
                 type="submit"
               >
-                {pending ? 'Menyimpan…' : 'Simpan Rincian Biaya'}
+                {pending ? 'Menyimpan…' : 'Simpan Draft Akad'}
               </button>
             </div>
           )}
@@ -3810,12 +3930,14 @@ function ApplicationDrawerForm({
                   </p>
                 </div>
                 <div className="relative flex shrink-0 flex-wrap items-center gap-2">
-                  <a
-                    className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
-                    href={`/api/admin/applications/${application.id}/akad?mode=docx`}
+                  <button
+                    className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!akadPreviewHtml || akadPreviewLoading}
+                    onClick={printAkadPreview}
+                    type="button"
                   >
-                    Unduh .docx
-                  </a>
+                    Simpan PDF
+                  </button>
                   {!akadIssued && (
                     <button
                       className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-[#0b57d0] shadow-sm transition hover:bg-blue-50 disabled:opacity-60"
@@ -3889,6 +4011,7 @@ function ApplicationDrawerForm({
               {akadPreviewHtml && !akadPreviewLoading && (
                 <iframe
                   className="mx-auto h-full min-h-[75vh] w-full max-w-4xl rounded-xl border border-slate-200 bg-white shadow-md"
+                  ref={akadPreviewFrameRef}
                   srcDoc={akadPreviewHtml}
                   title="Pratinjau dokumen akad"
                 />
@@ -4098,6 +4221,21 @@ function ApplicationDrawerForm({
           </section>
         </div>
       )}
+      {approvalSaving && (
+        <div
+          className="absolute inset-0 z-[70] flex flex-col items-center justify-center bg-white/90 px-6 text-center backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="size-11 animate-spin rounded-full border-[3px] border-emerald-100 border-t-emerald-600" />
+          <strong className="mt-4 text-sm font-bold text-slate-900">
+            Menyimpan Persetujuan Biaya
+          </strong>
+          <span className="mt-1 max-w-xs text-xs leading-5 text-slate-500">
+            Mohon tunggu sebentar, rincian sedang diproses dengan aman.
+          </span>
+        </div>
+      )}
     </form>
   )
 }
@@ -4207,6 +4345,7 @@ export function AdminDashboard({
   const [revertTarget, setRevertTarget] = useState<FinancingApplicationRecord | null>(null)
   const [revertError, setRevertError] = useState('')
   const [pending, startTransition] = useTransition()
+  const [approvalSavingId, setApprovalSavingId] = useState<string | null>(null)
 
   const [activeMenu, setActiveMenu] = useState<MenuId>('dashboard')
   const [dashboardRange, setDashboardRange] = useState<6 | 12>(6)
@@ -4756,6 +4895,11 @@ export function AdminDashboard({
         firstPaymentDate: String(
           formData.get('firstPaymentDate') ?? application.financialPlan?.firstPaymentDate ?? '',
         ),
+        installmentPaymentDay: String(
+          formData.get('installmentPaymentDay') ??
+            application.financialPlan?.installmentPaymentDay ??
+            28,
+        ),
         refundTotal: String(
           formData.get('refundTotal') ?? application.financialPlan?.refundTotal ?? '0',
         ),
@@ -4874,17 +5018,24 @@ export function AdminDashboard({
   const approvePricing = (applicationId: string, newNominal: number | null) => {
     setError('')
     setSavedNotice('')
+    setApprovalSavingId(applicationId)
     startTransition(async () => {
-      const result = await approveApplicationPricing(applicationId, newNominal)
-      if (!result.ok) {
-        setError(result.message)
-      } else {
-        setSavedNotice(
-          newNominal !== null
-            ? `Nominal disetujui dengan nominal baru ${formatRupiah(newNominal)}. Pengajuan dipindahkan ke menu Persiapan Akad.`
-            : 'Nominal pengajuan berhasil disetujui. Pengajuan dipindahkan ke menu Persiapan Akad.',
-        )
-        router.refresh()
+      try {
+        const result = await approveApplicationPricing(applicationId, newNominal)
+        if (!result.ok) {
+          setError(result.message)
+        } else {
+          setSavedNotice(
+            newNominal !== null
+              ? `Nominal disetujui dengan nominal baru ${formatRupiah(newNominal)}. Pengajuan dipindahkan ke menu Persiapan Akad.`
+              : 'Nominal pengajuan berhasil disetujui. Pengajuan dipindahkan ke menu Persiapan Akad.',
+          )
+          router.refresh()
+        }
+      } catch {
+        setError('Persetujuan biaya belum dapat disimpan. Coba lagi.')
+      } finally {
+        setApprovalSavingId(null)
       }
     })
   }
@@ -8002,6 +8153,7 @@ export function AdminDashboard({
           <div className="h-dvh w-full max-w-6xl shadow-2xl">
             <ApplicationDrawerForm
               activeTab={drawerTab}
+              approvalSaving={approvalSavingId === drawerApplication.id}
               application={drawerApplication}
               error={error}
               key={drawerApplication.id}

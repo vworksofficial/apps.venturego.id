@@ -29,7 +29,6 @@ export function FullCoverBudgetFields({
   pending,
   disabled,
   onDirtyChange,
-  onPreview,
 }: {
   fullCoverDetails?: Record<string, unknown> | null
   financialPlan: Record<string, unknown>
@@ -37,7 +36,6 @@ export function FullCoverBudgetFields({
   pending: boolean
   disabled: boolean
   onDirtyChange: (dirty: boolean) => void
-  onPreview: () => void
 }) {
   const savedBudgetRaw = financialPlan.fullCoverBudget ?? null
   const savedBudget = normalizeFullCoverBudget(savedBudgetRaw)
@@ -224,14 +222,6 @@ export function FullCoverBudgetFields({
               Skill {durationValid ? `${skillMonths} bulan` : 'belum diisi'}
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!savedBudget || isDirty || pending}
-                onClick={onPreview}
-                type="button"
-              >
-                Pratinjau Draft Akad
-              </button>
               <button
                 className="inline-flex items-center rounded-lg bg-[#0b57d0] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#0842a0] disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={disabled || !isDirty || pending || !durationValid}

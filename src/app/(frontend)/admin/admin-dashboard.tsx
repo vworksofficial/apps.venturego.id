@@ -1478,7 +1478,6 @@ function ApplicationDrawerForm({
               lpkName={application.lpkName}
               disabled={akadIssued}
               onDirtyChange={setFullCoverBudgetDirty}
-              onPreview={openAkadPreview}
               pending={pending}
             />
           )}

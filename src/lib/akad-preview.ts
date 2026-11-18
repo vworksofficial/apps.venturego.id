@@ -1635,8 +1635,8 @@ th { font-weight: 700; }
 .doc-header {
   position: absolute;
   top: ${HEADER_TOP_PT}pt;
-  left: ${MARGIN_LEFT_PT}pt;
-  width: ${CONTENT_W_PT}pt;
+  left: calc(${MARGIN_LEFT_PT}pt - 11pt);
+  width: calc(${CONTENT_W_PT}pt + 22pt);
   z-index: 3;
 }
 .doc-header p { margin: 0; }
@@ -1648,7 +1648,7 @@ th { font-weight: 700; }
   min-height: 34pt;
   font-family: "Google Sans", Arial, sans-serif;
 }
-.akad-preview-brand { display: flex; align-items: center; gap: 2pt; }
+.akad-preview-brand { display: flex; align-items: center; gap: 2pt; transform: translateY(2pt); }
 .akad-preview-logo { display: block; width: 96pt; height: 32pt; object-fit: contain; }
 .akad-preview-brand-name {
   color: #0b57d0;
@@ -1663,6 +1663,7 @@ th { font-weight: 700; }
   color: #000;
   text-align: right;
   line-height: 1.15;
+  transform: translateY(5pt);
 }
 .akad-preview-company-name { color: #0b57d0; font-size: 9pt; font-weight: 800; }
 .akad-preview-company-slogan { color: #0b57d0; font-size: 8pt; font-weight: 700; }

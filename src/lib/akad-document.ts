@@ -130,16 +130,21 @@ const setHeaderCompanyIdentity = async (zip: JSZip): Promise<void> => {
     .join('')
   const companyRun = (
     text: string,
-    options: { size: number; bold?: boolean; italic?: boolean; color: string },
+    options: { size: number; bold?: boolean; italic?: boolean; color: string; before?: number },
   ) =>
     `<w:r><w:rPr><w:rFonts w:ascii="Google Sans" w:hAnsi="Google Sans" w:eastAsia="Google Sans"/>${options.bold ? '<w:b/><w:bCs/>' : ''}${options.italic ? '<w:i/><w:iCs/>' : ''}<w:color w:val="${options.color}"/><w:sz w:val="${options.size}"/><w:szCs w:val="${options.size}"/></w:rPr><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`
   const companyLine = (
     text: string,
-    options: { size: number; bold?: boolean; italic?: boolean; color: string },
+    options: { size: number; bold?: boolean; italic?: boolean; color: string; before?: number },
   ) =>
-    `<w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="0" w:after="0" w:line="220" w:lineRule="auto"/></w:pPr>${companyRun(text, options)}</w:p>`
+    `<w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="${options.before ?? 0}" w:after="0" w:line="220" w:lineRule="auto"/></w:pPr>${companyRun(text, options)}</w:p>`
   const companyParagraphs = [
-    companyLine('PT VWORKS KOLABORASI BERSAMA', { size: 18, bold: true, color: '0B57D0' }),
+    companyLine('PT VWORKS KOLABORASI BERSAMA', {
+      size: 18,
+      bold: true,
+      color: '0B57D0',
+      before: 100,
+    }),
     companyLine('Your Partner to Leap Together', { size: 16, bold: true, color: '0B57D0' }),
     companyLine('Perum Bumi Dieng Indah 2, Blok G5 No. 2 & 3, RW 4', {
       size: 12,
@@ -152,8 +157,8 @@ const setHeaderCompanyIdentity = async (zip: JSZip): Promise<void> => {
     companyLine('082213072665', { size: 12, color: '000000' }),
   ].join('')
   const leftCell = `<w:tc><w:tcPr><w:tcW w:w="5438" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${leftParagraph}</w:tc>`
-  const rightCell = `<w:tc><w:tcPr><w:tcW w:w="4200" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${companyParagraphs}</w:tc>`
-  const headerTable = `<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${noBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="5438"/><w:gridCol w:w="4200"/></w:tblGrid><w:tr>${leftCell}${rightCell}</w:tr></w:tbl>`
+  const rightCell = `<w:tc><w:tcPr><w:tcW w:w="4642" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${companyParagraphs}</w:tc>`
+  const headerTable = `<w:tbl><w:tblPr><w:tblW w:w="10080" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${noBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="5438"/><w:gridCol w:w="4642"/></w:tblGrid><w:tr>${leftCell}${rightCell}</w:tr></w:tbl>`
   const previousHeaderContent = existingCompanyTable ?? logoParagraph
   zip.file('word/header1.xml', header.replace(previousHeaderContent, headerTable))
 }

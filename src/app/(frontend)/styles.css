@@ -1414,7 +1414,7 @@ body {
   padding: 12px 20px;
   justify-content: center;
   align-items: center;
-  border-radius: 0 0 18px 18px;
+  border-radius: 0;
   background:
     radial-gradient(circle at 18% 28%, rgba(194, 231, 255, 0.32), transparent 38%),
     linear-gradient(135deg, #1a73e8 0%, #0b57d0 100%);
@@ -1818,7 +1818,7 @@ body {
   justify-content: center;
   gap: 14px;
   overflow: hidden;
-  border-radius: 0 0 18px 18px;
+  border-radius: 0;
   background: var(--hero-gradient);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
   color: #fff;
@@ -2029,9 +2029,15 @@ body {
 }
 
 .mobile-shell.welcome-step .wizard-body {
+  position: relative;
+  z-index: 1;
   flex: 1 1 48%;
   min-height: 0;
+  transform: translateY(-28px);
+  margin-bottom: -28px;
   padding: 20px 28px max(24px, env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
+  background: #fff;
   display: flex;
   flex-direction: column;
   justify-content: center;

@@ -242,9 +242,20 @@ export default function HomePage() {
     preloadGoogleSignIn()?.catch(() => {})
     const params = new URLSearchParams(window.location.search)
     const requestedStep = Number(params.get('step'))
+    const returnToLogin = params.get('login') === 'true'
     const hasFormIntent =
-      params.has('step') || params.get('apply') === 'true' || params.get('baru') === 'true'
-    if (requestedStep >= 1 && requestedStep <= 6) {
+      returnToLogin ||
+      params.has('step') ||
+      params.get('apply') === 'true' ||
+      params.get('baru') === 'true'
+    if (returnToLogin) {
+      setStep(0)
+      try {
+        sessionStorage.removeItem(APPLICATION_DRAFT_KEY)
+      } catch {
+        // Ignore unavailable storage.
+      }
+    } else if (requestedStep >= 1 && requestedStep <= 6) {
       setStep(requestedStep === 5 ? 6 : requestedStep)
     } else if (params.get('apply') === 'true' || params.get('baru') === 'true') {
       setStep(1)

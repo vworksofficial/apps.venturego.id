@@ -133,8 +133,13 @@ export default function ProfilePage() {
     setIsLoggingOut(true)
     setError('')
     try {
+      try {
+        sessionStorage.removeItem('venturego.application-draft.v1')
+      } catch {
+        // Ignore unavailable storage; the login route also skips draft restoration.
+      }
       await signOut(getFirebaseClientAuth())
-      router.replace('/')
+      router.replace('/?login=true')
     } catch {
       setError('Tidak dapat keluar saat ini. Silakan coba lagi.')
       setIsLoggingOut(false)

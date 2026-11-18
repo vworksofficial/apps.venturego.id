@@ -1,6 +1,6 @@
 # Usulan: Pembiayaan Berulang, Poin Saldo, dan Salin Nomor VA
 
-> Status: **usulan** dari Adam (11 November 2026), belum diimplementasikan. Panut yang memutuskan
+> Status: sebagian aturan pembiayaan berulang diterapkan pada 19 November 2026; fitur produk baru, riwayat lengkap, poin, dan VA masih usulan. Panut yang memutuskan
 > desain teknis akhirnya. Terkait: `docs/usulan/2026-11-pembayaran-fleksibel.md` (alokasi
 > pembayaran, `paidAmount`) dan `docs/MIGRASI-BLUEPRINT.md` (data siswa lama). Dokumen ini sengaja
 > **tidak memuat nama atau angka siswa**; data per siswa disimpan di luar repo.
@@ -18,38 +18,33 @@
 - Setiap pembiayaan punya akad, rincian biaya, jadwal angsuran, dan status lunas **sendiri-sendiri**.
   Pembayaran satu pembiayaan tidak boleh tercampur ke pembiayaan lain.
 
-### Kondisi kode sekarang (main `e0abf37`)
+### Kondisi kode sekarang
 
 - Model data **sudah memungkinkan**: `applications` di-query dengan
   `where('ownerFirebaseUid', '==', uid)` dan hasilnya berupa daftar.
 - NIS terbit **satu kali per Firebase UID** (`ensureStudentNumber`) — tepat: pembiayaan kedua
   memakai **NIS yang sama**, tidak menerbitkan NIS baru.
-- Yang perlu dicek/ditambah ada di bawah.
+- Aturan satu program berjalan kini diperiksa di server dalam transaksi dengan mutex per UID; dashboard menyembunyikan CTA pengajuan baru saat masih ada program berjalan dan menampilkan notifikasi sukses di kartu ringkasan. Produk baru dan riwayat pembiayaan lengkap masih perlu dirancang.
 
-### Yang perlu ditambahkan
+### Yang masih perlu ditambahkan
 
-1. **Aturan boleh mengajukan lagi** (server, di action pengajuan baru):
-   - Tolak bila masih ada pengajuan yang belum selesai (status selain lunas/dibatalkan/ditolak).
-   - Usul: boleh mengajukan lagi bila semua pembiayaan sebelumnya **lunas** (termasuk lunas dengan
-     potongan pelunasan). Pengecualian (mis. dana darurat saat pembiayaan utama masih berjalan)
-     hanya lewat admin.
-2. **Produk baru** di luar `FULL_COVER` dan `DEPARTURE_BRIDGING`:
+1. **Produk baru** di luar `FULL_COVER` dan `DEPARTURE_BRIDGING`:
    - `BUSINESS` — Pembiayaan Usaha (untuk alumni yang sudah bekerja).
    - `EMERGENCY` — Dana Darurat (nominal kecil, tenor pendek).
    - Masing-masing butuh daftar dokumen (`src/lib/documents.ts`), template akad
      (`src/lib/akad-templates/`), dan label. Skema akadnya diputuskan bersama DPS.
-3. **Dashboard siswa**:
+2. **Dashboard siswa**:
    - Kartu utama menampilkan pembiayaan yang **sedang berjalan** (bila ada lebih dari satu yang
      aktif, tampilkan yang jatuh temponya paling dekat + penanda "2 pembiayaan aktif").
    - Pembiayaan yang sudah **lunas** masuk daftar **Riwayat Pembiayaan** (mis. di Profil), bisa
      dibuka untuk melihat akad dan riwayat bayarnya.
    - Tombol "Ajukan Pembiayaan Baru" hanya aktif bila aturan nomor 1 terpenuhi; bila tidak,
      tampilkan alasannya.
-4. **Pembayaran**: setiap invoice/VA dan setiap `payments` wajib membawa `applicationDocId`
+3. **Pembayaran**: setiap invoice/VA dan setiap `payments` wajib membawa `applicationDocId`
    supaya uang masuk ke pembiayaan yang benar.
-5. **Admin**: daftar pengajuan menampilkan penanda "pembiayaan ke-N" dan tautan ke pembiayaan
+4. **Admin**: daftar pengajuan menampilkan penanda "pembiayaan ke-N" dan tautan ke pembiayaan
    sebelumnya siswa yang sama (riwayat lunas = bahan penilaian).
-6. **Potongan pelunasan dipercepat**: pernah diberikan di data lama. Admin perlu bisa mencatatnya
+5. **Potongan pelunasan dipercepat**: pernah diberikan di data lama. Admin perlu bisa mencatatnya
    sebagai baris tersendiri (jenis `SETTLEMENT_DISCOUNT`, alasan wajib, tercatat di audit) sehingga
    pembiayaan berstatus lunas walau uang masuk lebih kecil dari total kewajiban. Pemberiannya
    mengikuti ketentuan DPS.

@@ -3,6 +3,7 @@
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
+import { blocksAdditionalProgram } from '@/lib/application-lifecycle'
 import { STUDENT_NUMBER_PATTERN } from '@/lib/student-number'
 
 export type DashboardScheduleSummary = {
@@ -19,9 +20,11 @@ export type DashboardApplication = {
   applicationId: string
   product: 'FULL_COVER' | 'DEPARTURE_BRIDGING'
   applicantName: string
+  lpkName: string
   status: string
   pricingStatus: string
   requestedFinancingAmount: number | null
+  fullCoverInvoiceAmount: number | null
   totalObligation: number | null
   schedule: DashboardScheduleSummary | null
   documentsUploaded: number
@@ -29,10 +32,15 @@ export type DashboardApplication = {
   documentsRevision: number
   documentsTotal: number
   createdAt: number | null
+  settled: boolean
 }
 
 export type DashboardSummaryResult =
-  | { ok: true; application: DashboardApplication | null }
+  | { ok: true; application: DashboardApplication | null; canApply: boolean }
+  | { ok: false; message: string }
+
+export type FullCoverProgramStatsResult =
+  | { ok: true; applicants: number; active: number; completed: number }
   | { ok: false; message: string }
 
 export type UserDocumentItem = {
@@ -370,6 +378,10 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
         data.departureDetails && typeof data.departureDetails === 'object'
           ? data.departureDetails
           : null
+      const fullCoverDetails =
+        data.fullCoverDetails && typeof data.fullCoverDetails === 'object'
+          ? data.fullCoverDetails
+          : null
       const documents = Array.isArray(data.documents) ? data.documents : []
       const paidSet = readPaidSet(data.paidInstallments)
 
@@ -378,6 +390,7 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
         applicationId: data.applicationId,
         product: data.product === 'FULL_COVER' ? 'FULL_COVER' : 'DEPARTURE_BRIDGING',
         applicantName: data.applicantName,
+        lpkName: typeof data.lpkName === 'string' ? data.lpkName : '',
         status: typeof data.status === 'string' ? data.status : 'SUBMITTED',
         pricingStatus:
           typeof financialPlan.pricingStatus === 'string'
@@ -385,6 +398,9 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
             : 'ESTIMATED',
         requestedFinancingAmount: departureDetails
           ? readCount(departureDetails.requestedFinancingAmount)
+          : null,
+        fullCoverInvoiceAmount: fullCoverDetails
+          ? readCount(fullCoverDetails.lpkInvoiceAmount)
           : null,
         totalObligation: readCount(financialPlan.totalObligation),
         schedule: readScheduleSummary(financialPlan.schedule, paidSet),
@@ -406,14 +422,68 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
         ).length,
         documentsTotal: documents.length,
         createdAt,
+        settled: !blocksAdditionalProgram(data),
       }
       return [application]
     })
 
     applications.sort((left, right) => (right.createdAt ?? 0) - (left.createdAt ?? 0))
-    return { ok: true, application: applications[0] ?? null }
+    const application = applications.find((item) => !item.settled) ?? applications[0] ?? null
+    const canApply = snapshot.docs.every((document) => !blocksAdditionalProgram(document.data()))
+    return {
+      ok: true,
+      application,
+      canApply,
+    }
   } catch {
     return { ok: false, message: 'Ringkasan dashboard belum dapat dimuat. Silakan coba lagi.' }
+  }
+}
+
+export async function getFullCoverProgramStats(
+  token: string,
+): Promise<FullCoverProgramStatsResult> {
+  try {
+    const identity = await verifyUserIdentity(token)
+    if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
+
+    const snapshot = await getFirebaseFirestore()
+      .collection('applications')
+      .where('product', '==', 'FULL_COVER')
+      .select('ownerFirebaseUid', 'status')
+      .get()
+    const groups = {
+      applicants: new Set<string>(),
+      active: new Set<string>(),
+      completed: new Set<string>(),
+    }
+    const applicationStatuses = new Set([
+      'SUBMITTED',
+      'ELIGIBILITY_REVIEW',
+      'DOCUMENT_REVIEW',
+      'REVISION_REQUIRED',
+      'COST_VERIFICATION',
+      'APPROVED',
+      'CONTRACT_PREPARATION',
+    ])
+
+    snapshot.docs.forEach((document) => {
+      const data = document.data()
+      const participantId =
+        typeof data.ownerFirebaseUid === 'string' ? data.ownerFirebaseUid : document.id
+      if (applicationStatuses.has(String(data.status))) groups.applicants.add(participantId)
+      if (data.status === 'ACTIVE') groups.active.add(participantId)
+      if (data.status === 'COMPLETED') groups.completed.add(participantId)
+    })
+
+    return {
+      ok: true,
+      applicants: groups.applicants.size,
+      active: groups.active.size,
+      completed: groups.completed.size,
+    }
+  } catch {
+    return { ok: false, message: 'Informasi program belum dapat dimuat.' }
   }
 }
 

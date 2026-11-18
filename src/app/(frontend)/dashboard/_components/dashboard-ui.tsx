@@ -203,7 +203,10 @@ export function DashboardScaffold({
 }) {
   return (
     <main className="dashboard-app min-h-dvh bg-[var(--canvas)]">
-      <section className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-[#f8f9fd] shadow-[0_0_48px_rgba(15,23,42,0.08)]">
+      <section
+        className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-[#f8f9fd] shadow-[0_0_48px_rgba(15,23,42,0.08)]"
+        data-active-route={active}
+      >
         {showHeader && (
           <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur">
             <Link
@@ -220,7 +223,6 @@ export function DashboardScaffold({
           </header>
         )}
         <div className="flex flex-1 flex-col gap-5 px-5 py-5 pb-32">{children}</div>
-        <DashboardBottomNav active={active} />
       </section>
     </main>
   )
@@ -246,7 +248,7 @@ export function DashboardBottomNav({ active }: { active: PrimaryRoute }) {
                 <span
                   className={
                     isHome && isActive
-                      ? 'grid size-10 place-items-center rounded-2xl brand-fill text-white shadow-[0_4px_12px_rgba(11,87,208,0.24)] ring-2 ring-blue-100 transition group-hover:opacity-90'
+                      ? 'grid size-12 -translate-y-1.5 place-items-center rounded-2xl brand-fill text-white shadow-[0_4px_12px_rgba(11,87,208,0.24)] ring-2 ring-blue-100 transition group-hover:opacity-90'
                       : isActive
                         ? 'grid size-9 place-items-center rounded-2xl brand-fill text-white shadow-sm transition group-hover:opacity-90'
                         : 'grid size-9 place-items-center rounded-2xl text-slate-400 transition group-hover:bg-slate-100 group-hover:text-slate-600'

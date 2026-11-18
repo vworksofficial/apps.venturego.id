@@ -4,11 +4,11 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
-import { DashboardBottomNav, SkeletonBlock } from './_components/dashboard-ui'
+import { SkeletonBlock } from './_components/dashboard-ui'
 import { VaNumber } from './_components/va-number'
 import { WalletCarousel } from './_components/wallet-carousel'
 import { getWalletSummary, type VipSummary } from './vip/actions'
-import { getDashboardSummary, type DashboardApplication } from './actions'
+import { getDashboardSummary, getFullCoverProgramStats, type DashboardApplication } from './actions'
 
 type IconName =
   | 'bell'
@@ -366,19 +366,26 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [application, setApplication] = useState<DashboardApplication | null>(null)
+  const [canApply, setCanApply] = useState(false)
   const [accountName, setAccountName] = useState('')
   const [accountPhotoUrl, setAccountPhotoUrl] = useState('')
   const [accountPhotoFailed, setAccountPhotoFailed] = useState(false)
   const [wallet, setWallet] = useState<{ vip: VipSummary | null; points: number } | null>(null)
   const [walletLoading, setWalletLoading] = useState(true)
+  const [showProgramInfo, setShowProgramInfo] = useState(false)
+  const [programStats, setProgramStats] = useState<{
+    applicants: number
+    active: number
+    completed: number
+  } | null>(null)
+  const [programStatsLoading, setProgramStatsLoading] = useState(false)
+  const [programStatsError, setProgramStatsError] = useState('')
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('applicationSubmitted') !== '1') return
 
     setShowSubmissionNotice(true)
     window.history.replaceState(window.history.state, '', '/dashboard')
-    const timeout = window.setTimeout(() => setShowSubmissionNotice(false), 5000)
-    return () => window.clearTimeout(timeout)
   }, [])
 
   useEffect(() => {
@@ -389,6 +396,7 @@ export default function DashboardPage() {
         if (!active) return
         if (!user) {
           setApplication(null)
+          setCanApply(false)
           setAccountName('')
           setAccountPhotoUrl('')
           setAccountPhotoFailed(false)
@@ -417,9 +425,11 @@ export default function DashboardPage() {
           if (!result.ok) {
             setError(result.message)
             setApplication(null)
+            setCanApply(false)
           } else {
             setError('')
             setApplication(result.application)
+            setCanApply(result.canApply)
           }
         } catch {
           if (active) setError('Ringkasan tidak dapat dimuat. Silakan muat ulang halaman.')
@@ -440,14 +450,50 @@ export default function DashboardPage() {
   const schedule = application?.schedule ?? null
   const closed = ['REJECTED', 'CANCELLED'].includes(application?.status ?? '')
   const currentStep = application ? (STAGE_BY_STATUS[application.status] ?? 0) : 0
-  const allDone = application?.status === 'COMPLETED'
+  const allDone = Boolean(application?.settled && !closed)
+  const openProgramInfo = async () => {
+    setShowProgramInfo(true)
+    if (application?.product !== 'FULL_COVER' || programStats || programStatsLoading) return
+    const user = getFirebaseClientAuth().currentUser
+    if (!user) return
+    setProgramStatsLoading(true)
+    try {
+      const result = await getFullCoverProgramStats(await user.getIdToken())
+      if (result.ok) {
+        setProgramStats({
+          applicants: result.applicants,
+          active: result.active,
+          completed: result.completed,
+        })
+      } else {
+        setProgramStatsError(result.message)
+      }
+    } catch {
+      setProgramStatsError('Informasi jumlah peserta belum dapat dimuat.')
+    } finally {
+      setProgramStatsLoading(false)
+    }
+  }
   const primaryAmount =
-    application?.totalObligation ?? application?.requestedFinancingAmount ?? null
+    application?.totalObligation ??
+    application?.requestedFinancingAmount ??
+    application?.fullCoverInvoiceAmount ??
+    null
   const amountLabel =
     application?.totalObligation !== null && application?.totalObligation !== undefined
       ? 'Total kewajiban akad'
-      : 'Estimasi diajukan'
-  const statusLabel = application ? (STATUS_LABELS[application.status] ?? application.status) : ''
+      : application?.requestedFinancingAmount !== null &&
+          application?.requestedFinancingAmount !== undefined
+        ? 'Nominal diajukan'
+        : application?.fullCoverInvoiceAmount !== null &&
+            application?.fullCoverInvoiceAmount !== undefined
+          ? 'Estimasi tagihan LPK'
+          : 'Estimasi pembiayaan'
+  const statusLabel = application
+    ? application.settled && !closed
+      ? 'Lunas'
+      : (STATUS_LABELS[application.status] ?? application.status)
+    : ''
   const greetingName = loading
     ? ''
     : application
@@ -456,18 +502,6 @@ export default function DashboardPage() {
 
   return (
     <main className="dashboard-app min-h-dvh bg-[var(--canvas)]">
-      {showSubmissionNotice && (
-        <div
-          aria-live="polite"
-          className="fixed left-1/2 top-4 z-50 flex w-[calc(100%-32px)] max-w-[398px] -translate-x-1/2 items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-[0_8px_32px_rgba(15,23,42,0.16)] ring-1 ring-emerald-100"
-          role="status"
-        >
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-emerald-50 text-sm font-bold text-emerald-700">
-            ✓
-          </span>
-          <span className="text-sm font-semibold text-slate-800">Pengajuan berhasil diajukan</span>
-        </div>
-      )}
       <section className="mx-auto flex min-h-dvh w-full max-w-[430px] flex-col bg-[#f8f9fd] shadow-[0_0_48px_rgba(15,23,42,0.08)]">
         <header className="rounded-b-[32px] brand-surface px-5 pb-24 pt-6 text-white">
           <div className="flex items-center justify-between">
@@ -518,6 +552,28 @@ export default function DashboardPage() {
                 label: 'Ringkasan angsuran',
                 content: (
                   <>
+                    {showSubmissionNotice && (
+                      <div
+                        aria-live="polite"
+                        className="mb-4 flex items-center gap-3 rounded-2xl bg-emerald-50 px-3.5 py-3 ring-1 ring-emerald-100"
+                        role="status"
+                      >
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-sm font-bold text-emerald-700 shadow-sm">
+                          ✓
+                        </span>
+                        <span className="flex-1 text-xs font-bold text-emerald-900">
+                          Pengajuan berhasil diajukan
+                        </span>
+                        <button
+                          aria-label="Tutup notifikasi pengajuan berhasil"
+                          className="grid size-7 shrink-0 place-items-center rounded-full text-emerald-800 transition hover:bg-emerald-100"
+                          onClick={() => setShowSubmissionNotice(false)}
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                     {loading && (
                       <div
                         aria-label="Memuat ringkasan pengajuan"
@@ -549,42 +605,73 @@ export default function DashboardPage() {
                     )}
                     {!loading && !error && application && (
                       <>
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <p className="text-xs font-medium text-slate-500">{amountLabel}</p>
-                            <div className="mt-2 flex items-center gap-2">
-                              <strong className="text-2xl font-bold tracking-[-0.03em] text-slate-950">
-                                {primaryAmount !== null
-                                  ? showBalance
-                                    ? formatRupiah(primaryAmount)
-                                    : 'Rp••••••••'
-                                  : 'Belum tercatat'}
-                              </strong>
-                              {primaryAmount !== null && (
-                                <button
-                                  aria-label={
-                                    showBalance ? 'Sembunyikan nominal' : 'Tampilkan nominal'
-                                  }
-                                  className="grid size-8 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                                  onClick={() => setShowBalance((current) => !current)}
-                                  type="button"
-                                >
-                                  <Icon name={showBalance ? 'eye' : 'eyeOff'} className="size-4" />
-                                </button>
-                              )}
+                        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-emerald-50/70 p-4 ring-1 ring-blue-100/80">
+                          <div className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full bg-blue-100/70 blur-2xl" />
+                          <div className="relative z-10">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[10px] font-bold tracking-[0.02em] text-slate-500">
+                                  {amountLabel}
+                                </p>
+                                {primaryAmount !== null ? (
+                                  <div className="mt-1.5 flex items-center gap-1">
+                                    <strong className="text-[26px] font-extrabold leading-tight tracking-[-0.04em] text-slate-950">
+                                      {showBalance ? formatRupiah(primaryAmount) : 'Rp••••••••'}
+                                    </strong>
+                                    <button
+                                      aria-label={
+                                        showBalance ? 'Sembunyikan nominal' : 'Tampilkan nominal'
+                                      }
+                                      className="grid size-8 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-white/80 hover:text-slate-700"
+                                      onClick={() => setShowBalance((current) => !current)}
+                                      type="button"
+                                    >
+                                      <Icon
+                                        name={showBalance ? 'eye' : 'eyeOff'}
+                                        className="size-4"
+                                      />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <strong className="mt-1.5 block text-xl font-extrabold leading-tight tracking-tight text-slate-900">
+                                      Menunggu verifikasi
+                                    </strong>
+                                    <p className="mt-1.5 max-w-[240px] text-[11px] leading-4 text-slate-600">
+                                      Nominal pembiayaan disusun setelah kebutuhan Anda
+                                      diverifikasi.
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                              <span
+                                className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${
+                                  application.status === 'ACTIVE'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : application.status === 'COMPLETED'
+                                      ? 'bg-slate-100 text-slate-700'
+                                      : closed
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-blue-100 text-[var(--primary)]'
+                                }`}
+                              >
+                                {statusLabel}
+                              </span>
                             </div>
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-blue-100/80 pt-3 text-[10px] text-slate-500">
+                              <span className="font-semibold text-slate-700">
+                                {PRODUCT_LABELS[application.product]}
+                              </span>
+                              <span className="truncate">{application.lpkName}</span>
+                            </div>
+                            {application.fullCoverInvoiceAmount !== null &&
+                              application.totalObligation === null && (
+                                <p className="mt-2 text-[10px] leading-4 text-slate-500">
+                                  Nilai di atas adalah estimasi tagihan LPK, bukan nominal
+                                  pembiayaan final.
+                                </p>
+                              )}
                           </div>
-                          <span
-                            className={`rounded-full px-3 py-1.5 text-[10px] font-bold ${
-                              application.status === 'ACTIVE'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : closed
-                                  ? 'bg-red-50 text-red-700'
-                                  : 'bg-blue-50 text-[var(--primary)]'
-                            }`}
-                          >
-                            {statusLabel}
-                          </span>
                         </div>
                         {schedule ? (
                           <>
@@ -635,27 +722,31 @@ export default function DashboardPage() {
                             </div>
                           </>
                         ) : (
-                          <div
-                            className="mt-5 grid gap-3 border-t border-slate-100 pt-4"
-                            style={{ gridTemplateColumns: '1fr 3fr' }}
-                          >
-                            <div>
-                              <span className="text-[11px] text-slate-400">Berkas terunggah</span>
-                              <strong className="mt-1 block text-sm text-slate-800">
-                                {application.documentsUploaded}/{application.documentsTotal}
-                                {application.documentsVerified > 0
-                                  ? ` (${application.documentsVerified} ✓)`
-                                  : ''}
-                              </strong>
-                            </div>
-                            <div className="border-l border-slate-100 pl-4">
-                              <span className="text-[11px] text-slate-400">Nomor pengajuan</span>
-                              <div className="mt-1">
-                                <strong className="text-sm text-slate-800">
-                                  {application.applicationId}
+                          <div className="mt-5 border-t border-slate-100 pt-4">
+                            <Link
+                              className="group flex min-h-14 items-center justify-between gap-3 rounded-xl bg-blue-50 px-3.5 py-2.5 text-[var(--primary)] ring-1 ring-blue-100 transition hover:bg-blue-100"
+                              href="/dashboard/unggah-berkas"
+                            >
+                              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-white text-[var(--primary)] shadow-sm">
+                                <Icon name="document" className="size-4" />
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <strong className="block text-xs font-bold">
+                                  {application.documentsRevision > 0
+                                    ? 'Perbaiki berkas'
+                                    : application.documentsUploaded < application.documentsTotal
+                                      ? 'Unggah berkas'
+                                      : 'Lihat status berkas'}
                                 </strong>
-                              </div>
-                            </div>
+                                <small className="mt-0.5 block text-[9px] leading-3 text-slate-500">
+                                  Dokumen persyaratan pengajuan
+                                </small>
+                              </span>
+                              <Icon
+                                name="chevron"
+                                className="size-4 shrink-0 transition group-hover:translate-x-0.5"
+                              />
+                            </Link>
                           </div>
                         )}
                         {application.documentsRevision > 0 && (
@@ -664,16 +755,27 @@ export default function DashboardPage() {
                             periksa menu Unggah Berkas.
                           </p>
                         )}
-                        {application.pricingStatus === 'ESTIMATED' && !schedule && (
-                          <p className="mt-4 text-[11px] leading-4 text-slate-400">
-                            {PRODUCT_LABELS[application.product]} · Rincian biaya sedang disusun dan
-                            diverifikasi tim VentureGo.
-                          </p>
-                        )}
                       </>
                     )}
                     {!loading && !error && !application && (
                       <>
+                        <div className="mb-5 rounded-2xl bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-4 ring-1 ring-blue-100">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">
+                              Status pembiayaan
+                            </p>
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--primary)] ring-1 ring-blue-100">
+                              Siap memulai
+                            </span>
+                          </div>
+                          <h2 className="mt-2 text-lg font-extrabold tracking-tight text-slate-900">
+                            Belum ada program berjalan
+                          </h2>
+                          <p className="mt-1 text-[11px] leading-4 text-slate-600">
+                            Satu program dapat berjalan pada satu waktu. Setelah kewajiban lunas,
+                            Anda bisa mengajukan program berikutnya.
+                          </p>
+                        </div>
                         <div className="flex items-start justify-between">
                           <div>
                             <p className="text-xs font-medium text-slate-500">
@@ -695,9 +797,6 @@ export default function DashboardPage() {
                               </button>
                             </div>
                           </div>
-                          <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-bold text-slate-500">
-                            Belum ada pengajuan
-                          </span>
                         </div>
                         <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
                           <div className="h-full w-0 rounded-full bg-[var(--accent)]" />
@@ -750,25 +849,151 @@ export default function DashboardPage() {
             ]}
           />
 
-          <section className="relative overflow-hidden rounded-3xl brand-card p-5 text-white shadow-sm">
-            <div className="relative z-10 flex items-center justify-between gap-4">
-              <div>
-                <h2 className="text-base font-bold tracking-tight text-white">
-                  Ajukan Pembiayaan Baru
-                </h2>
-                <p className="mt-1 text-xs leading-relaxed text-blue-100">
-                  Mulai pengajuan Full Cover atau Dana Keberangkatan dengan skema syariah.
-                </p>
+          {!loading && !error && application && !canApply && (
+            <section className="rounded-3xl bg-white p-5 text-center shadow-sm ring-1 ring-blue-100">
+              <p className="text-xs font-bold text-[var(--primary)]">
+                {closed
+                  ? application.status === 'COMPLETED'
+                    ? 'Program Selesai'
+                    : 'Pengajuan Ditutup'
+                  : application.status === 'ACTIVE'
+                    ? 'Program Sedang Dijalani'
+                    : 'Pengajuan Telah Terkirim'}
+              </p>
+              <div className="mt-2 flex justify-center">
+                {application.product === 'FULL_COVER' ? (
+                  <button
+                    className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    onClick={openProgramInfo}
+                    type="button"
+                  >
+                    Program {PRODUCT_LABELS[application.product]}
+                  </button>
+                ) : (
+                  <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                    Program {PRODUCT_LABELS[application.product]}
+                  </span>
+                )}
               </div>
-              <Link
-                className="shrink-0 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-sm transition hover:bg-amber-300 active:scale-95"
-                href="/?step=1"
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {closed
+                  ? application.status === 'COMPLETED'
+                    ? 'Seluruh tahapan program pembiayaan Anda telah selesai.'
+                    : 'Pengajuan ini telah ditutup. Hubungi tim VentureGo untuk informasi lebih lanjut.'
+                  : application.product === 'FULL_COVER' &&
+                      application.pricingStatus === 'ESTIMATED' &&
+                      !schedule
+                    ? 'Rincian biaya sedang disusun dan diverifikasi tim VentureGo.'
+                    : schedule
+                      ? 'Pantau progres angsuran dan jatuh tempo pada kartu ringkasan di atas.'
+                      : 'Pengajuan Anda sedang ditinjau oleh tim VentureGo.'}
+              </p>
+            </section>
+          )}
+          {showProgramInfo && application?.product === 'FULL_COVER' && (
+            <div
+              className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-5"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) setShowProgramInfo(false)
+              }}
+            >
+              <section
+                aria-labelledby="full-cover-info-title"
+                aria-modal="true"
+                className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+                role="dialog"
               >
-                Mulai
-              </Link>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                      Program pembiayaan
+                    </p>
+                    <h2
+                      className="mt-1 text-lg font-bold tracking-tight text-slate-900"
+                      id="full-cover-info-title"
+                    >
+                      VSV Full Cover
+                    </h2>
+                  </div>
+                  <button
+                    aria-label="Tutup informasi program"
+                    className="grid size-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    onClick={() => setShowProgramInfo(false)}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="text-xl leading-none">
+                      ×
+                    </span>
+                  </button>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  Program pendampingan pembiayaan persiapan kerja ke Jepang yang membantu memenuhi
+                  kebutuhan pendidikan bahasa, pelatihan keterampilan, dokumen keberangkatan, dan
+                  uang saku sesuai hasil verifikasi.
+                </p>
+                <div className="mt-4 rounded-2xl bg-emerald-50/80 p-4">
+                  <h3 className="text-xs font-bold text-slate-900">Bagaimana akadnya?</h3>
+                  <p className="mt-1.5 text-xs leading-5 text-slate-600">
+                    Akad Full Cover menggunakan Wakalah bil Ujrah dan Ju&apos;alah. Rincian
+                    kebutuhan serta nilai biaya disusun dan diverifikasi tim VentureGo sebelum
+                    disampaikan untuk ditinjau dan disepakati dalam akad.
+                  </p>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-xs font-bold text-slate-900">
+                    Perjalanan peserta Full Cover
+                  </h3>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Sedang mengajukan', value: programStats?.applicants },
+                      { label: 'Sedang menjalani', value: programStats?.active },
+                      { label: 'Telah lulus', value: programStats?.completed },
+                    ].map((stat) => (
+                      <div className="rounded-2xl bg-slate-50 p-3 text-center" key={stat.label}>
+                        <p className="text-lg font-bold text-slate-900">
+                          {programStatsLoading ? '…' : (stat.value ?? '—')}
+                        </p>
+                        <p className="mt-1 text-[10px] leading-4 text-slate-500">{stat.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[10px] leading-4 text-slate-400">
+                    {programStatsError ||
+                      'Jumlah orang unik berdasarkan status program di sistem VentureGo.'}
+                  </p>
+                </div>
+              </section>
             </div>
-            <div className="pointer-events-none absolute -bottom-8 -right-8 size-32 rounded-full bg-white/10 blur-xl" />
-          </section>
+          )}
+          {!loading && !error && canApply && (
+            <section className="relative overflow-hidden rounded-3xl brand-card p-5 text-white shadow-sm">
+              <div className="relative z-10 flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-bold tracking-tight text-white">
+                    {!application
+                      ? 'Ajukan Pembiayaan Baru'
+                      : closed
+                        ? 'Mulai pengajuan baru'
+                        : 'Program sebelumnya telah lunas'}
+                  </h2>
+                  <p className="mt-1 text-xs leading-relaxed text-blue-100">
+                    {!application
+                      ? 'Mulai pengajuan Full Cover atau Dana Keberangkatan dengan skema syariah.'
+                      : closed
+                        ? 'Pengajuan sebelumnya tidak memiliki kewajiban berjalan. Anda dapat memulai pengajuan kembali.'
+                        : 'Kewajiban sebelumnya telah selesai. Anda dapat memulai pengajuan program berikutnya.'}
+                  </p>
+                </div>
+                <Link
+                  className="shrink-0 rounded-full bg-amber-400 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-sm transition hover:bg-amber-300 active:scale-95"
+                  href="/?step=1"
+                >
+                  {application ? 'Ajukan' : 'Mulai'}
+                </Link>
+              </div>
+              <div className="pointer-events-none absolute -bottom-8 -right-8 size-32 rounded-full bg-white/10 blur-xl" />
+            </section>
+          )}
 
           <section aria-labelledby="quick-actions-title">
             <div className="mb-4 flex items-center justify-between">
@@ -782,21 +1007,23 @@ export default function DashboardPage() {
                 Semua layanan
               </Link>
             </div>
-            <div className="grid grid-cols-5 gap-2">
-              {quickActions.map((action) => (
-                <Link
-                  className="group flex min-w-0 flex-col items-center gap-2 text-center"
-                  href={action.href}
-                  key={action.label}
-                >
-                  <span className="grid size-13 place-items-center rounded-2xl bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-100 transition group-hover:-translate-y-0.5 group-hover:shadow-md">
-                    <Icon name={action.icon} className="size-5" />
-                  </span>
-                  <span className="text-[10px] font-semibold leading-4 text-slate-600">
-                    {action.label}
-                  </span>
-                </Link>
-              ))}
+            <div className={`grid ${canApply ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
+              {quickActions
+                .filter((action) => canApply || action.label !== 'Ajukan baru')
+                .map((action) => (
+                  <Link
+                    className="group flex min-w-0 flex-col items-center gap-2 text-center"
+                    href={action.href}
+                    key={action.label}
+                  >
+                    <span className="grid size-13 place-items-center rounded-2xl bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-100 transition group-hover:-translate-y-0.5 group-hover:shadow-md">
+                      <Icon name={action.icon} className="size-5" />
+                    </span>
+                    <span className="text-[10px] font-semibold leading-4 text-slate-600">
+                      {action.label}
+                    </span>
+                  </Link>
+                ))}
             </div>
           </section>
 
@@ -936,8 +1163,6 @@ export default function DashboardPage() {
             </div>
           </aside>
         </div>
-
-        <DashboardBottomNav active="home" />
       </section>
     </main>
   )

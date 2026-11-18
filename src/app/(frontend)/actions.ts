@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
+import { blocksAdditionalProgram } from '@/lib/application-lifecycle'
 import {
   DOCUMENT_DEFINITIONS,
   MAX_DOCUMENT_SIZE_BYTES,
@@ -342,7 +343,8 @@ export async function submitFinancingApplication(request: FormData): Promise<App
     const seenIndexes = new Set<number>()
     const uploadedDocuments: Record<string, unknown>[] = []
     let totalBytes = 0
-    const mappingRef = getFirebaseFirestore().collection('driveFolders').doc(identity.uid)
+    const firestore = getFirebaseFirestore()
+    const mappingRef = firestore.collection('driveFolders').doc(identity.uid)
     const mappingSnapshot = await mappingRef.get()
     const mappingData = mappingSnapshot.data()
     const ownedFolderId =
@@ -429,7 +431,7 @@ export async function submitFinancingApplication(request: FormData): Promise<App
       .filter((category) => allowedNeeds.has(category))
       .map((category) => ({ category }))
     const applicationId = `VSV-APP-${randomUUID().slice(0, 8).toUpperCase()}`
-    const applicationRef = getFirebaseFirestore().collection('applications').doc()
+    const applicationRef = firestore.collection('applications').doc()
     const record = {
       applicationId,
       ownerFirebaseUid: identity.uid,
@@ -490,7 +492,30 @@ export async function submitFinancingApplication(request: FormData): Promise<App
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }
-    await applicationRef.set(record)
+    const lockRef = firestore.collection('applicantProgramLocks').doc(identity.uid)
+    const existingApplicationsQuery = firestore
+      .collection('applications')
+      .where('ownerFirebaseUid', '==', identity.uid)
+    const reserved = await firestore.runTransaction(async (transaction) => {
+      // Reading the per-account lock serializes simultaneous first submissions.
+      await transaction.get(lockRef)
+      const existingApplications = await transaction.get(existingApplicationsQuery)
+      if (existingApplications.docs.some((document) => blocksAdditionalProgram(document.data()))) {
+        return false
+      }
+      transaction.set(applicationRef, record)
+      transaction.set(lockRef, {
+        ownerFirebaseUid: identity.uid,
+        currentApplicationDocId: applicationRef.id,
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+      return true
+    })
+    if (!reserved) {
+      return rejectUploads(
+        'Masih ada program atau kewajiban pembiayaan yang berjalan. Selesaikan program saat ini hingga lunas sebelum mengajukan program baru.',
+      )
+    }
     if (ownedFolderId) {
       await mappingRef
         .update({

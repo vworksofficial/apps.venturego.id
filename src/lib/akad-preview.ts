@@ -1640,6 +1640,34 @@ th { font-weight: 700; }
   z-index: 3;
 }
 .doc-header p { margin: 0; }
+.akad-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 34pt;
+  font-family: "Google Sans", Arial, sans-serif;
+}
+.akad-preview-brand { display: flex; align-items: center; gap: 2pt; }
+.akad-preview-logo { display: block; width: 96pt; height: 32pt; object-fit: contain; }
+.akad-preview-brand-name {
+  color: #0b57d0;
+  font-family: Raleway, Arial, sans-serif;
+  font-size: 12pt;
+  font-weight: 800;
+  line-height: 1.05;
+  white-space: nowrap;
+}
+.akad-preview-company {
+  width: 57%;
+  color: #000;
+  text-align: right;
+  line-height: 1.15;
+}
+.akad-preview-company-name { color: #0b57d0; font-size: 9pt; font-weight: 800; }
+.akad-preview-company-slogan { color: #0b57d0; font-size: 8pt; font-weight: 700; }
+.akad-preview-company-address,
+.akad-preview-company-phone { color: #000; font-size: 6.5pt; }
 .doc-footer {
   position: absolute;
   bottom: ${FOOTER_BOTTOM_PT}pt;
@@ -1747,6 +1775,8 @@ export async function renderAkadPreviewHtml(
     'word/_rels/footer1.xml.rels',
     'footer',
   )
+  const logoSrc = /<img\b[^>]*\bsrc="([^"]+)"/.exec(header.blocks)?.[1]
+  const previewHeaderHtml = `<div class="akad-preview-header"><div class="akad-preview-brand">${logoSrc ? `<img class="akad-preview-logo" src="${logoSrc}" alt="VentureGo" />` : ''}<div class="akad-preview-brand-name">Vworks<br />Student Venture</div></div><div class="akad-preview-company"><div class="akad-preview-company-name">PT VWORKS KOLABORASI BERSAMA</div><div class="akad-preview-company-slogan">Your Partner to Leap Together</div><div class="akad-preview-company-address">Perum Bumi Dieng Indah 2, Blok G5 No. 2 &amp; 3, RW 4<br />Andongsili, Kec. Mojotengah, Kabupaten Wonosobo, Jawa Tengah 56351</div><div class="akad-preview-company-phone">082213072665</div></div></div>`
 
   return `<!doctype html>
 <html lang="id">
@@ -1767,7 +1797,7 @@ export async function renderAkadPreviewHtml(
   </div>
   <template id="page-shell">
     <div class="a4-page">
-      <div class="doc-header">${header.blocks}</div>
+      <div class="doc-header">${previewHeaderHtml}</div>
       ${header.watermark ? `<div class="doc-watermark">${header.watermark}</div>` : ''}
       ${draft ? '<div class="doc-draft-mark"><span>DRAFT</span></div>' : ''}
       <div class="a4-body"></div>

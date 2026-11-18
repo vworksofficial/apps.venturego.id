@@ -1958,6 +1958,18 @@ body {
   animation: rocket-loader-in 220ms ease-out both;
 }
 
+.rocket-loader--submission {
+  background: rgb(239 246 255 / 76%);
+  color: #0b57d0;
+  -webkit-backdrop-filter: blur(1px);
+  backdrop-filter: blur(1px);
+}
+
+.rocket-loader--submission p {
+  color: #0b57d0;
+  font-weight: 700;
+}
+
 .rocket-loader p {
   margin: 0;
   font-size: 15px;
@@ -2936,6 +2948,16 @@ body {
   font-weight: 650;
 }
 
+.mobile-shell.application-form:not(.welcome-step) .duration-input > span {
+  order: 2;
+  margin-left: auto;
+  padding-left: 10px;
+  border-left: 1px solid #dbe3ef;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .mobile-shell.application-form:not(.welcome-step) .currency-input input,
 .mobile-shell.application-form:not(.welcome-step) .currency-input input:focus,
 .mobile-shell.application-form:not(.welcome-step) .currency-input input:focus-visible {
@@ -2961,6 +2983,14 @@ body {
 .mobile-shell.application-form:not(.welcome-step) .compact-review-list > div {
   min-height: 42px;
   padding: 6px 2px;
+}
+
+.mobile-shell.application-form:not(.welcome-step) .compact-review-list > .review-needs-list {
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 4px;
+  padding-block: 8px;
 }
 
 .mobile-shell.application-form:not(.welcome-step) .compact-review-list span {

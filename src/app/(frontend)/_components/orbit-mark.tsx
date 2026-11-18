@@ -26,9 +26,9 @@ export function OrbitMark({ label, compact = false }: OrbitMarkProps) {
   )
 }
 
-export function RocketLoader({ message }: { message: string }) {
+export function RocketLoader({ message, className = '' }: { message: string; className?: string }) {
   return (
-    <div className="rocket-loader" role="status" aria-live="polite">
+    <div className={`rocket-loader ${className}`.trim()} role="status" aria-live="polite">
       <OrbitMark compact />
       <p>{message}</p>
     </div>

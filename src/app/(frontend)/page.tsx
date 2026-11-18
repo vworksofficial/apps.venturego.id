@@ -68,15 +68,53 @@ const isIndonesianDate = (value: string) => {
 }
 const formatIndonesianDate = (date: Date) =>
   `${date.getDate()} ${date.toLocaleDateString('id-ID', { month: 'long' })} ${date.getFullYear()}`
+const formatIsoDateIndonesian = (value: string) => {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return ''
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return date.getFullYear() === Number(match[1]) &&
+    date.getMonth() === Number(match[2]) - 1 &&
+    date.getDate() === Number(match[3])
+    ? formatIndonesianDate(date)
+    : ''
+}
+const parseIndonesianDateToIso = (value: string) => {
+  const match = value.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/)
+  if (!match) return ''
+  const months: Record<string, number> = {
+    januari: 1,
+    februari: 2,
+    maret: 3,
+    april: 4,
+    mei: 5,
+    juni: 6,
+    juli: 7,
+    agustus: 8,
+    september: 9,
+    oktober: 10,
+    november: 11,
+    desember: 12,
+  }
+  const month = months[match[2].toLowerCase()]
+  if (!month) return ''
+  const day = Number(match[1])
+  const year = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+    ? `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    : ''
+}
 
 function BirthDatePicker({
   value,
   onChange,
   mode = 'past',
+  futureLabel = 'tanggal keberangkatan',
 }: {
   value: string
   onChange: (value: string) => void
-  mode?: 'past' | 'future'
+  mode?: 'past' | 'future' | 'any'
+  futureLabel?: string
 }) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<'calendar' | 'months' | 'years'>('calendar')
@@ -124,7 +162,10 @@ function BirthDatePicker({
           { length: today.getFullYear() - 1940 + 1 },
           (_, index) => today.getFullYear() - index,
         )
-      : Array.from({ length: 11 }, (_, index) => today.getFullYear() + index)
+      : mode === 'future'
+        ? Array.from({ length: 11 }, (_, index) => today.getFullYear() + index)
+        : Array.from({ length: 91 }, (_, index) => today.getFullYear() + 10 - index)
+  const pickerLabel = mode === 'past' ? 'tanggal lahir' : futureLabel
 
   useEffect(() => {
     if (selectedDate)
@@ -154,13 +195,7 @@ function BirthDatePicker({
   return (
     <div className="form-select" ref={rootRef}>
       <button
-        aria-label={
-          value
-            ? `Tanggal: ${value}`
-            : mode === 'past'
-              ? 'Pilih tanggal lahir'
-              : 'Pilih tanggal keberangkatan'
-        }
+        aria-label={value ? `Tanggal: ${value}` : `Pilih ${pickerLabel}`}
         aria-expanded={open}
         aria-haspopup="dialog"
         className={`form-select-trigger${open ? ' is-open' : ''}`}
@@ -168,20 +203,14 @@ function BirthDatePicker({
         onKeyDown={(event) => event.key === 'Escape' && setOpen(false)}
         type="button"
       >
-        <span className={value ? '' : 'placeholder'}>
-          {value || (mode === 'past' ? 'Pilih tanggal lahir' : 'Pilih tanggal keberangkatan')}
-        </span>
+        <span className={value ? '' : 'placeholder'}>{value || `Pilih ${pickerLabel}`}</span>
         <svg aria-hidden="true" className={open ? 'rotate' : ''} viewBox="0 0 24 24">
           <rect x="3" y="5" width="18" height="16" rx="2" />
           <path d="M16 3v4M8 3v4M3 11h18" />
         </svg>
       </button>
       {open && (
-        <div
-          className="date-picker-menu"
-          role="dialog"
-          aria-label={mode === 'past' ? 'Pilih tanggal lahir' : 'Pilih tanggal keberangkatan'}
-        >
+        <div className="date-picker-menu" role="dialog" aria-label={`Pilih ${pickerLabel}`}>
           <div className="date-picker-header">
             <button
               aria-label="Bulan sebelumnya"
@@ -308,12 +337,12 @@ function BirthDatePicker({
 }
 
 const FULL_COVER_NEEDS = [
-  ['LANGUAGE_TRAINING', 'Biaya pelatihan bahasa'],
-  ['LANGUAGE_ALLOWANCE', 'Uang saku pelatihan bahasa'],
-  ['SKILL_TRAINING', 'Biaya pelatihan skill'],
-  ['SKILL_ALLOWANCE', 'Uang saku pelatihan skill'],
-  ['MEDICAL', 'Biaya MCU'],
-  ['DOCUMENT', 'Biaya dokumen keberangkatan'],
+  ['MEDICAL', 'Biaya pendaftaran & MCU'],
+  ['LANGUAGE_TRAINING', 'Biaya Pelatihan tahap 1 (Pelatihan bahasa)'],
+  ['LANGUAGE_ALLOWANCE', 'Uang saku Pelatihan tahap 1 (Pelatihan bahasa)'],
+  ['SKILL_TRAINING', 'Biaya Pelatihan tahap 2 (Pelatihan keterampilan)'],
+  ['SKILL_ALLOWANCE', 'Uang saku Pelatihan tahap 2 (Pelatihan keterampilan)'],
+  ['DOCUMENT', 'Biaya pengurusan dokumen keberangkatan'],
   ['ALLOWANCE', 'Biaya uang saku keberangkatan'],
 ] as const
 
@@ -1315,40 +1344,57 @@ export default function HomePage() {
                   </label>
                   <label className="field">
                     <span>Perkiraan tanggal mulai</span>
-                    <input
-                      type="date"
-                      value={form.trainingStartDate}
-                      onChange={(e) => set('trainingStartDate', e.target.value)}
+                    <BirthDatePicker
+                      futureLabel="tanggal mulai pelatihan"
+                      mode="any"
+                      value={formatIsoDateIndonesian(form.trainingStartDate)}
+                      onChange={(value) =>
+                        set('trainingStartDate', parseIndonesianDateToIso(value))
+                      }
                     />
                   </label>
                   <div className="field-grid">
                     <label className="field">
-                      <span>Durasi pelatihan bahasa (bulan)</span>
-                      <input
-                        inputMode="numeric"
-                        min="1"
-                        max="60"
-                        required
-                        value={form.languageTrainingMonths}
-                        onChange={(e) =>
-                          set('languageTrainingMonths', e.target.value.replace(/\D/g, ''))
-                        }
-                        placeholder="Bulan"
-                      />
+                      <span>
+                        Pelatihan tahap 1
+                        <br />
+                        (Pelatihan bahasa)
+                      </span>
+                      <div className="currency-input duration-input">
+                        <input
+                          inputMode="numeric"
+                          min="1"
+                          max="60"
+                          required
+                          value={form.languageTrainingMonths}
+                          onChange={(e) =>
+                            set('languageTrainingMonths', e.target.value.replace(/\D/g, ''))
+                          }
+                          placeholder="3"
+                        />
+                        <span>bulan</span>
+                      </div>
                     </label>
                     <label className="field">
-                      <span>Durasi pelatihan keterampilan (bulan)</span>
-                      <input
-                        inputMode="numeric"
-                        min="1"
-                        max="60"
-                        required
-                        value={form.skillTrainingMonths}
-                        onChange={(e) =>
-                          set('skillTrainingMonths', e.target.value.replace(/\D/g, ''))
-                        }
-                        placeholder="Bulan"
-                      />
+                      <span>
+                        Pelatihan tahap 2
+                        <br />
+                        (Pelatihan keterampilan)
+                      </span>
+                      <div className="currency-input duration-input">
+                        <input
+                          inputMode="numeric"
+                          min="1"
+                          max="60"
+                          required
+                          value={form.skillTrainingMonths}
+                          onChange={(e) =>
+                            set('skillTrainingMonths', e.target.value.replace(/\D/g, ''))
+                          }
+                          placeholder="3"
+                        />
+                        <span>bulan</span>
+                      </div>
                     </label>
                   </div>
                   <label className="field">
@@ -1505,64 +1551,6 @@ export default function HomePage() {
                   disepakati.
                 </small>
               </section>
-              {!isDeparture && (
-                <div className="soft-note space-y-3">
-                  <p className="font-semibold text-slate-800">
-                    Rincian biaya Full Cover akan diisi dan diverifikasi tim VentureGo sebelum akad
-                    disepakati.
-                  </p>
-                  <ul className="space-y-2">
-                    <li>
-                      <strong>Nafaqah:</strong> pengeluaran riil untuk kebutuhan yang disetujui,
-                      disertai bukti pembayaran.
-                    </li>
-                    <li>
-                      <strong>Ujrah:</strong> imbalan jasa yang nilainya dicantumkan dalam akad.
-                    </li>
-                    <li>
-                      <strong>Ju&apos;alah:</strong>{' '}
-                      {form.destination === 'JAPAN'
-                        ? 'hanya berlaku jika COE atas nama Anda terbit.'
-                        : 'ketentuannya belum ditetapkan untuk negara tujuan ini dan perlu dikonfirmasi dalam akad.'}
-                    </li>
-                  </ul>
-                  <p>
-                    VentureGo bertindak sebagai wakil terbatas untuk kebutuhan yang disetujui dan
-                    bukti pengeluaran dapat diminta. Dokumen administrasi digunakan untuk
-                    verifikasi, bukan sebagai jaminan.
-                  </p>
-                  <p>
-                    Total, tenor, angsuran, dan waktu mulai pembayaran akan dikonfirmasi sebelum
-                    penandatanganan. Jika COE tidak terbit atau pengajuan dihentikan, perhitungan
-                    dilakukan berdasarkan ketentuan akad final dan biaya aktual yang dapat
-                    dibuktikan; aplikasi ini tidak menetapkan biaya komitmen otomatis.
-                  </p>
-                  <p>
-                    Contoh akad menyebut total tetap setelah ditandatangani, pelunasan dipercepat
-                    tanpa penalti, dan biaya penagihan hanya berdasarkan biaya aktual yang
-                    dibuktikan. Ketentuan yang berlaku tetap harus tercantum dalam akad final.
-                  </p>
-                  <p>
-                    {form.destination === 'JAPAN'
-                      ? 'Contoh akad memulai angsuran pada bulan pertama setelah keberangkatan; tanggal dan jadwal final tetap dicantumkan dalam akad yang disepakati.'
-                      : 'Jadwal pembayaran untuk negara tujuan ini akan ditetapkan dalam akad final.'}
-                  </p>
-                  <div className="border-t border-slate-200 pt-3">
-                    <strong>Kebutuhan yang diajukan</strong>
-                    <p className="mt-1">
-                      {form.selectedNeeds.length
-                        ? FULL_COVER_NEEDS.filter(([value]) => form.selectedNeeds.includes(value))
-                            .map(([, label]) => label)
-                            .join(', ')
-                        : 'Belum dipilih'}
-                    </p>
-                    <p className="mt-1">
-                      Durasi pelatihan: bahasa {form.languageTrainingMonths || '—'} bulan,
-                      keterampilan {form.skillTrainingMonths || '—'} bulan.
-                    </p>
-                  </div>
-                </div>
-              )}
               <div className="review-list compact-review-list">
                 <div>
                   <span>Nama</span>
@@ -1575,14 +1563,15 @@ export default function HomePage() {
                 <div>
                   <span>Rekening pribadi</span>
                   <strong>
-                    {form.personalBankName} · {form.personalBankAccountNumber} ·{' '}
-                    {form.personalBankAccountName}
+                    {form.personalBankName ?? ''} · {form.personalBankAccountNumber ?? ''} ·{' '}
+                    {form.personalBankAccountName ?? ''}
                   </strong>
                 </div>
                 <div>
                   <span>Rekening LPK</span>
                   <strong>
-                    {form.lpkBankName} · {form.lpkBankAccountNumber} · {form.lpkBankAccountName}
+                    {form.lpkBankName ?? ''} · {form.lpkBankAccountNumber ?? ''} ·{' '}
+                    {form.lpkBankAccountName ?? ''}
                   </strong>
                 </div>
                 <div>
@@ -1597,13 +1586,6 @@ export default function HomePage() {
                         {form.fullCoverInvoiceAmount
                           ? formatRupiah(Number(form.fullCoverInvoiceAmount))
                           : 'Belum diisi'}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Durasi pelatihan</span>
-                      <strong>
-                        Bahasa {form.languageTrainingMonths || '—'} bulan · Keterampilan{' '}
-                        {form.skillTrainingMonths || '—'} bulan
                       </strong>
                     </div>
                   </>
@@ -1658,7 +1640,75 @@ export default function HomePage() {
                     {`${form.birthPlace || 'Belum diisi'}${form.birthDate ? `, ${form.birthDate}` : ''}`}
                   </strong>
                 </div>
+                {!isDeparture && (
+                  <div className="review-needs-list">
+                    <span>Kebutuhan yang diajukan</span>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[11px] leading-4 text-slate-700">
+                      {FULL_COVER_NEEDS.filter(([value]) => form.selectedNeeds.includes(value)).map(
+                        ([value, label]) => (
+                          <li key={value}>{label}</li>
+                        ),
+                      )}
+                    </ul>
+                  </div>
+                )}
               </div>
+              {!isDeparture && (
+                <div className="soft-note mt-3 space-y-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Rincian biaya Full Cover</h3>
+                    <p className="mt-1">
+                      Tim VentureGo akan mengisi dan memverifikasi nilainya sebelum akad disepakati.
+                    </p>
+                  </div>
+                  <div className="border-t border-slate-200 pt-3">
+                    <h4 className="text-xs font-bold text-slate-800">Komponen akad</h4>
+                    <ul className="mt-2 space-y-2">
+                      <li>
+                        <strong>Nafaqah</strong> — biaya nyata untuk kebutuhan yang disetujui,
+                        didukung bukti pengeluaran.
+                      </li>
+                      <li>
+                        <strong>Ujrah</strong> — imbalan jasa yang besar dan cara pembayarannya
+                        dicantumkan dalam akad.
+                      </li>
+                      <li>
+                        <strong>Ju&apos;alah</strong> — untuk Jepang berlaku jika COE atas nama Anda
+                        terbit; negara lain perlu dikonfirmasi dalam akad final.
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="border-t border-slate-200 pt-3">
+                    <h4 className="text-xs font-bold text-slate-800">Pengelolaan dana</h4>
+                    <p className="mt-1">
+                      VentureGo bertindak sebagai wakil terbatas untuk kebutuhan yang disetujui.
+                      Dokumen administrasi digunakan untuk verifikasi, bukan sebagai jaminan.
+                    </p>
+                  </div>
+                  <div className="border-t border-slate-200 pt-3">
+                    <h4 className="text-xs font-bold text-slate-800">
+                      Pembayaran dan perlindungan
+                    </h4>
+                    <ul className="mt-2 space-y-2">
+                      <li>
+                        Total, tenor, angsuran, dan waktu mulai pembayaran ditetapkan dalam akad
+                        final. Untuk Jepang, contoh jadwal dimulai pada bulan setelah keberangkatan;
+                        tanggal pastinya mengikuti akad.
+                      </li>
+                      <li>
+                        Jika COE tidak terbit atau pengajuan dihentikan, perhitungan mengikuti akad
+                        final dan biaya aktual yang dapat dibuktikan. Tidak ada biaya komitmen
+                        otomatis.
+                      </li>
+                      <li>
+                        Contoh akad mencantumkan total tetap setelah ditandatangani, pelunasan
+                        dipercepat tanpa penalti, dan biaya penagihan sebatas biaya aktual yang
+                        terbukti. Ketentuan yang berlaku harus tertulis dalam akad final.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
               {isDeparture && (
                 <div className="soft-note review-simulation-note">
                   Nilai dana cair, total Ujrah, total kewajiban, dan angsuran di atas hanya
@@ -1716,7 +1766,16 @@ export default function HomePage() {
                 Kembali
               </Link>
             ) : (
-              <button className="back-button" onClick={() => setStep(step - 1)} type="button">
+              <button
+                className="back-button"
+                onClick={() => {
+                  setStepError('')
+                  setStep3Error('')
+                  setResult({})
+                  setStep(step - 1)
+                }}
+                type="button"
+              >
                 Kembali
               </button>
             )}
@@ -1727,12 +1786,12 @@ export default function HomePage() {
                 setStepError('')
                 if (step === 6) {
                   if (
-                    !form.personalBankName.trim() ||
-                    !form.personalBankAccountName.trim() ||
-                    !/^\d{6,30}$/.test(form.personalBankAccountNumber) ||
-                    !form.lpkBankName.trim() ||
-                    !form.lpkBankAccountName.trim() ||
-                    !/^\d{6,30}$/.test(form.lpkBankAccountNumber)
+                    !form.personalBankName?.trim() ||
+                    !form.personalBankAccountName?.trim() ||
+                    !/^\d{6,30}$/.test(form.personalBankAccountNumber ?? '') ||
+                    !form.lpkBankName?.trim() ||
+                    !form.lpkBankAccountName?.trim() ||
+                    !/^\d{6,30}$/.test(form.lpkBankAccountNumber ?? '')
                   ) {
                     setStepError('Lengkapi kembali informasi rekening pribadi dan LPK.')
                     setStep(5)
@@ -1821,10 +1880,10 @@ export default function HomePage() {
                 }
                 if (step === 5) {
                   const missing = [
-                    ['nama bank pribadi', form.personalBankName.trim()],
-                    ['nama pemilik rekening pribadi', form.personalBankAccountName.trim()],
-                    ['nama bank LPK', form.lpkBankName.trim()],
-                    ['nama pemilik rekening LPK', form.lpkBankAccountName.trim()],
+                    ['nama bank pribadi', form.personalBankName?.trim() ?? ''],
+                    ['nama pemilik rekening pribadi', form.personalBankAccountName?.trim() ?? ''],
+                    ['nama bank LPK', form.lpkBankName?.trim() ?? ''],
+                    ['nama pemilik rekening LPK', form.lpkBankAccountName?.trim() ?? ''],
                   ]
                     .filter(([, value]) => !value)
                     .map(([label]) => label)
@@ -1832,11 +1891,11 @@ export default function HomePage() {
                     setStepError(`Lengkapi ${missing.join(', ')}.`)
                     return
                   }
-                  if (!/^\d{6,30}$/.test(form.personalBankAccountNumber)) {
+                  if (!/^\d{6,30}$/.test(form.personalBankAccountNumber ?? '')) {
                     setStepError('Nomor rekening pribadi harus terdiri dari 6 sampai 30 digit.')
                     return
                   }
-                  if (!/^\d{6,30}$/.test(form.lpkBankAccountNumber)) {
+                  if (!/^\d{6,30}$/.test(form.lpkBankAccountNumber ?? '')) {
                     setStepError('Nomor rekening LPK harus terdiri dari 6 sampai 30 digit.')
                     return
                   }
@@ -1850,8 +1909,17 @@ export default function HomePage() {
           </footer>
         )}
       </section>
-      {(pendingSignIn !== '' || redirecting) && (
-        <RocketLoader message={redirecting ? 'Menyiapkan akunmu…' : 'Menghubungkan ke Google…'} />
+      {(pendingSignIn !== '' || redirecting || isPending) && (
+        <RocketLoader
+          className={isPending ? 'rocket-loader--submission' : ''}
+          message={
+            redirecting
+              ? 'Menyiapkan akunmu…'
+              : isPending
+                ? 'Mengirim pengajuan… Mohon tunggu.'
+                : 'Menghubungkan ke Google…'
+          }
+        />
       )}
     </main>
   )

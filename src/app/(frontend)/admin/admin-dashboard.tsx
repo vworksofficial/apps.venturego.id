@@ -293,110 +293,6 @@ const DETAIL_TABS: { id: DetailTabId; label: string }[] = [
   { id: 'program-history', label: 'Riwayat Program' },
 ]
 
-function TabIcon({ id }: { id: DetailTabId }) {
-  switch (id) {
-    case 'profile':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" strokeLinecap="round" />
-        </svg>
-      )
-    case 'nominal':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <rect height="14" rx="2" width="20" x="2" y="5" />
-          <circle cx="12" cy="12" r="2.5" />
-          <path d="M6 9h.01M18 15h.01" strokeLinecap="round" />
-        </svg>
-      )
-    case 'documents':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <path d="M14 2v6h6M8 13h8M8 17h5" strokeLinecap="round" />
-        </svg>
-      )
-    case 'pricing':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <rect height="16" rx="2" width="18" x="3" y="4" />
-          <path d="M7 8h10M7 12h4M13 12h4M7 16h4M13 16h4" strokeLinecap="round" />
-        </svg>
-      )
-    case 'contract':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="12" r="9" />
-        </svg>
-      )
-    case 'installment-history':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="12" r="9" />
-        </svg>
-      )
-    case 'program-history':
-      return (
-        <svg
-          aria-hidden="true"
-          className="size-3 shrink-0"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          viewBox="0 0 24 24"
-        >
-          <rect height="16" rx="2" width="18" x="3" y="4" />
-          <path d="M3 10h18M8 4v16M3 14h18" strokeLinecap="round" />
-        </svg>
-      )
-  }
-}
-
 function formatDisplayApplicationId(id: string): string {
   if (!id) return ''
   if (id.startsWith('VSV-LGC-')) {
@@ -1395,7 +1291,7 @@ function ApplicationDrawerForm({
           className="flex items-center gap-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100 p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
         >
-          {DETAIL_TABS.map((tab) => {
+          {DETAIL_TABS.map((tab, index) => {
             const isActive = activeTab === tab.id
             let badge = ''
             if (tab.id === 'documents') badge = `${uploadedCount}/${application.documents.length}`
@@ -1413,7 +1309,14 @@ function ApplicationDrawerForm({
                 role="tab"
                 type="button"
               >
-                <TabIcon id={tab.id} />
+                <span
+                  aria-hidden="true"
+                  className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {index + 1}
+                </span>
                 <span className="text-xs leading-none">
                   {application.product === 'FULL_COVER' && tab.id === 'nominal' ? (
                     <em>Budgeting</em>
@@ -3855,9 +3758,9 @@ function ApplicationDrawerForm({
 
       {/* Slide-over preview berkas dokumen */}
       {previewIndex !== null && previewDocument && (
-        <div className="fixed inset-0 z-[60] flex justify-end bg-slate-900/50">
-          <div className="flex h-dvh w-full max-w-5xl flex-col bg-white shadow-2xl">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-[60] flex justify-end overflow-hidden bg-slate-900/50">
+          <div className="flex h-dvh min-h-0 w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl">
+            <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
                 <h3 className="text-sm font-bold text-slate-900">{previewDocument.documentType}</h3>
                 <p className="mt-0.5 truncate text-[11px] text-slate-500">
@@ -3905,7 +3808,7 @@ function ApplicationDrawerForm({
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto bg-slate-100 p-4">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-slate-100 p-4">
               {previewIsPdf ? (
                 <iframe
                   className="h-full min-h-[60vh] w-full rounded-lg border border-slate-200 bg-white"
@@ -3939,7 +3842,7 @@ function ApplicationDrawerForm({
       {/* Slide-over pratinjau dokumen akad */}
       {akadPreviewOpen && (
         <div
-          className="fixed inset-0 z-[60] flex justify-end bg-slate-950/55 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex justify-end overflow-hidden bg-slate-950/55"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setAkadPreviewOpen(false)
           }}
@@ -3951,8 +3854,8 @@ function ApplicationDrawerForm({
             onMouseDown={(event) => event.stopPropagation()}
             role="dialog"
           >
-            <header className="relative overflow-hidden bg-gradient-to-br from-[#0b57d0] via-[#0b57d0] to-[#0842a0] px-5 pb-4 pt-5 text-white sm:px-7 sm:pb-5 sm:pt-6">
-              <div className="absolute -right-16 -top-24 size-64 rounded-full bg-white/10 blur-3xl" />
+            <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-[#0b57d0] via-[#0b57d0] to-[#0842a0] px-5 pb-4 pt-5 text-white sm:px-7 sm:pb-5 sm:pt-6">
+              <div className="absolute -right-16 -top-24 size-64 rounded-full bg-white/10 blur-xl" />
               <div className="relative flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -4000,7 +3903,7 @@ function ApplicationDrawerForm({
                 </div>
               </div>
             </header>
-            <div className="flex-1 overflow-auto bg-slate-100 p-4 sm:p-6">
+              <div className="min-h-0 flex-1 overflow-auto overscroll-contain bg-slate-100 p-4 sm:p-6">
               {akadPdfError && (
                 <p
                   className="mx-auto mb-3 max-w-4xl rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
@@ -4073,7 +3976,7 @@ function ApplicationDrawerForm({
       {/* Slide-over khusus: Setujui dengan Nominal Baru */}
       {showNominalInput && (pricingStatus === 'ESTIMATED' || pricingStatus === 'VERIFIED') && (
         <div
-          className="fixed inset-0 z-[60] flex justify-end bg-slate-950/55 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex justify-end overflow-hidden bg-slate-950/55"
           onClick={(event) => {
             if (event.target === event.currentTarget && !pending) {
               setShowNominalInput(false)
@@ -4088,8 +3991,8 @@ function ApplicationDrawerForm({
             onClick={(event) => event.stopPropagation()}
             role="dialog"
           >
-            <header className="relative overflow-hidden bg-gradient-to-br from-[#0b57d0] to-[#0842a0] px-6 pb-5 pt-6 text-white">
-              <div className="absolute -right-10 -top-14 size-44 rounded-full bg-white/10 blur-2xl" />
+            <header className="relative shrink-0 overflow-hidden bg-gradient-to-br from-[#0b57d0] to-[#0842a0] px-6 pb-5 pt-6 text-white">
+              <div className="absolute -right-10 -top-14 size-44 rounded-full bg-white/10 blur-xl" />
               <div className="relative flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <h3 className="text-base font-bold tracking-tight" id="new-nominal-title">
@@ -4126,7 +4029,7 @@ function ApplicationDrawerForm({
               </p>
             </header>
 
-            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-xs">
                   <span className="text-[11px] font-medium text-slate-500">

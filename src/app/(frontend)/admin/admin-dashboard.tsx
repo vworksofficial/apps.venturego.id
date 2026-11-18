@@ -1006,6 +1006,8 @@ function ApplicationDrawerForm({
   const [akadPreviewHtml, setAkadPreviewHtml] = useState<string | null>(null)
   const [akadPreviewLoading, setAkadPreviewLoading] = useState(false)
   const [akadPreviewError, setAkadPreviewError] = useState('')
+  const [akadPdfSaving, setAkadPdfSaving] = useState(false)
+  const [akadPdfError, setAkadPdfError] = useState('')
   const akadPreviewFrameRef = useRef<HTMLIFrameElement>(null)
 
   const router = useRouter()
@@ -1100,21 +1102,64 @@ function ApplicationDrawerForm({
   } | null
   const akadIssued = Boolean(akadMeta)
 
-  const printAkadPreview = () => {
+  const downloadAkadPreviewPdf = async () => {
     const frame = akadPreviewFrameRef.current
-    const printWindow = frame?.contentWindow
-    if (!frame || !printWindow || !akadPreviewHtml) return
+    const previewDocument = frame?.contentDocument
+    if (!previewDocument || !akadPreviewHtml || akadPdfSaving) return
 
     const programLabel =
       application.product === 'FULL_COVER'
         ? "Program Full Cover - Wakalah bil Ujrah + Ju'alah"
         : 'Program Dana Keberangkatan - Wakalah bil Ujrah'
-    const safeApplicantName = application.applicantName.replace(/[\\/:*?"<>|]/g, '-').trim()
-    const documentTitle = `Draft Akad VSV - ${safeApplicantName} (${programLabel})`
+    const safeApplicantName = application.applicantName
+      .replace(/[\\/:*?"<>|]/g, '-')
+      .trim()
+      .replace(/[. ]+$/, '')
+    const fileName = `Draft Akad VSV - ${safeApplicantName} (${programLabel}).pdf`
 
-    if (frame.contentDocument) frame.contentDocument.title = documentTitle
-    printWindow.focus()
-    printWindow.print()
+    setAkadPdfSaving(true)
+    setAkadPdfError('')
+    try {
+      await previewDocument.fonts?.ready
+      const pages = Array.from(previewDocument.querySelectorAll<HTMLElement>('.a4-page'))
+      if (!pages.length) throw new Error('Halaman akad belum siap untuk dijadikan PDF.')
+
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4', compress: true })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+
+      for (const [index, page] of pages.entries()) {
+        const previousShadow = page.style.boxShadow
+        page.style.boxShadow = 'none'
+        try {
+          const canvas = await html2canvas(page, {
+            backgroundColor: '#ffffff',
+            imageTimeout: 15000,
+            logging: false,
+            scale: 2,
+            useCORS: true,
+          })
+          if (index > 0) pdf.addPage('a4', 'portrait')
+          pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, pageWidth, pageHeight)
+          canvas.width = 0
+          canvas.height = 0
+        } finally {
+          page.style.boxShadow = previousShadow
+        }
+      }
+
+      pdf.save(fileName)
+    } catch (error) {
+      setAkadPdfError(
+        error instanceof Error ? error.message : 'PDF belum dapat dibuat. Silakan coba lagi.',
+      )
+    } finally {
+      setAkadPdfSaving(false)
+    }
   }
   const akadGateOpen = pricingStatus === 'VERIFIED' || pricingStatus === 'AGREED' || akadIssued
 
@@ -3932,11 +3977,11 @@ function ApplicationDrawerForm({
                 <div className="relative flex shrink-0 flex-wrap items-center gap-2">
                   <button
                     className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!akadPreviewHtml || akadPreviewLoading}
-                    onClick={printAkadPreview}
+                    disabled={!akadPreviewHtml || akadPreviewLoading || akadPdfSaving}
+                    onClick={downloadAkadPreviewPdf}
                     type="button"
                   >
-                    Simpan PDF
+                    {akadPdfSaving ? 'Menyiapkan PDF…' : 'Unduh PDF'}
                   </button>
                   {!akadIssued && (
                     <button
@@ -3960,6 +4005,14 @@ function ApplicationDrawerForm({
               </div>
             </header>
             <div className="flex-1 overflow-auto bg-slate-100 p-4 sm:p-6">
+              {akadPdfError && (
+                <p
+                  className="mx-auto mb-3 max-w-4xl rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+                  role="alert"
+                >
+                  {akadPdfError}
+                </p>
+              )}
               {akadPreviewLoading && (
                 <div
                   aria-live="polite"

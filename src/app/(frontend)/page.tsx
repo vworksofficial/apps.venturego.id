@@ -449,6 +449,7 @@ export default function HomePage() {
     }
     preloadGoogleSignIn()?.catch(() => {})
     const params = new URLSearchParams(window.location.search)
+    const requestedProduct = params.get('product')
     const requestedStep = Number(params.get('step'))
     const returnToLogin = params.get('login') === 'true'
     const hasFormIntent =
@@ -456,6 +457,15 @@ export default function HomePage() {
       params.has('step') ||
       params.get('apply') === 'true' ||
       params.get('baru') === 'true'
+    if (requestedProduct === 'FULL_COVER' || requestedProduct === 'DEPARTURE_BRIDGING') {
+      setForm((current) => ({
+        ...current,
+        product: requestedProduct,
+        ...(requestedProduct === 'DEPARTURE_BRIDGING'
+          ? { financingAmount: String(getFinancingOptions(current.destination)[0].amount) }
+          : {}),
+      }))
+    }
     if (returnToLogin) {
       setStep(0)
       try {

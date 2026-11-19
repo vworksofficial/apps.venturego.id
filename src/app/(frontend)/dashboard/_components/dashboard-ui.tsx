@@ -200,7 +200,7 @@ const navigation: {
   icon: DashboardIconName
 }[] = [
   { key: 'angsuran', href: '/dashboard/angsuran', label: 'Angsuran', icon: 'wallet' },
-  { key: 'riwayat', href: '/dashboard/riwayat', label: 'Riwayat', icon: 'history' },
+  { key: 'riwayat', href: '/dashboard/riwayat', label: 'Aktivitas', icon: 'history' },
   { key: 'home', href: '/dashboard', label: 'Beranda', icon: 'home' },
   { key: 'berkas', href: '/dashboard/unggah-berkas', label: 'Unggah', icon: 'upload' },
   { key: 'profil', href: '/dashboard/profil', label: 'Profil', icon: 'profile' },

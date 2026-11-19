@@ -73,22 +73,30 @@ export default function SimulationPage() {
           ['Total ujrah', formatRupiah(plan.ujrahTotal)],
           ['Total kewajiban', formatRupiah(plan.totalObligation)],
           ['Tenor', `${plan.tenorMonths} bulan`],
-          ['Angsuran terakhir', formatRupiah(plan.finalInstallment)],
+          ['Angsuran per bulan', formatRupiah(plan.monthlyInstallment)],
         ].map(([label, value]) => (
           <div
-            className={`flex items-center justify-between border-b border-slate-200/80 py-3 text-xs ${
+            className={`border-b border-slate-200/80 py-3 text-xs ${
               label === 'Total kewajiban' ? 'font-bold text-slate-900' : ''
             }`}
             key={label}
           >
-            <span className={label === 'Total kewajiban' ? 'text-slate-900' : 'text-slate-500'}>
-              {label}
-            </span>
-            <strong
-              className={label === 'Total kewajiban' ? 'text-[var(--primary)]' : 'text-slate-800'}
-            >
-              {value}
-            </strong>
+            <div className="flex items-center justify-between gap-4">
+              <span className={label === 'Total kewajiban' ? 'text-slate-900' : 'text-slate-500'}>
+                {label}
+              </span>
+              <strong
+                className={label === 'Total kewajiban' ? 'text-[var(--primary)]' : 'text-slate-800'}
+              >
+                {value}
+              </strong>
+            </div>
+            {label === 'Angsuran per bulan' && (
+              <p className="mt-1.5 text-[10px] font-normal leading-4 text-slate-500">
+                Angsuran mulai dibayar setelah Anda menerima gaji pertama dari pekerjaan di negara
+                tujuan.
+              </p>
+            )}
           </div>
         ))}
       </section>

@@ -9,12 +9,7 @@ import {
   type ApplicantProfileInput,
   type UserApplicationDetail,
 } from '../../actions'
-import {
-  DashboardCard,
-  DashboardIcon,
-  DashboardScaffold,
-  SkeletonBlock,
-} from '../../_components/dashboard-ui'
+import { DashboardIcon, DashboardScaffold, SkeletonBlock } from '../../_components/dashboard-ui'
 
 const RELIGION_LABELS: Record<ApplicantProfileInput['religion'], string> = {
   ISLAM: 'Islam',
@@ -225,54 +220,35 @@ export default function PersonalDataPage() {
 
       <section aria-label="Data diri">
         {profileLoading ? (
-          <DashboardCard>
-            <div
-              aria-label="Memuat data diri"
-              className="grid grid-cols-2 gap-px bg-slate-100"
-              role="status"
-            >
-              <span className="sr-only">Memuat data diri…</span>
-              <div className="space-y-2 bg-white p-4">
-                <SkeletonBlock className="h-2.5 w-20" />
-                <SkeletonBlock className="h-3.5 w-28" />
+          <div aria-label="Memuat data diri" className="divide-y divide-slate-200" role="status">
+            <span className="sr-only">Memuat data diri…</span>
+            {Array.from({ length: 7 }, (_, index) => (
+              <div className="space-y-2 py-4" key={index}>
+                <SkeletonBlock className="h-2.5 w-28" />
+                <SkeletonBlock className={index > 3 ? 'h-3.5 w-4/5' : 'h-3.5 w-2/5'} />
               </div>
-              <div className="space-y-2 bg-white p-4">
-                <SkeletonBlock className="h-2.5 w-20" />
-                <SkeletonBlock className="h-3.5 w-32" />
-              </div>
-              <div className="space-y-2 bg-white p-4">
-                <SkeletonBlock className="h-2.5 w-24" />
-                <SkeletonBlock className="h-3.5 w-28" />
-              </div>
-              <div className="col-span-2 space-y-2 bg-white p-4">
-                <SkeletonBlock className="h-2.5 w-32" />
-                <SkeletonBlock className="h-3.5 w-full" />
-                <SkeletonBlock className="h-3.5 w-4/5" />
-              </div>
-            </div>
-          </DashboardCard>
+            ))}
+          </div>
         ) : !selectedApplication ? (
-          <DashboardCard className="p-5">
-            <div className="flex items-start gap-3">
-              <DashboardIcon className="size-5 shrink-0 text-[var(--primary)]" name="info" />
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">Belum ada data pengajuan</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Data diri akan tampil setelah Anda mengirim formulir pengajuan.
-                </p>
-                <a
-                  className="mt-3 inline-flex text-xs font-bold text-[var(--primary)] underline"
-                  href="/?step=1"
-                >
-                  Mulai pengajuan
-                </a>
-              </div>
+          <div className="flex items-start gap-3 py-4">
+            <DashboardIcon className="size-5 shrink-0 text-[var(--primary)]" name="info" />
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Belum ada data pengajuan</h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Data diri akan tampil setelah Anda mengirim formulir pengajuan.
+              </p>
+              <a
+                className="mt-3 inline-flex text-xs font-bold text-[var(--primary)] underline"
+                href="/?step=1"
+              >
+                Mulai pengajuan
+              </a>
             </div>
-          </DashboardCard>
+          </div>
         ) : (
-          <DashboardCard>
+          <div>
             {lockedPersonalData && (
-              <div className="flex items-start gap-2.5 border-b border-amber-100 bg-amber-50 p-4 text-xs leading-5 text-amber-900">
+              <div className="mb-3 flex items-start gap-2.5 border-l-2 border-amber-400 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900">
                 <DashboardIcon className="mt-0.5 size-4 shrink-0" name="lock" />
                 <p>
                   Data dikunci setelah akad disepakati atau pembiayaan aktif agar tetap sesuai
@@ -282,35 +258,42 @@ export default function PersonalDataPage() {
             )}
             {!editing ? (
               <>
-                <dl className="grid grid-cols-2 gap-px bg-slate-100 text-xs">
-                  <div className="bg-white p-4">
-                    <dt className="text-slate-400">Nama lengkap</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">
+                <dl className="divide-y divide-slate-200 text-xs">
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Nama lengkap</dt>
+                    <dd className="min-w-0 break-words font-semibold text-slate-800">
                       {selectedApplication.applicantName}
                     </dd>
                   </div>
-                  <div className="bg-white p-4">
-                    <dt className="text-slate-400">Nomor WhatsApp</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Nomor WhatsApp</dt>
+                    <dd className="min-w-0 break-words font-semibold text-slate-800">
                       {selectedApplication.phone || '—'}
                     </dd>
                   </div>
-                  <div className="bg-white p-4">
-                    <dt className="text-slate-400">Tempat, tanggal lahir</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Tempat lahir</dt>
+                    <dd className="min-w-0 break-words font-semibold text-slate-800">
                       {selectedApplication.personalDetails.birthPlace || '—'}
-                      {selectedApplication.personalDetails.birthDate
-                        ? `, ${selectedApplication.personalDetails.birthDate}`
-                        : ''}
                     </dd>
                   </div>
-                  <div className="bg-white p-4">
-                    <dt className="text-slate-400">Jenis kelamin & agama</dt>
-                    <dd className="mt-1 font-semibold text-slate-800">
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Tanggal lahir</dt>
+                    <dd className="min-w-0 break-words font-semibold text-slate-800">
+                      {selectedApplication.personalDetails.birthDate || '—'}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Jenis kelamin</dt>
+                    <dd className="min-w-0 break-words font-semibold text-slate-800">
                       {selectedApplication.personalDetails.gender === 'FEMALE'
                         ? 'Perempuan'
                         : 'Laki-laki'}
-                      {' · '}
+                    </dd>
+                  </div>
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Agama</dt>
+                    <dd className="min-w-0 break-words font-semibold text-slate-800">
                       {RELIGION_LABELS[
                         selectedApplication.personalDetails
                           .religion as ApplicantProfileInput['religion']
@@ -318,15 +301,15 @@ export default function PersonalDataPage() {
                         (selectedApplication.personalDetails.religion || '—')}
                     </dd>
                   </div>
-                  <div className="col-span-2 bg-white p-4">
-                    <dt className="text-slate-400">Alamat sesuai KTP</dt>
-                    <dd className="mt-1 font-semibold leading-5 text-slate-800">
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Alamat sesuai KTP</dt>
+                    <dd className="min-w-0 break-words font-semibold leading-5 text-slate-800">
                       {selectedApplication.personalDetails.idCardAddress || '—'}
                     </dd>
                   </div>
-                  <div className="col-span-2 bg-white p-4">
-                    <dt className="text-slate-400">Alamat korespondensi</dt>
-                    <dd className="mt-1 font-semibold leading-5 text-slate-800">
+                  <div className="grid grid-cols-[minmax(6.5rem,0.8fr)_minmax(0,1.2fr)] gap-3 py-3.5">
+                    <dt className="text-slate-500">Alamat korespondensi</dt>
+                    <dd className="min-w-0 break-words font-semibold leading-5 text-slate-800">
                       {selectedApplication.personalDetails.domicileAddress || '—'}
                       {selectedApplication.personalDetails.domicilePostalCode
                         ? ` (${selectedApplication.personalDetails.domicilePostalCode})`
@@ -335,25 +318,23 @@ export default function PersonalDataPage() {
                   </div>
                 </dl>
                 {lockedPersonalData ? null : (
-                  <div className="p-4">
-                    <button
-                      className="w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-bold text-[var(--primary)] transition hover:bg-blue-100"
-                      onClick={() => {
-                        fillForm(selectedApplication)
-                        setEditing(true)
-                        setError('')
-                      }}
-                      type="button"
-                    >
-                      Ubah Data Diri
-                    </button>
-                  </div>
+                  <button
+                    className="mt-4 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-bold text-[var(--primary)] transition hover:bg-blue-100"
+                    onClick={() => {
+                      fillForm(selectedApplication)
+                      setEditing(true)
+                      setError('')
+                    }}
+                    type="button"
+                  >
+                    Ubah Data Diri
+                  </button>
                 )}
               </>
             ) : (
-              <form className="space-y-4 p-4" onSubmit={saveProfile}>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="col-span-2 space-y-1.5 text-xs font-semibold text-slate-600">
+              <form className="space-y-4" onSubmit={saveProfile}>
+                <div className="space-y-4">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Nama lengkap
                     <input
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -363,7 +344,7 @@ export default function PersonalDataPage() {
                       value={profileForm.applicantName}
                     />
                   </label>
-                  <label className="col-span-2 space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Nomor WhatsApp
                     <input
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -374,7 +355,7 @@ export default function PersonalDataPage() {
                       value={profileForm.phone}
                     />
                   </label>
-                  <label className="space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Tempat lahir
                     <input
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -384,7 +365,7 @@ export default function PersonalDataPage() {
                       value={profileForm.birthPlace}
                     />
                   </label>
-                  <label className="space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Tanggal lahir
                     <input
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -394,7 +375,7 @@ export default function PersonalDataPage() {
                       value={profileForm.birthDate}
                     />
                   </label>
-                  <label className="space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Jenis kelamin
                     <select
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -407,7 +388,7 @@ export default function PersonalDataPage() {
                       <option value="FEMALE">Perempuan</option>
                     </select>
                   </label>
-                  <label className="space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Agama
                     <select
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -426,7 +407,7 @@ export default function PersonalDataPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="col-span-2 space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Alamat sesuai KTP
                     <textarea
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -437,7 +418,7 @@ export default function PersonalDataPage() {
                       value={profileForm.idCardAddress}
                     />
                   </label>
-                  <label className="col-span-2 flex items-center gap-2 text-xs font-medium text-slate-700">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-700">
                     <input
                       checked={profileForm.domicileSameAsIdCard}
                       onChange={(event) =>
@@ -448,7 +429,7 @@ export default function PersonalDataPage() {
                     Alamat korespondensi sama dengan alamat KTP
                   </label>
                   {!profileForm.domicileSameAsIdCard && (
-                    <label className="col-span-2 space-y-1.5 text-xs font-semibold text-slate-600">
+                    <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                       Alamat korespondensi
                       <textarea
                         className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -460,7 +441,7 @@ export default function PersonalDataPage() {
                       />
                     </label>
                   )}
-                  <label className="col-span-2 space-y-1.5 text-xs font-semibold text-slate-600">
+                  <label className="block space-y-1.5 text-xs font-semibold text-slate-600">
                     Kode pos korespondensi
                     <input
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal text-slate-800"
@@ -498,7 +479,7 @@ export default function PersonalDataPage() {
                 </div>
               </form>
             )}
-          </DashboardCard>
+          </div>
         )}
       </section>
     </DashboardScaffold>

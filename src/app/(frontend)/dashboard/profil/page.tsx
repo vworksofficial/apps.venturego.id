@@ -23,16 +23,22 @@ const PROFILE_MENU: { href: string; label: string; detail: string; icon: Dashboa
     icon: 'profile',
   },
   {
-    href: '/dashboard/profil/dokumen',
-    label: 'Dokumen Saya',
-    detail: 'PDF Akad Wakalah bil Ujrah',
-    icon: 'document',
+    href: '/dashboard/profil/kartu',
+    label: 'Kartu Identitas Siswa',
+    detail: 'Kartu ringkas NIS untuk dicetak',
+    icon: 'card',
   },
   {
     href: '/dashboard/profil/akad',
     label: 'Akad Wakalah bil Ujrah',
     detail: 'Penjelasan skema dan istilah akad',
     icon: 'receipt',
+  },
+  {
+    href: '/dashboard/profil/dokumen',
+    label: 'Dokumen Saya',
+    detail: 'PDF Akad Wakalah bil Ujrah',
+    icon: 'document',
   },
   {
     href: '/dashboard/profil/keamanan',
@@ -45,12 +51,6 @@ const PROFILE_MENU: { href: string; label: string; detail: string; icon: Dashboa
     label: 'Kebijakan & Persetujuan',
     detail: 'Salinan persetujuan dan kebijakan data',
     icon: 'check',
-  },
-  {
-    href: '/dashboard/profil/kartu',
-    label: 'Kartu Identitas Siswa',
-    detail: 'Kartu ringkas NIS untuk dicetak',
-    icon: 'card',
   },
   {
     href: '/dashboard/profil/tentang',

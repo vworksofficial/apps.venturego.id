@@ -2993,20 +2993,32 @@ body {
   font-family: var(--welcome-font);
 }
 
+#student-card-back {
+  font-family: var(--welcome-font);
+}
+
 @media print {
   body * {
     visibility: hidden;
   }
-  #student-card,
-  #student-card * {
+  #student-card-print,
+  #student-card-print * {
     visibility: visible;
   }
-  #student-card {
+  #student-card-print {
     position: absolute;
     left: 0;
     top: 0;
+    display: flex;
+    flex-direction: row;
+    gap: 5mm;
+  }
+  #student-card,
+  #student-card-back {
     width: 85.6mm;
     height: 54mm;
+    flex: 0 0 85.6mm;
+    aspect-ratio: auto;
     border-radius: 0;
     box-shadow: none;
     -webkit-print-color-adjust: exact;

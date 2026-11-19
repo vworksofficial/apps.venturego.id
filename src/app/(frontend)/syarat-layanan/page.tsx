@@ -6,16 +6,27 @@ export const metadata: Metadata = {
   description: 'Ketentuan penggunaan aplikasi pengajuan pembiayaan VentureGo VSV.',
 }
 
-export default function TermsOfServicePage() {
+export default async function TermsOfServicePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>
+}) {
+  const params = await searchParams
+  const returnToProfile = params.from === 'profile'
+
   return (
     <LegalPage
+      returnToProfile={returnToProfile}
       title="Syarat Layanan"
       effectiveDate="10 November 2026"
       intro={
         <p>
           Dengan masuk dan memakai aplikasi VentureGo — layanan Vworks Student Venture (VSV) yang
           dikelola PT Vworks Kolaborasi Bersama — Anda menyetujui ketentuan berikut. Bacalah juga{' '}
-          <a className="font-semibold text-[var(--primary)]" href="/kebijakan-privasi">
+          <a
+            className="font-semibold text-[var(--primary)]"
+            href={returnToProfile ? '/kebijakan-privasi?from=profile' : '/kebijakan-privasi'}
+          >
             Kebijakan Privasi
           </a>{' '}
           kami.

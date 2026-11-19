@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 
 export type DashboardIconName =
   | 'arrowLeft'
+  | 'alert'
   | 'bank'
   | 'bell'
   | 'calculator'
@@ -38,6 +39,12 @@ export function DashboardIcon({
   className?: string
 }) {
   const paths: Record<DashboardIconName, ReactNode> = {
+    alert: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v6M12 16h.01" />
+      </>
+    ),
     arrowLeft: <path d="m15 18-6-6 6-6M9 12h11" />,
     bank: (
       <>

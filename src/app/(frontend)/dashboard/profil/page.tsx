@@ -50,12 +50,24 @@ const PROFILE_MENU: { href: string; label: string; detail: string; icon: Dashboa
     href: '/dashboard/profil/persetujuan',
     label: 'Kebijakan & Persetujuan',
     detail: 'Salinan persetujuan dan kebijakan data',
-    icon: 'check',
+    icon: 'alert',
+  },
+  {
+    href: '/kebijakan-privasi?from=profile',
+    label: 'Kebijakan Privasi',
+    detail: 'Cara data pribadi digunakan dan dilindungi',
+    icon: 'shield',
+  },
+  {
+    href: '/syarat-layanan?from=profile',
+    label: 'Syarat Layanan',
+    detail: 'Ketentuan penggunaan layanan VentureGo',
+    icon: 'document',
   },
   {
     href: '/dashboard/profil/tentang',
     label: 'Tentang Aplikasi',
-    detail: 'Identitas, situs, dan kontak',
+    detail: 'Fitur aplikasi dan versi terbaru',
     icon: 'info',
   },
   {

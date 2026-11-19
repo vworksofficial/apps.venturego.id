@@ -1,17 +1,37 @@
-'use client'
-
+import Image from 'next/image'
+import packageInfo from '../../../../../../package.json'
 import { DashboardCard, DashboardIcon, DashboardScaffold } from '../../_components/dashboard-ui'
 
-const ABOUT_ROWS: { label: string; value: string; href?: string }[] = [
-  { label: 'Nama', value: 'VSV — Vworks Student Venture' },
-  { label: 'Situs', value: 'venturego.id', href: 'https://venturego.id' },
+const FEATURES = [
   {
-    label: 'Email layanan',
-    value: 'vworksofficial@gmail.com',
-    href: 'mailto:vworksofficial@gmail.com',
+    icon: 'card' as const,
+    title: 'Informasi penting dalam satu akun',
+    description:
+      'Lihat ringkasan program, status pengajuan, jadwal angsuran, dan riwayat pembayaran tanpa berpindah-pindah tempat.',
   },
-  { label: 'Skema pembiayaan', value: 'Wakalah bil Ujrah' },
-  { label: 'Basis data', value: 'Database aplikasi' },
+  {
+    icon: 'document' as const,
+    title: 'Dokumen lebih mudah ditemukan',
+    description:
+      'Unggah berkas persyaratan, buka dokumen akad yang sudah tersedia, dan unduh salinannya langsung dari akun Anda.',
+  },
+  {
+    icon: 'calculator' as const,
+    title: 'Simulasi sebelum mengajukan',
+    description:
+      'Lihat perkiraan pembiayaan dan angsuran lebih awal. Nilai simulasi membantu memberi gambaran dan bukan keputusan akad final.',
+  },
+  {
+    icon: 'wallet' as const,
+    title: 'Pembayaran dan catatannya tersambung',
+    description: 'Akses pembayaran angsuran dan periksa kembali catatan pembayaran dari dashboard.',
+  },
+  {
+    icon: 'profile' as const,
+    title: 'Nyaman dibuka lewat ponsel',
+    description:
+      'Tampilan menyesuaikan layar ponsel maupun komputer agar informasi tetap mudah dibaca.',
+  },
 ]
 
 export default function AboutPage() {
@@ -19,50 +39,94 @@ export default function AboutPage() {
     <DashboardScaffold
       active="profil"
       backHref="/dashboard/profil"
-      subtitle="Keterangan aplikasi"
+      subtitle="Keunikan fitur dan versi aplikasi"
       title="Tentang Aplikasi"
     >
-      <DashboardCard className="brand-card p-5 text-white ring-0">
-        <span className="grid size-12 place-items-center rounded-2xl bg-white/15">
-          <DashboardIcon name="star" />
-        </span>
-        <h2 className="mt-4 text-lg font-bold">VSV — Vworks Student Venture</h2>
-        <p className="mt-1.5 text-xs leading-5 text-blue-100">
-          Platform pengajuan dan pemantauan pembiayaan syariah Wakalah bil Ujrah untuk siswa LPK —
-          dari pengajuan, verifikasi berkas, hingga angsuran.
-        </p>
-      </DashboardCard>
+      <section aria-labelledby="about-app-title">
+        <div className="brand-card relative isolate overflow-hidden rounded-3xl p-5 text-white shadow-sm">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-12 -top-16 size-56 rounded-full border border-white/10"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-5 -top-9 size-40 rounded-full border border-white/10"
+          />
+          <div className="relative flex items-center gap-3">
+            <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/12 ring-1 ring-white/15">
+              <Image alt="VentureGo" height={46} src="/venturego-mark.svg" width={48} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold tracking-wide text-white/80">venturego.id</p>
+              <h2 className="text-base font-extrabold tracking-tight" id="about-app-title">
+                Vworks Student Venture
+              </h2>
+            </div>
+          </div>
+          <p className="relative mt-4 max-w-sm text-xs leading-5 text-white/90">
+            Aplikasi VentureGo yang membantu siswa mengelola informasi pembiayaan dengan jelas,
+            praktis, dan dapat dipantau dari satu akun.
+          </p>
+        </div>
+      </section>
 
-      <DashboardCard>
-        <dl className="grid grid-cols-2 gap-px bg-slate-100 text-xs">
-          {ABOUT_ROWS.map((row, index) => (
-            <div
-              className={`bg-white p-4 ${index === ABOUT_ROWS.length - 1 && ABOUT_ROWS.length % 2 === 1 ? 'col-span-2' : ''}`}
-              key={row.label}
-            >
-              <dt className="text-slate-400">{row.label}</dt>
-              <dd className="mt-1 font-semibold text-slate-800">
-                {row.href ? (
-                  <a
-                    className="text-[var(--primary)] underline"
-                    href={row.href}
-                    rel={row.href.startsWith('http') ? 'noreferrer' : undefined}
-                    target={row.href.startsWith('http') ? '_blank' : undefined}
-                  >
-                    {row.value}
-                  </a>
-                ) : (
-                  row.value
-                )}
-              </dd>
+      <section aria-labelledby="about-version-title">
+        <DashboardCard className="relative overflow-hidden border border-blue-100 bg-gradient-to-br from-white via-blue-50/40 to-indigo-50/70 p-4">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-7 -top-10 size-28 rounded-full border border-blue-100/70"
+          />
+          <div className="relative flex items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-[var(--primary)] shadow-sm ring-1 ring-blue-100">
+              <DashboardIcon name="info" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                Versi aplikasi
+              </p>
+              <h2
+                className="mt-0.5 text-2xl font-extrabold leading-7 tracking-tight text-[var(--primary)]"
+                id="about-version-title"
+              >
+                {packageInfo.version}
+              </h2>
+            </div>
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-100">
+              Rilis resmi
+            </span>
+          </div>
+          <p className="relative mt-3 text-[11px] leading-5 text-slate-600">
+            Nomor rilis Vworks Student Venture yang sedang Anda gunakan.
+          </p>
+        </DashboardCard>
+      </section>
+
+      <section aria-labelledby="about-features-title" className="space-y-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900" id="about-features-title">
+            Fitur yang memudahkan Anda
+          </h2>
+          <p className="mt-1 text-[11px] leading-5 text-slate-500">
+            Dirancang agar informasi dan kebutuhan pembiayaan mudah dikelola.
+          </p>
+        </div>
+        <DashboardCard className="divide-y divide-slate-100 px-4">
+          {FEATURES.map((feature) => (
+            <div className="flex items-start gap-3 py-4 first:pt-4 last:pb-4" key={feature.title}>
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-50 text-[var(--primary)]">
+                <DashboardIcon className="size-4" name={feature.icon} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-xs font-bold text-slate-800">{feature.title}</h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{feature.description}</p>
+              </div>
             </div>
           ))}
-        </dl>
-      </DashboardCard>
+        </DashboardCard>
+      </section>
 
-      <p className="text-center text-[10px] leading-4 text-slate-400">
-        © 2026 VentureGo · Vworks Student Venture. Seluruh data pemohon dilindungi kebijakan
-        pemrosesan data.
+      <p className="pb-2 text-center text-[10px] leading-4 text-slate-400">
+        © VentureGo · Vworks Student Venture
       </p>
     </DashboardScaffold>
   )

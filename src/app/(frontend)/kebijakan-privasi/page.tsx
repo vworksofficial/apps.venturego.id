@@ -6,9 +6,17 @@ export const metadata: Metadata = {
   description: 'Cara VentureGo mengumpulkan, memakai, dan melindungi data pribadi pengguna.',
 }
 
-export default function PrivacyPolicyPage() {
+export default async function PrivacyPolicyPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string | string[] }>
+}) {
+  const params = await searchParams
+  const returnToProfile = params.from === 'profile'
+
   return (
     <LegalPage
+      returnToProfile={returnToProfile}
       title="Kebijakan Privasi"
       effectiveDate="18 November 2026"
       intro={

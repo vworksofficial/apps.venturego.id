@@ -39,7 +39,7 @@ export type DashboardSummaryResult =
   | { ok: true; application: DashboardApplication | null; canApply: boolean }
   | { ok: false; message: string }
 
-export type FullCoverProgramStatsResult =
+export type ProgramStatsResult =
   | { ok: true; applicants: number; active: number; completed: number }
   | { ok: false; message: string }
 
@@ -440,16 +440,19 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
   }
 }
 
-export async function getFullCoverProgramStats(
+export async function getProgramStats(
   token: string,
-): Promise<FullCoverProgramStatsResult> {
+  product: DashboardApplication['product'],
+): Promise<ProgramStatsResult> {
   try {
     const identity = await verifyUserIdentity(token)
     if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
+    if (product !== 'FULL_COVER' && product !== 'DEPARTURE_BRIDGING')
+      return { ok: false, message: 'Program tidak dikenal.' }
 
     const snapshot = await getFirebaseFirestore()
       .collection('applications')
-      .where('product', '==', 'FULL_COVER')
+      .where('product', '==', product)
       .select('ownerFirebaseUid', 'status')
       .get()
     const groups = {

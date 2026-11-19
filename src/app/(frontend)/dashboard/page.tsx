@@ -8,7 +8,7 @@ import { SkeletonBlock } from './_components/dashboard-ui'
 import { VaNumber } from './_components/va-number'
 import { WalletCarousel } from './_components/wallet-carousel'
 import { getWalletSummary, type VipSummary } from './vip/actions'
-import { getDashboardSummary, getFullCoverProgramStats, type DashboardApplication } from './actions'
+import { getDashboardSummary, getProgramStats, type DashboardApplication } from './actions'
 
 type IconName =
   | 'bell'
@@ -374,6 +374,7 @@ export default function DashboardPage() {
   const [walletLoading, setWalletLoading] = useState(true)
   const [showProgramInfo, setShowProgramInfo] = useState(false)
   const [programStats, setProgramStats] = useState<{
+    product: DashboardApplication['product']
     applicants: number
     active: number
     completed: number
@@ -453,14 +454,17 @@ export default function DashboardPage() {
   const allDone = Boolean(application?.settled && !closed)
   const openProgramInfo = async () => {
     setShowProgramInfo(true)
-    if (application?.product !== 'FULL_COVER' || programStats || programStatsLoading) return
+    const product = application?.product
+    if (!product || programStats?.product === product || programStatsLoading) return
     const user = getFirebaseClientAuth().currentUser
     if (!user) return
     setProgramStatsLoading(true)
+    setProgramStatsError('')
     try {
-      const result = await getFullCoverProgramStats(await user.getIdToken())
+      const result = await getProgramStats(await user.getIdToken(), product)
       if (result.ok) {
         setProgramStats({
+          product,
           applicants: result.applicants,
           active: result.active,
           completed: result.completed,
@@ -474,6 +478,25 @@ export default function DashboardPage() {
       setProgramStatsLoading(false)
     }
   }
+  const programInfo =
+    application?.product === 'DEPARTURE_BRIDGING'
+      ? {
+          title: 'VSV Dana Keberangkatan',
+          description:
+            'Program pembiayaan tahap akhir yang membantu memenuhi pembayaran LPK, pengurusan dokumen akhir, dan uang saku keberangkatan sesuai hasil verifikasi.',
+          akadBody:
+            'Akad Dana Keberangkatan menggunakan Wakalah bil Ujrah. Biaya riil kebutuhan keberangkatan dibayarkan VentureGo atas persetujuan Anda lalu disalurkan sesuai kebutuhan yang diverifikasi.',
+          statsHeading: 'Perjalanan peserta Dana Keberangkatan',
+        }
+      : {
+          title: 'VSV Full Cover',
+          description:
+            'Program pendampingan pembiayaan persiapan kerja ke Jepang yang membantu memenuhi kebutuhan pendidikan bahasa, pelatihan keterampilan, dokumen keberangkatan, dan uang saku sesuai hasil verifikasi.',
+          akadBody:
+            "Akad Full Cover menggunakan Wakalah bil Ujrah dan Ju'alah. Rincian kebutuhan serta nilai biaya disusun dan diverifikasi tim VentureGo sebelum disampaikan untuk ditinjau dan disepakati dalam akad.",
+          statsHeading: 'Perjalanan peserta Full Cover',
+        }
+  const stats = programStats && programStats.product === application?.product ? programStats : null
   const primaryAmount =
     application?.totalObligation ??
     application?.requestedFinancingAmount ??
@@ -861,19 +884,13 @@ export default function DashboardPage() {
                     : 'Pengajuan Telah Terkirim'}
               </p>
               <div className="mt-2 flex justify-center">
-                {application.product === 'FULL_COVER' ? (
-                  <button
-                    className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                    onClick={openProgramInfo}
-                    type="button"
-                  >
-                    Program {PRODUCT_LABELS[application.product]}
-                  </button>
-                ) : (
-                  <span className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
-                    Program {PRODUCT_LABELS[application.product]}
-                  </span>
-                )}
+                <button
+                  className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  onClick={openProgramInfo}
+                  type="button"
+                >
+                  Program {PRODUCT_LABELS[application.product]}
+                </button>
               </div>
               <p className="mt-1 text-xs leading-5 text-slate-500">
                 {closed
@@ -890,7 +907,7 @@ export default function DashboardPage() {
               </p>
             </section>
           )}
-          {showProgramInfo && application?.product === 'FULL_COVER' && (
+          {showProgramInfo && application && (
             <div
               className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-5"
               onClick={(event) => {
@@ -898,7 +915,7 @@ export default function DashboardPage() {
               }}
             >
               <section
-                aria-labelledby="full-cover-info-title"
+                aria-labelledby="program-info-title"
                 aria-modal="true"
                 className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
                 role="dialog"
@@ -910,9 +927,9 @@ export default function DashboardPage() {
                     </p>
                     <h2
                       className="mt-1 text-lg font-bold tracking-tight text-slate-900"
-                      id="full-cover-info-title"
+                      id="program-info-title"
                     >
-                      VSV Full Cover
+                      {programInfo.title}
                     </h2>
                   </div>
                   <button
@@ -926,28 +943,18 @@ export default function DashboardPage() {
                     </span>
                   </button>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Program pendampingan pembiayaan persiapan kerja ke Jepang yang membantu memenuhi
-                  kebutuhan pendidikan bahasa, pelatihan keterampilan, dokumen keberangkatan, dan
-                  uang saku sesuai hasil verifikasi.
-                </p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{programInfo.description}</p>
                 <div className="mt-4 rounded-2xl bg-emerald-50/80 p-4">
                   <h3 className="text-xs font-bold text-slate-900">Bagaimana akadnya?</h3>
-                  <p className="mt-1.5 text-xs leading-5 text-slate-600">
-                    Akad Full Cover menggunakan Wakalah bil Ujrah dan Ju&apos;alah. Rincian
-                    kebutuhan serta nilai biaya disusun dan diverifikasi tim VentureGo sebelum
-                    disampaikan untuk ditinjau dan disepakati dalam akad.
-                  </p>
+                  <p className="mt-1.5 text-xs leading-5 text-slate-600">{programInfo.akadBody}</p>
                 </div>
                 <div className="mt-4">
-                  <h3 className="text-xs font-bold text-slate-900">
-                    Perjalanan peserta Full Cover
-                  </h3>
+                  <h3 className="text-xs font-bold text-slate-900">{programInfo.statsHeading}</h3>
                   <div className="mt-2 grid grid-cols-3 gap-2">
                     {[
-                      { label: 'Sedang mengajukan', value: programStats?.applicants },
-                      { label: 'Sedang menjalani', value: programStats?.active },
-                      { label: 'Telah lulus', value: programStats?.completed },
+                      { label: 'Sedang mengajukan', value: stats?.applicants },
+                      { label: 'Sedang menjalani', value: stats?.active },
+                      { label: 'Telah lulus', value: stats?.completed },
                     ].map((stat) => (
                       <div className="rounded-2xl bg-slate-50 p-3 text-center" key={stat.label}>
                         <p className="text-lg font-bold text-slate-900">

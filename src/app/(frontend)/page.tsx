@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { discardDriveUploads, submitFinancingApplication, type ApplicationInput } from './actions'
-import { FINANCING_OPTIONS, formatRupiah } from '@/lib/financing-plan'
+import { formatRupiah, getFinancingOptions } from '@/lib/financing-plan'
 import {
   ACCEPTED_DOCUMENT_TYPES,
   DOCUMENT_DEFINITIONS,
@@ -473,7 +473,7 @@ export default function HomePage() {
         if (saved) {
           const draft = JSON.parse(saved) as { form?: Partial<ApplicationInput>; step?: number }
           if (draft.form && typeof draft.form === 'object') {
-            setForm({
+            const restoredForm = {
               ...initialForm,
               ...draft.form,
               personalBankName: '',
@@ -482,7 +482,18 @@ export default function HomePage() {
               lpkBankName: '',
               lpkBankAccountNumber: '',
               lpkBankAccountName: '',
-            })
+            }
+            if (
+              restoredForm.product === 'DEPARTURE_BRIDGING' &&
+              !getFinancingOptions(restoredForm.destination).some(
+                (option) => String(option.amount) === restoredForm.financingAmount,
+              )
+            ) {
+              restoredForm.financingAmount = String(
+                getFinancingOptions(restoredForm.destination)[0].amount,
+              )
+            }
+            setForm(restoredForm)
             const savedStep =
               draft.step && draft.step >= 5
                 ? 5
@@ -582,6 +593,10 @@ export default function HomePage() {
     setForm((current) => ({ ...current, [key]: value }))
   }
   const isDeparture = form.product === 'DEPARTURE_BRIDGING'
+  const departureFinancingOptions = getFinancingOptions(form.destination)
+  const hasValidDepartureFinancingAmount = departureFinancingOptions.some(
+    (option) => option.amount === Number(form.financingAmount),
+  )
   const requestedFinancingAmount = Number(form.financingAmount)
   const estimatedMonthlyUjrah =
     Number.isSafeInteger(requestedFinancingAmount) && requestedFinancingAmount > 0
@@ -792,6 +807,9 @@ export default function HomePage() {
                 className={`product-option ${isDeparture ? 'selected' : ''}`}
                 onClick={() => {
                   set('product', 'DEPARTURE_BRIDGING')
+                  if (!hasValidDepartureFinancingAmount) {
+                    set('financingAmount', String(departureFinancingOptions[0].amount))
+                  }
                   setDocumentFiles({})
                 }}
               >
@@ -1113,9 +1131,12 @@ export default function HomePage() {
                     <span>Negara tujuan</span>
                     <FormSelect
                       value={form.destination}
-                      onChange={(value) =>
-                        set('destination', value as ApplicationInput['destination'])
-                      }
+                      onChange={(value) => {
+                        const destination = value as ApplicationInput['destination']
+                        if (destination === form.destination) return
+                        set('destination', destination)
+                        set('financingAmount', String(getFinancingOptions(destination)[0].amount))
+                      }}
                       options={[
                         { value: 'JAPAN', label: 'Jepang', destination: 'JAPAN' },
                         { value: 'TURKEY', label: 'Turki', destination: 'TURKEY' },
@@ -1148,10 +1169,10 @@ export default function HomePage() {
                     <label className="field">
                       <span>Nilai pembiayaan sebelum biaya jasa administrasi</span>
                       <FormSelect
-                        value={form.financingAmount}
+                        value={hasValidDepartureFinancingAmount ? form.financingAmount : ''}
                         onChange={(value) => set('financingAmount', value)}
                         placeholder="Pilih nilai pembiayaan"
-                        options={FINANCING_OPTIONS.map((option) => ({
+                        options={departureFinancingOptions.map((option) => ({
                           value: String(option.amount),
                           label: option.label,
                         }))}
@@ -1751,8 +1772,8 @@ export default function HomePage() {
                     setStepError('Isi nama LPK terlebih dahulu.')
                     return
                   }
-                  if (isDeparture && (!form.financingAmount || Number(form.financingAmount) <= 0)) {
-                    setStepError('Pilih nilai pembiayaan yang diajukan.')
+                  if (isDeparture && !hasValidDepartureFinancingAmount) {
+                    setStepError('Pilih nilai pembiayaan yang sesuai dengan negara tujuan.')
                     return
                   }
                   if (

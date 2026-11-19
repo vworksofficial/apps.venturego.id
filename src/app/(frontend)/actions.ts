@@ -5,6 +5,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
 import { blocksAdditionalProgram } from '@/lib/application-lifecycle'
+import { getFinancingOptions } from '@/lib/financing-plan'
 import {
   DOCUMENT_DEFINITIONS,
   MAX_DOCUMENT_SIZE_BYTES,
@@ -239,14 +240,20 @@ export async function submitFinancingApplication(request: FormData): Promise<App
   }
   const financingAmount = Number(input.financingAmount)
   const fullCoverInvoiceAmount = Number(input.fullCoverInvoiceAmount)
+  const financingAmountAllowed = getFinancingOptions(input.destination).some(
+    (option) => option.amount === financingAmount,
+  )
   if (
     departure &&
     (typeof input.financingAmount !== 'string' ||
       input.financingAmount.length > 16 ||
       !Number.isSafeInteger(financingAmount) ||
-      financingAmount <= 0)
+      !financingAmountAllowed)
   ) {
-    return { ok: false, message: 'Masukkan estimasi total kebutuhan pembiayaan yang valid.' }
+    return {
+      ok: false,
+      message: 'Pilih nilai pembiayaan yang tersedia untuk negara tujuan.',
+    }
   }
   if (
     !departure &&

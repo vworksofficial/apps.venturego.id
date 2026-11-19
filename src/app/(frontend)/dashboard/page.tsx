@@ -497,21 +497,26 @@ export default function DashboardPage() {
           statsHeading: 'Perjalanan peserta Full Cover',
         }
   const stats = programStats && programStats.product === application?.product ? programStats : null
-  const primaryAmount =
-    application?.totalObligation ??
-    application?.requestedFinancingAmount ??
-    application?.fullCoverInvoiceAmount ??
-    null
+  const isDepartureApplication = application?.product === 'DEPARTURE_BRIDGING'
+  const isSubmittedDeparture = isDepartureApplication && application?.status === 'SUBMITTED'
+  const primaryAmount = isSubmittedDeparture
+    ? (application?.requestedFinancingAmount ?? application?.totalObligation ?? null)
+    : (application?.totalObligation ??
+      application?.requestedFinancingAmount ??
+      application?.fullCoverInvoiceAmount ??
+      null)
   const amountLabel =
-    application?.totalObligation !== null && application?.totalObligation !== undefined
-      ? 'Total kewajiban akad'
-      : application?.requestedFinancingAmount !== null &&
-          application?.requestedFinancingAmount !== undefined
-        ? 'Nominal diajukan'
-        : application?.fullCoverInvoiceAmount !== null &&
-            application?.fullCoverInvoiceAmount !== undefined
-          ? 'Estimasi tagihan LPK'
-          : 'Estimasi pembiayaan'
+    isSubmittedDeparture && application?.requestedFinancingAmount != null
+      ? 'Paket yang diajukan'
+      : application?.totalObligation !== null && application?.totalObligation !== undefined
+        ? 'Total kewajiban akad'
+        : application?.requestedFinancingAmount !== null &&
+            application?.requestedFinancingAmount !== undefined
+          ? 'Nominal diajukan'
+          : application?.fullCoverInvoiceAmount !== null &&
+              application?.fullCoverInvoiceAmount !== undefined
+            ? 'Estimasi tagihan LPK'
+            : 'Estimasi pembiayaan'
   const statusLabel = application
     ? application.settled && !closed
       ? 'Lunas'
@@ -687,16 +692,9 @@ export default function DashboardPage() {
                               </span>
                               <span className="truncate">{application.lpkName}</span>
                             </div>
-                            {application.fullCoverInvoiceAmount !== null &&
-                              application.totalObligation === null && (
-                                <p className="mt-2 text-[10px] leading-4 text-slate-500">
-                                  Nilai di atas adalah estimasi tagihan LPK, bukan nominal
-                                  pembiayaan final.
-                                </p>
-                              )}
                           </div>
                         </div>
-                        {schedule ? (
+                        {schedule && !isSubmittedDeparture ? (
                           <>
                             <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
                               <div
@@ -770,6 +768,14 @@ export default function DashboardPage() {
                                 className="size-4 shrink-0 transition group-hover:translate-x-0.5"
                               />
                             </Link>
+                            {application.product === 'FULL_COVER' &&
+                              application.fullCoverInvoiceAmount !== null &&
+                              application.totalObligation === null && (
+                                <p className="mt-2 text-[10px] leading-4 text-slate-500">
+                                  Nilai di atas adalah estimasi tagihan LPK, bukan nominal
+                                  pembiayaan final.
+                                </p>
+                              )}
                           </div>
                         )}
                         {application.documentsRevision > 0 && (
@@ -873,38 +879,41 @@ export default function DashboardPage() {
           />
 
           {!loading && !error && application && !canApply && (
-            <section className="rounded-3xl bg-white p-5 text-center shadow-sm ring-1 ring-blue-100">
-              <p className="text-xs font-bold text-[var(--primary)]">
-                {closed
-                  ? application.status === 'COMPLETED'
-                    ? 'Program Selesai'
-                    : 'Pengajuan Ditutup'
-                  : application.status === 'ACTIVE'
-                    ? 'Program Sedang Dijalani'
-                    : 'Pengajuan Telah Terkirim'}
-              </p>
-              <div className="mt-2 flex justify-center">
-                <button
-                  className="inline-flex rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                  onClick={openProgramInfo}
-                  type="button"
-                >
-                  Program {PRODUCT_LABELS[application.product]}
-                </button>
+            <section className="relative overflow-hidden rounded-3xl border border-blue-100/80 bg-gradient-to-br from-white via-white to-blue-50/70 p-5 text-center shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+              <div className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full bg-blue-100/60 blur-2xl" />
+              <div className="relative z-10">
+                <p className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-[var(--primary)]">
+                  <span className="size-1.5 rounded-full bg-blue-500" />
+                  {closed
+                    ? application.status === 'COMPLETED'
+                      ? 'Program Selesai'
+                      : 'Pengajuan Ditutup'
+                    : application.status === 'ACTIVE'
+                      ? 'Program Sedang Dijalani'
+                      : 'Pengajuan Telah Terkirim'}
+                </p>
+                <div className="mt-3 flex justify-center">
+                  <button
+                    className="inline-flex items-center gap-1 rounded-xl border border-blue-100 bg-white px-2.5 py-1.5 text-[10px] font-medium text-slate-800 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                    onClick={openProgramInfo}
+                    type="button"
+                  >
+                    Program {PRODUCT_LABELS[application.product]}
+                    <Icon name="chevron" className="size-2.5 -rotate-90 text-blue-600" />
+                  </button>
+                </div>
+                <p className="mx-auto mt-2 max-w-sm text-[11px] leading-5 text-slate-600">
+                  {closed
+                    ? application.status === 'COMPLETED'
+                      ? 'Seluruh tahapan program pembiayaan Anda telah selesai.'
+                      : 'Pengajuan ini telah ditutup. Hubungi tim VentureGo untuk informasi lebih lanjut.'
+                    : application.status === 'SUBMITTED'
+                      ? 'Rincian biaya sedang disusun dan diverifikasi tim VentureGo.'
+                      : schedule
+                        ? 'Pantau progres angsuran dan jatuh tempo pada kartu ringkasan di atas.'
+                        : 'Pengajuan Anda sedang ditinjau oleh tim VentureGo.'}
+                </p>
               </div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                {closed
-                  ? application.status === 'COMPLETED'
-                    ? 'Seluruh tahapan program pembiayaan Anda telah selesai.'
-                    : 'Pengajuan ini telah ditutup. Hubungi tim VentureGo untuk informasi lebih lanjut.'
-                  : application.product === 'FULL_COVER' &&
-                      application.pricingStatus === 'ESTIMATED' &&
-                      !schedule
-                    ? 'Rincian biaya sedang disusun dan diverifikasi tim VentureGo.'
-                    : schedule
-                      ? 'Pantau progres angsuran dan jatuh tempo pada kartu ringkasan di atas.'
-                      : 'Pengajuan Anda sedang ditinjau oleh tim VentureGo.'}
-              </p>
             </section>
           )}
           {showProgramInfo && application && (

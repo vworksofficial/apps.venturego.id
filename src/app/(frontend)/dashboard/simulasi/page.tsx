@@ -1,12 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { FINANCING_OPTIONS, calculateWakalahPlan, formatRupiah } from '@/lib/financing-plan'
+import { calculateWakalahPlan, formatRupiah, getFinancingOptions } from '@/lib/financing-plan'
 import { DashboardCard, DashboardIcon, DashboardScaffold } from '../_components/dashboard-ui'
 import { FormSelect } from '../../_components/form-select'
 
 export default function SimulationPage() {
-  const [amount, setAmount] = useState<number>(FINANCING_OPTIONS[0].amount)
+  const [amount, setAmount] = useState<number>(getFinancingOptions('JAPAN')[0].amount)
   const [destination, setDestination] = useState<'JAPAN' | 'TURKEY'>('JAPAN')
   const plan = useMemo(() => calculateWakalahPlan(amount), [amount])
   const adminFee = Math.round(amount * 0.05)
@@ -35,7 +35,11 @@ export default function SimulationPage() {
         <h2 className="mb-3 text-sm font-bold text-slate-900">Pilih negara tujuan</h2>
         <FormSelect
           value={destination}
-          onChange={(value) => setDestination(value as 'JAPAN' | 'TURKEY')}
+          onChange={(value) => {
+            const nextDestination = value as 'JAPAN' | 'TURKEY'
+            setDestination(nextDestination)
+            setAmount(getFinancingOptions(nextDestination)[0].amount)
+          }}
           placeholder="Pilih negara tujuan"
           options={[
             { value: 'JAPAN', label: 'Jepang', destination: 'JAPAN' },
@@ -50,7 +54,7 @@ export default function SimulationPage() {
           value={String(amount)}
           onChange={(value) => setAmount(Number(value))}
           placeholder="Pilih nilai pembiayaan"
-          options={FINANCING_OPTIONS.map((option) => ({
+          options={getFinancingOptions(destination).map((option) => ({
             value: String(option.amount),
             label: option.label,
           }))}

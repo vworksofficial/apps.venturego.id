@@ -8,6 +8,19 @@ export const FINANCING_OPTIONS = [
   { amount: 40_000_000, label: 'Rp40.000.000' },
 ] as const
 
+export const TURKEY_FINANCING_OPTIONS = [
+  { amount: 4_000_000, label: 'Rp4.000.000' },
+  { amount: 8_000_000, label: 'Rp8.000.000' },
+  { amount: 12_000_000, label: 'Rp12.000.000' },
+  { amount: 16_000_000, label: 'Rp16.000.000' },
+  { amount: 20_000_000, label: 'Rp20.000.000' },
+  { amount: 24_000_000, label: 'Rp24.000.000' },
+  { amount: 28_000_000, label: 'Rp28.000.000' },
+] as const
+
+export const getFinancingOptions = (destination: 'JAPAN' | 'TURKEY') =>
+  destination === 'TURKEY' ? TURKEY_FINANCING_OPTIONS : FINANCING_OPTIONS
+
 export type FinancingAmount = (typeof FINANCING_OPTIONS)[number]['amount']
 
 export type WakalahPlan = {

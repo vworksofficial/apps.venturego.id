@@ -67,6 +67,7 @@ export type UserApplicationDetail = {
   destination: 'JAPAN' | 'TURKEY'
   status: string
   pricingStatus: string
+  akadDocumentIssued: boolean
   requestedFinancingAmount: number | null
   totalObligation: number | null
   finalAgreementReference: string | null
@@ -601,6 +602,8 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
             typeof financialPlan.pricingStatus === 'string'
               ? financialPlan.pricingStatus
               : 'ESTIMATED',
+          akadDocumentIssued:
+            Boolean(financialPlan.akadDocument) && typeof financialPlan.akadDocument === 'object',
           requestedFinancingAmount: departureDetails
             ? readCount(departureDetails.requestedFinancingAmount)
             : null,

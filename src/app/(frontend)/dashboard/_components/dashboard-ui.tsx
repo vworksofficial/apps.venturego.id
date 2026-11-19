@@ -15,6 +15,7 @@ export type DashboardIconName =
   | 'download'
   | 'edit'
   | 'help'
+  | 'handshake'
   | 'history'
   | 'home'
   | 'info'
@@ -87,6 +88,7 @@ export function DashboardIcon({
         <path d="M9.8 9a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.2.9-1.2 1.8M12 17h.01" />
       </>
     ),
+    handshake: null,
     history: (
       <>
         <path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2" />
@@ -153,6 +155,17 @@ export function DashboardIcon({
         <path d="M15 11h7v5h-7a2.5 2.5 0 0 1 0-5Z" />
       </>
     ),
+  }
+
+  if (name === 'handshake') {
+    return (
+      <span
+        aria-hidden="true"
+        className={`${className} inline-flex items-center justify-center text-[17px] leading-none`}
+      >
+        🤝
+      </span>
+    )
   }
 
   return (

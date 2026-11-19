@@ -32,12 +32,12 @@ const PROFILE_MENU: { href: string; label: string; detail: string; icon: Dashboa
     href: '/dashboard/profil/akad',
     label: 'Akad Wakalah bil Ujrah',
     detail: 'Penjelasan skema dan istilah akad',
-    icon: 'receipt',
+    icon: 'handshake',
   },
   {
     href: '/dashboard/profil/dokumen',
-    label: 'Dokumen Saya',
-    detail: 'PDF Akad Wakalah bil Ujrah',
+    label: 'Dokumen Akad Saya',
+    detail: 'Riwayat program dan scan akad bertanda tangan basah',
     icon: 'document',
   },
   {

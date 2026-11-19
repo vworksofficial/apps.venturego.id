@@ -31,8 +31,6 @@ const PRICING_LABELS: Record<string, string> = {
 }
 
 const DOC_STATUS_LABELS: Record<string, string> = {
-  UPLOADED: 'Sudah diunggah',
-  VERIFIED: 'Diverifikasi',
   REVISION_REQUIRED: 'Perlu perbaikan',
 }
 
@@ -212,30 +210,26 @@ export default function DocumentsPage() {
                       }`}
                     >
                       <DashboardIcon
-                        name={doc.status === 'VERIFIED' ? 'check' : 'document'}
+                        name={doc.status === 'REVISION_REQUIRED' ? 'info' : 'check'}
                         className="size-5"
                       />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-xs font-bold text-slate-800">
-                        {doc.documentType}
-                      </h3>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h3 className="truncate text-xs font-bold text-slate-800">
+                          {doc.documentType}
+                        </h3>
+                        {DOC_STATUS_LABELS[doc.status] && (
+                          <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+                            {DOC_STATUS_LABELS[doc.status]}
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1 truncate text-[10px] text-slate-400">
                         {doc.fileName ?? 'Berkas'}
                         {doc.size ? ` • ${formatSize(doc.size)}` : ''} • {doc.applicationId}
                       </p>
                     </div>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                        doc.status === 'VERIFIED'
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : doc.status === 'REVISION_REQUIRED'
-                            ? 'bg-amber-50 text-amber-800'
-                            : 'bg-blue-50 text-[var(--primary)]'
-                      }`}
-                    >
-                      {DOC_STATUS_LABELS[doc.status] ?? doc.status}
-                    </span>
                   </article>
                 ))
               )}

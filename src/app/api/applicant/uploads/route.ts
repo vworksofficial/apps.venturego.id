@@ -104,6 +104,16 @@ const handleInit = async (request: Request, uid: string) => {
     documentLabel = definitions[documentIndex].label
     ownerName = typeof data?.applicantName === 'string' ? data.applicantName : ''
 
+    const currentDocuments = Array.isArray(data?.documents)
+      ? (data.documents as Array<{ documentType?: string; status?: string }>)
+      : []
+    const lockedDocument =
+      currentDocuments[documentIndex] ??
+      currentDocuments.find((item) => item.documentType === documentLabel)
+    if (lockedDocument?.status === 'VERIFIED') {
+      return failure('Dokumen sudah diverifikasi dan tidak dapat diubah.', 409)
+    }
+
     const existingFolderId = typeof data?.driveFolderId === 'string' ? data.driveFolderId : ''
     if (existingFolderId) {
       folderId = existingFolderId
@@ -241,6 +251,16 @@ const handleChunk = async (request: Request, uid: string) => {
         const definitions = DOCUMENT_DEFINITIONS[data?.product as keyof typeof DOCUMENT_DEFINITIONS]
         if (!definitions) throw new GDriveError('Jenis pengajuan tidak valid.', 'INVALID')
         const currentDocuments = Array.isArray(data?.documents) ? data.documents : []
+        const targetIndex = ticket.documentIndex
+        const targetLabel = definitions[targetIndex]?.label
+        const isTargetVerified = currentDocuments.some(
+          (item: { documentType?: string; status?: string }, index: number) =>
+            item?.status === 'VERIFIED' &&
+            (index === targetIndex || item.documentType === targetLabel),
+        )
+        if (isTargetVerified) {
+          throw new GDriveError('Dokumen sudah diverifikasi dan tidak dapat diubah.', 'INVALID')
+        }
         const nextDocuments = definitions.map((definition, index) => {
           if (index !== ticket.documentIndex) {
             return (

@@ -19,6 +19,20 @@ import {
 
 const formatSize = (size?: number) => (size ? `${(size / 1024 / 1024).toFixed(1)} MB` : '')
 
+const APPLICATION_STATUS_LABELS: Record<string, string> = {
+  SUBMITTED: 'Terkirim',
+  ELIGIBILITY_REVIEW: 'Tinjauan kelayakan',
+  DOCUMENT_REVIEW: 'Tinjauan berkas',
+  REVISION_REQUIRED: 'Perlu revisi',
+  COST_VERIFICATION: 'Verifikasi biaya',
+  APPROVED: 'Disetujui',
+  CONTRACT_PREPARATION: 'Persiapan akad',
+  ACTIVE: 'AKTIF',
+  COMPLETED: 'Selesai',
+  REJECTED: 'Ditolak',
+  CANCELLED: 'Dibatalkan',
+}
+
 export default function UploadDocumentsPage() {
   const [applications, setApplications] = useState<OwnedApplication[]>([])
   const [selectedApplicationId, setSelectedApplicationId] = useState('')
@@ -86,20 +100,29 @@ export default function UploadDocumentsPage() {
   const definitions = selectedApplication
     ? DOCUMENT_DEFINITIONS[selectedApplication.product]
     : DOCUMENT_DEFINITIONS.DEPARTURE_BRIDGING
-  const documentGroups = [
-    {
-      title: 'Dokumen utama',
-      documents: definitions
-        .map((document, index) => ({ document, index }))
-        .filter(({ document }) => document.section !== 'dokumen-pendukung'),
-    },
-    {
-      title: 'Dokumen pendukung',
-      documents: definitions
-        .map((document, index) => ({ document, index }))
-        .filter(({ document }) => document.section === 'dokumen-pendukung'),
-    },
-  ].filter((group) => group.documents.length > 0)
+  const groupTitles: Record<string, string> =
+    selectedApplication?.product === 'FULL_COVER'
+      ? {
+          'dokumen-wajib': 'Dokumen Wajib',
+          'dokumen-susulan': 'Dokumen Susulan (setelah pelatihan selesai)',
+          'dokumen-pendukung': 'Dokumen Pendukung',
+        }
+      : {
+          default: 'Dokumen utama',
+          'dokumen-pendukung': 'Dokumen pendukung',
+        }
+  const documentGroups = Object.entries(
+    definitions.reduce<Record<string, { document: (typeof definitions)[number]; index: number }[]>>(
+      (groups, document, index) => {
+        const key = document.section ?? 'default'
+        ;(groups[key] ??= []).push({ document, index })
+        return groups
+      },
+      {},
+    ),
+  )
+    .map(([key, documents]) => ({ title: groupTitles[key] ?? key, documents }))
+    .filter((group) => group.documents.length > 0)
   const uploadedBytes = useMemo(
     () =>
       selectedApplication?.documents.reduce(
@@ -114,6 +137,10 @@ export default function UploadDocumentsPage() {
     setUploadError('')
     setSuccessMessage('')
     if (!file || !selectedApplication) return
+    if (selectedApplication.documents[index]?.status === 'VERIFIED') {
+      setUploadError('Dokumen sudah diverifikasi dan tidak dapat diubah.')
+      return
+    }
     if (!ACCEPTED_DOCUMENT_TYPES.includes(file.type as (typeof ACCEPTED_DOCUMENT_TYPES)[number])) {
       setUploadError('Gunakan berkas PDF, JPG, atau PNG.')
       return
@@ -164,13 +191,6 @@ export default function UploadDocumentsPage() {
       subtitle="Lengkapi dokumen pengajuan"
       title="Unggah berkas"
     >
-      <div className="flex items-start gap-3 rounded-2xl bg-blue-50 p-4">
-        <DashboardIcon name="shield" className="size-5 shrink-0 text-[var(--primary)]" />
-        <p className="text-[11px] leading-5 text-slate-600">
-          Unggah dokumen PDF, JPG, atau PNG. Maksimal 10 MB untuk setiap berkas.
-        </p>
-      </div>
-
       {loading && (
         <>
           <DashboardCardSkeleton rows={2} />
@@ -208,39 +228,73 @@ export default function UploadDocumentsPage() {
         </div>
       )}
 
-      {!loading && !loadingError && definitions.length > 0 && (
-        <>
-          {selectedApplication && applications.length > 1 && (
-            <label className="block text-xs font-semibold text-slate-600">
-              Pilih pengajuan
-              <select
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800"
-                onChange={(event) => setSelectedApplicationId(event.target.value)}
-                value={selectedApplication.id}
-              >
-                {applications.map((application) => (
-                  <option key={application.id} value={application.id}>
-                    {application.applicationId} · {application.applicantName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <DashboardCard>
-            {selectedApplication && (
-              <div className="border-b border-slate-100 p-4">
+      {!loading && !loadingError && selectedApplication && (
+        <DashboardCard>
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  {selectedApplication.applicationId}
+                  ID pengajuan
                 </p>
-                <h2 className="mt-1 text-sm font-bold text-slate-800">
-                  {selectedApplication.product === 'FULL_COVER'
-                    ? 'Full Cover'
-                    : 'Dana Keberangkatan'}
+                <h2 className="mt-1 truncate text-base font-extrabold tracking-tight text-slate-900">
+                  {selectedApplication.applicationId}
                 </h2>
               </div>
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                  selectedApplication.status === 'ACTIVE'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : selectedApplication.status === 'COMPLETED'
+                      ? 'bg-slate-100 text-slate-700'
+                      : ['REJECTED', 'CANCELLED'].includes(selectedApplication.status)
+                        ? 'bg-red-100 text-red-700'
+                        : 'bg-blue-100 text-[var(--primary)]'
+                }`}
+              >
+                {APPLICATION_STATUS_LABELS[selectedApplication.status] ??
+                  selectedApplication.status}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-[11px]">
+              <span className="font-bold text-slate-800">
+                {selectedApplication.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+              </span>
+              <span aria-hidden="true" className="text-slate-300">
+                ·
+              </span>
+              <span className="min-w-0 truncate text-slate-600">
+                {selectedApplication.applicantName}
+              </span>
+            </div>
+            {applications.length > 1 && (
+              <label className="mt-3 block text-xs font-semibold text-slate-600">
+                Pilih pengajuan
+                <select
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-800"
+                  onChange={(event) => setSelectedApplicationId(event.target.value)}
+                  value={selectedApplication.id}
+                >
+                  {applications.map((application) => (
+                    <option key={application.id} value={application.id}>
+                      {application.applicationId} · {application.applicantName}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
-          </DashboardCard>
+          </div>
+        </DashboardCard>
+      )}
+
+      <div className="flex items-start gap-3 rounded-2xl bg-blue-50 p-4">
+        <DashboardIcon name="shield" className="size-5 shrink-0 text-[var(--primary)]" />
+        <p className="text-[11px] leading-5 text-slate-600">
+          Unggah dokumen PDF, JPG, atau PNG. Maksimal 10 MB untuk setiap berkas.
+        </p>
+      </div>
+
+      {!loading && !loadingError && definitions.length > 0 && (
+        <>
           {documentGroups.map((group) => (
             <section aria-label={group.title} className="mt-4" key={group.title}>
               <h3 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
@@ -254,13 +308,8 @@ export default function UploadDocumentsPage() {
                   const isVerified = status === 'VERIFIED'
                   const needsRevision = status === 'REVISION_REQUIRED'
                   const isUploading = uploadingIndex === index
-                  const statusBadge = isVerified
-                    ? 'Diverifikasi'
-                    : needsRevision
-                      ? 'Perlu perbaikan'
-                      : isUploaded
-                        ? 'Sudah diunggah'
-                        : ''
+                  const statusBadge = needsRevision ? 'Perlu perbaikan' : ''
+                  const isReplacing = status === 'UPLOADED'
                   return (
                     <div
                       className={`flex items-center gap-3 p-4 ${
@@ -280,7 +329,7 @@ export default function UploadDocumentsPage() {
                         }`}
                       >
                         <DashboardIcon
-                          name={isVerified ? 'check' : needsRevision ? 'info' : 'document'}
+                          name={needsRevision ? 'info' : isUploaded ? 'check' : 'document'}
                           className="size-5"
                         />
                       </span>
@@ -319,27 +368,37 @@ export default function UploadDocumentsPage() {
                         </p>
                       </div>
                       <label
-                        className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-bold text-white ${
-                          selectedApplication
-                            ? needsRevision
-                              ? 'cursor-pointer bg-amber-600'
-                              : 'cursor-pointer bg-[var(--primary)]'
-                            : 'cursor-not-allowed bg-slate-300'
+                        aria-disabled={isVerified || !selectedApplication}
+                        className={`min-w-[4.5rem] shrink-0 rounded-full px-3 py-2 text-center text-[10px] font-bold transition ${
+                          !selectedApplication || isVerified
+                            ? 'cursor-not-allowed bg-slate-300 text-white'
+                            : isReplacing
+                              ? 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                              : needsRevision
+                                ? 'cursor-pointer bg-amber-600 text-white'
+                                : 'cursor-pointer bg-[var(--primary)] text-white'
                         }`}
+                        title={
+                          isVerified
+                            ? 'Dokumen sudah diverifikasi dan tidak dapat diubah'
+                            : undefined
+                        }
                       >
-                        {selectedApplication
-                          ? isUploading
-                            ? 'Mengunggah…'
-                            : needsRevision
-                              ? 'Perbaiki'
-                              : isUploaded
-                                ? 'Ganti'
-                                : 'Unggah'
-                          : 'Belum aktif'}
+                        {isVerified
+                          ? 'Ganti'
+                          : selectedApplication
+                            ? isUploading
+                              ? 'Mengunggah…'
+                              : needsRevision
+                                ? 'Perbaiki'
+                                : isUploaded
+                                  ? 'Ganti'
+                                  : 'Unggah'
+                            : 'Belum aktif'}
                         <input
                           accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                           className="sr-only"
-                          disabled={uploadingIndex !== null || !selectedApplication}
+                          disabled={uploadingIndex !== null || !selectedApplication || isVerified}
                           onChange={(event) => {
                             void uploadDocument(index, event.target.files?.[0])
                             event.target.value = ''

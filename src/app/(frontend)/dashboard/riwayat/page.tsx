@@ -18,7 +18,7 @@ type FilterCategory = 'Semua' | 'Pembayaran' | 'Dokumen'
 type ActivityItem = {
   id: string
   category: 'Pembayaran' | 'Dokumen'
-  icon: 'receipt' | 'wallet' | 'document' | 'check'
+  icon: 'receipt' | 'wallet' | 'document' | 'check' | 'info'
   tone: 'emerald' | 'indigo' | 'amber'
   title: string
   subtitle: string
@@ -42,8 +42,6 @@ const PAYMENT_STATUS_LABELS: Record<UserPaymentItem['status'], string> = {
 }
 
 const DOC_STATUS_LABELS: Record<string, string> = {
-  UPLOADED: 'Sudah diunggah',
-  VERIFIED: 'Diverifikasi',
   REVISION_REQUIRED: 'Perlu perbaikan',
 }
 
@@ -135,7 +133,7 @@ export default function HistoryPage() {
         items.push({
           id: `doc-${app.id}-${idx}`,
           category: 'Dokumen',
-          icon: doc.status === 'VERIFIED' ? 'check' : 'document',
+          icon: doc.status === 'REVISION_REQUIRED' ? 'info' : 'check',
           tone:
             doc.status === 'VERIFIED'
               ? 'emerald'
@@ -144,7 +142,7 @@ export default function HistoryPage() {
                 : 'indigo',
           title: doc.documentType,
           subtitle: `${app.applicationId} • ${doc.fileName ?? 'Berkas terunggah'}`,
-          rightLabel: DOC_STATUS_LABELS[doc.status] ?? doc.status,
+          rightLabel: DOC_STATUS_LABELS[doc.status] ?? '',
           timestamp: app.updatedAt ?? app.createdAt ?? '',
         })
       }

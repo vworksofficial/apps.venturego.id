@@ -1883,7 +1883,11 @@ function ApplicationDrawerForm({
                         )}
                       </td>
                       <td className="px-3.5 py-2.5 text-slate-500">
-                        {def?.section === 'dokumen-pendukung' ? 'Pendukung' : 'Utama'}
+                        {def?.section === 'dokumen-susulan'
+                          ? 'Susulan'
+                          : def?.section === 'dokumen-pendukung'
+                            ? 'Pendukung'
+                            : 'Utama'}
                       </td>
                       <td className="px-3.5 py-2.5">
                         <span

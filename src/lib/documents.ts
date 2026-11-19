@@ -1,9 +1,11 @@
 export type DocumentProduct = 'FULL_COVER' | 'DEPARTURE_BRIDGING'
 
+export type DocumentSection = 'dokumen-wajib' | 'dokumen-susulan' | 'dokumen-pendukung'
+
 export type DocumentDefinition = {
   label: string
   required: boolean
-  section?: 'dokumen-pendukung'
+  section?: DocumentSection
 }
 
 export const DOCUMENT_DEFINITIONS: Record<DocumentProduct, DocumentDefinition[]> = {
@@ -27,15 +29,23 @@ export const DOCUMENT_DEFINITIONS: Record<DocumentProduct, DocumentDefinition[]>
     { label: 'Scan Surat Nikah Orang Tua', required: false },
   ],
   FULL_COVER: [
-    { label: 'KTP siswa', required: true },
-    { label: 'Kartu Keluarga', required: false },
-    { label: 'Persetujuan orang tua', required: false },
-    { label: 'Rekomendasi LPK', required: false },
-    { label: 'Akta kelahiran', required: false },
-    { label: 'Ijazah terakhir', required: false },
-    { label: 'Bukti pendaftaran LPK', required: false },
-    { label: 'Rincian program pelatihan', required: false },
-    { label: 'Estimasi biaya LPK', required: false },
+    { label: 'Pas Foto', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan KTP', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan Akta Kelahiran', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan KK (Kartu Keluarga)', required: true, section: 'dokumen-wajib' },
+    { label: 'Ijazah SD/MI', required: true, section: 'dokumen-wajib' },
+    { label: 'Ijazah SMP/MTs/SLTP', required: true, section: 'dokumen-wajib' },
+    { label: 'Ijazah SMA/SMK/MA/SLTA', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan SKCK (Jika ada)', required: false, section: 'dokumen-wajib' },
+    { label: 'Scan KTP Orang Tua / Wali', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan Surat Nikah Orang Tua / Wali', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan Passport', required: false, section: 'dokumen-susulan' },
+    { label: 'Scan Kontrak Kerja', required: false, section: 'dokumen-susulan' },
+    { label: 'Scan Visa Kerja atau COE', required: false, section: 'dokumen-susulan' },
+    { label: 'Scan Surat Rekomendasi LPK', required: false, section: 'dokumen-pendukung' },
+    { label: 'Scan Form Pendaftaran', required: false, section: 'dokumen-pendukung' },
+    { label: 'Scan Surat Kesediaan Mengangsur', required: false, section: 'dokumen-pendukung' },
+    { label: 'Scan Surat Mengetahui Orang Tua', required: false, section: 'dokumen-pendukung' },
   ],
 }
 

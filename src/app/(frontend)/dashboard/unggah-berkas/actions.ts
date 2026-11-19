@@ -18,6 +18,7 @@ export type OwnedApplication = {
   applicationId: string
   product: keyof typeof DOCUMENT_DEFINITIONS
   applicantName: string
+  status: string
   documents: DocumentEntry[]
 }
 
@@ -56,6 +57,7 @@ export async function getOwnedApplications(uploadToken: string): Promise<OwnedAp
           applicationId: data.applicationId,
           product: data.product as keyof typeof DOCUMENT_DEFINITIONS,
           applicantName: data.applicantName,
+          status: typeof data.status === 'string' ? data.status : '',
           documents: Array.isArray(data.documents) ? (data.documents as DocumentEntry[]) : [],
         },
       ]

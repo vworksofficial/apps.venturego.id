@@ -333,13 +333,6 @@ export async function submitFinancingApplication(request: FormData): Promise<App
     if (ktpIndex >= 0 && !uploadIndexes.has(ktpIndex)) {
       return { ok: false, message: `Dokumen ${definitions[ktpIndex].label} wajib diunggah.` }
     }
-    const missingRequired =
-      input.product === 'FULL_COVER'
-        ? definitions.find((definition, index) => definition.required && !uploadIndexes.has(index))
-        : undefined
-    if (missingRequired) {
-      return { ok: false, message: `Dokumen ${missingRequired.label} wajib diunggah.` }
-    }
     const seenIndexes = new Set<number>()
     const uploadedDocuments: Record<string, unknown>[] = []
     let totalBytes = 0

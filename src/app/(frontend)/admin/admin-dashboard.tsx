@@ -5130,6 +5130,7 @@ export function AdminDashboard({
                   const workflowStep = SIDEBAR_WORKFLOW_STEPS[item.id]
                   return (
                     <button
+                      aria-pressed={active}
                       className={`relative flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition lg:w-full ${
                         workflowStep && workflowStep < 5
                           ? "lg:after:pointer-events-none lg:after:absolute lg:after:left-[18px] lg:after:top-1/2 lg:after:-bottom-5 lg:after:z-0 lg:after:w-px lg:after:bg-white/30 lg:after:content-['']"
@@ -5138,7 +5139,7 @@ export function AdminDashboard({
                         active
                           ? 'bg-[#0842a0] font-semibold text-white shadow-2xs ring-1 ring-white/20'
                           : 'text-blue-100/80 hover:bg-white/10 hover:text-white'
-                      }`}
+                      } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
                       key={item.id}
                       onClick={() => setActiveMenu(item.id)}
                       suppressHydrationWarning

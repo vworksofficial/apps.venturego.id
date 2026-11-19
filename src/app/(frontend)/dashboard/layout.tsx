@@ -6,22 +6,25 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
 import { isAppAccount, resolveUserDestination } from '@/lib/auth-client'
 import { RocketLoader } from '../_components/orbit-mark'
-import { DashboardBottomNav } from './_components/dashboard-ui'
+import { DashboardBottomNav, type PrimaryRoute } from './_components/dashboard-ui'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [ready, setReady] = useState(false)
-  const activeRoute =
-    pathname.startsWith('/dashboard/angsuran') || pathname.startsWith('/dashboard/pembayaran')
+  const matchesRoute = (route: string) => pathname === route || pathname.startsWith(`${route}/`)
+  const activeRoute: PrimaryRoute | null =
+    matchesRoute('/dashboard/angsuran') || matchesRoute('/dashboard/pembayaran')
       ? 'angsuran'
-      : pathname.startsWith('/dashboard/riwayat')
+      : matchesRoute('/dashboard/riwayat')
         ? 'riwayat'
-        : pathname.startsWith('/dashboard/unggah-berkas')
+        : matchesRoute('/dashboard/unggah-berkas')
           ? 'berkas'
-          : pathname.startsWith('/dashboard/profil') || pathname.startsWith('/dashboard/dokumen')
+          : matchesRoute('/dashboard/profil') || matchesRoute('/dashboard/dokumen')
             ? 'profil'
-            : 'home'
+            : pathname === '/dashboard' || pathname === '/dashboard/'
+              ? 'home'
+              : null
 
   useEffect(() => {
     let active = true
@@ -53,7 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <>
       {ready ? children : <RocketLoader message="Menyiapkan akunmu…" />}
-      <DashboardBottomNav active={activeRoute} />
+      {ready && <DashboardBottomNav active={activeRoute} />}
     </>
   )
 }

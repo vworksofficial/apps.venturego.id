@@ -171,7 +171,7 @@ export function DashboardIcon({
   )
 }
 
-type PrimaryRoute = 'home' | 'angsuran' | 'riwayat' | 'berkas' | 'profil'
+export type PrimaryRoute = 'home' | 'angsuran' | 'riwayat' | 'berkas' | 'profil'
 
 const navigation: {
   key: PrimaryRoute
@@ -228,7 +228,7 @@ export function DashboardScaffold({
   )
 }
 
-export function DashboardBottomNav({ active }: { active: PrimaryRoute }) {
+export function DashboardBottomNav({ active }: { active: PrimaryRoute | null }) {
   return (
     <nav
       aria-label="Navigasi utama"
@@ -240,7 +240,8 @@ export function DashboardBottomNav({ active }: { active: PrimaryRoute }) {
           const isHome = item.key === 'home'
           return (
             <Link
-              className="group flex min-w-0 flex-1 flex-col items-center gap-0 px-1 py-1"
+              aria-current={isActive ? 'page' : undefined}
+              className="group flex min-w-0 flex-1 flex-col items-center gap-0 rounded-xl px-1 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
               href={item.href}
               key={item.key}
             >

@@ -189,28 +189,27 @@ export default function ProfilePage() {
                 )}
               </>
             )}
-            {firstApplication && (
+            {firstApplication?.lpkName && (
               <span className="mt-1.5 inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold text-[var(--primary)]">
-                {firstApplication.applicationId} · {firstApplication.lpkName}
+                {firstApplication.lpkName}
               </span>
             )}
           </div>
         </div>
         <div className="grid grid-cols-2 border-t border-slate-100">
           <div className="p-4">
-            <span className="text-[10px] text-slate-400">Nomor Induk Siswa VSV</span>
+            <span className="text-[10px] text-slate-400">
+              {studentNumber || !firstApplication
+                ? 'Nomor Induk Siswa VSV'
+                : 'ID Pengajuan Terkirim'}
+            </span>
             {profileLoading ? (
               <SkeletonBlock className="mt-2 h-4 w-32" />
             ) : (
               <>
                 <strong className="mt-1 block truncate text-sm font-bold tracking-wide text-[var(--primary)]">
-                  {studentNumber || 'Belum tersedia'}
+                  {studentNumber || firstApplication?.applicationId || 'Belum tersedia'}
                 </strong>
-                {!studentNumber && (
-                  <span className="mt-1 block text-[10px] leading-4 text-slate-400">
-                    Terbit setelah dokumen akad diterbitkan.
-                  </span>
-                )}
               </>
             )}
             {studentNumberError && !profileLoading && (
@@ -219,7 +218,7 @@ export default function ProfilePage() {
               </span>
             )}
           </div>
-          <div className="border-l border-slate-100 p-4">
+          <div className="flex flex-col items-start border-l border-slate-100 p-4">
             <span className="text-[10px] text-slate-400">Status Akun</span>
             {profileLoading ? (
               <SkeletonBlock className="mt-2 h-5 w-24 rounded-full" />

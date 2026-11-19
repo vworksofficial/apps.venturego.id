@@ -1,9 +1,6 @@
 import React from 'react'
 import type { Metadata } from 'next'
 import { Google_Sans, Plus_Jakarta_Sans } from 'next/font/google'
-import Script from 'next/script'
-import { BodyCustomCode, renderHeadCustomCode } from '@/lib/make-custom-code'
-import { makeSiteSettings, sanitizeHtmlAttribute } from '@/lib/make-site-settings'
 import '@fontsource-variable/inter'
 import './styles.css'
 
@@ -20,22 +17,15 @@ const googleSans = Google_Sans({
   display: 'swap',
 })
 
-const defaultTitle = 'VentureGo VSV'
-const title = makeSiteSettings.title ?? defaultTitle
-const description =
-  makeSiteSettings.description ?? 'Pengajuan pembiayaan syariah Wakalah bil Ujrah untuk siswa VSV'
-const favicon = makeSiteSettings.icons?.icon
-const socialImage = makeSiteSettings.openGraph?.image
-const googleAnalyticsId = sanitizeHtmlAttribute(makeSiteSettings.analytics?.googleAnalyticsId)
+const title = 'VentureGo VSV'
+const description = 'Pengajuan pembiayaan syariah Wakalah bil Ujrah untuk siswa VSV'
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title,
   description,
-  robots: makeSiteSettings.robots?.index === false ? { follow: false, index: false } : undefined,
   icons: {
     icon: [
-      ...(favicon ? [favicon] : []),
       { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
     ],
@@ -46,58 +36,20 @@ export const metadata: Metadata = {
   openGraph: {
     title,
     description,
-    images: socialImage ? [socialImage] : undefined,
   },
-  twitter: socialImage
-    ? {
-        card: 'summary_large_image',
-        images: [socialImage],
-      }
-    : undefined,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const language = sanitizeHtmlAttribute(makeSiteSettings.language) || 'id'
-  const addBypassLinks = makeSiteSettings.accessibility?.addBypassLinks === true
-  const customScripts = makeSiteSettings.customScripts
-
   return (
     <html
       className={`${plusJakartaSans.variable} ${googleSans.variable}`}
-      lang={language}
+      lang="id"
       suppressHydrationWarning
     >
-      <head>
-        {renderHeadCustomCode(customScripts?.headStart, 'head-start')}
-        {renderHeadCustomCode(customScripts?.headEnd, 'head-end')}
-      </head>
       <body className="min-h-screen bg-white text-slate-950 antialiased" suppressHydrationWarning>
-        <BodyCustomCode html={customScripts?.bodyStart} />
-        {addBypassLinks && (
-          <a className="figma-bypass-link" href="#root">
-            Skip to content
-          </a>
-        )}
         <div id="root" tabIndex={-1}>
           {children}
         </div>
-        {googleAnalyticsId && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${googleAnalyticsId}`}
-              strategy="afterInteractive"
-            />
-            <Script id="figma-google-analytics" strategy="afterInteractive">
-              {`
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-gtag('js', new Date());
-gtag('config', ${JSON.stringify(googleAnalyticsId)});
-`}
-            </Script>
-          </>
-        )}
-        <BodyCustomCode html={customScripts?.bodyEnd} />
       </body>
     </html>
   )

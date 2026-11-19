@@ -12,14 +12,10 @@ next-env.d.ts
 logs/
 *.log
 .claude-replay.*
-.figma/runtime/
 .tmp-*
-/.figma/design-context/
 
-# Platform-managed agentplat state, not project source. In the
-# client-initiated single-repo workspace layout (make's `Path: "."` spec) the
-# repo root IS the workspace root, so these land inside this repo rather than
-# beside it.
+# Platform-managed agent state, not project source. These land inside this
+# repo rather than beside it when an agent platform uses a single-repo layout.
 /.plugins/
 /.opencode-skills/
 .vercel

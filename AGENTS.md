@@ -1,6 +1,7 @@
-# figma-make-app
+# apps.venturego.id
 
-React + Next.js + Firebase + Tailwind CSS project running inside Figma Make.
+React + Next.js + Firebase + Tailwind CSS app (VSV — pembiayaan syariah
+siswa VentureGo), deployed on Vercel.
 
 This file is supplied as project instructions at the start of each task. Do not
 reread it before opening source. Load `nextjs-docs` when the task involves
@@ -15,9 +16,9 @@ of these are done:
 - When a Client Component calls a Server Action inside `useTransition`, keep
   `revalidatePath` out of the action. Return a serializable result and call
   `router.refresh()` in the client after success.
-- Run `figma make verify-deploy`, inspect its production route table, and visit
-  every generated public route. `verify-bootstrap` and source inspection are
-  not substitutes.
+- Run `npm run build` (`next build --webpack`) to completion, inspect its route
+  table, and preview every requested route on the dev server. A clean source
+  inspection is not a substitute for a passing build.
 
 ## Backend: Firebase (not Payload)
 
@@ -99,7 +100,6 @@ This project uses Next.js App Router route groups:
 - `next.config.ts` - Next.js configuration
 - `package.json` - Dependencies and scripts
 - `.mise.toml` - Toolchain versions (Node.js, pnpm)
-- `.figma/make/*` - Lifecycle scripts (install, dev, deploy, deploy-preview)
 
 ## Styling
 
@@ -128,9 +128,8 @@ Use the lightest stack that satisfies the request:
 
 ## Auth Modeling
 
-Keep three authorization concerns distinct:
+Keep two authorization concerns distinct:
 
-- Figma/Make access controls who can view or edit the Make file.
 - Staff Firebase Auth controls who can manage applications in `/admin`
   (Google in production, plus `src/lib/demo-accounts.json` email/password in
   local development + built-in staff emails / `FIREBASE_ADMIN_EMAILS` allowlist
@@ -195,41 +194,7 @@ call a `'use server'` action that verifies the token and queries Firestore with
 the Admin SDK (see `dashboard/angsuran/actions.ts`,
 `dashboard/actions.ts`). Do not query Firestore from the client directly.
 
-## Preview/Proxy Configuration
-
-Keep the Make preview origin configuration intact if present in
-`next.config.ts`. If Payload/Make server actions log `Invalid Server Actions
-request` with an `x-forwarded-host`/`origin` mismatch, treat it as preview
-proxy configuration first. Do not rewrite app routes or disable Server Actions
-to work around it.
-
-## Figma Make Scripts
-
-These scripts are called by sboxd to manage the project lifecycle:
-
-- `.figma/make/install` - Install project dependencies (`pnpm install`)
-- `.figma/make/dev` - Start the dev server (`next dev --port $PORT --hostname 0.0.0.0`)
-- `.figma/make/deploy` - Build, upload, finalize, and report completion through `figma make deploy`
-- `.figma/make/deploy-preview` - Build the platform-provided cached preview;
-  keep its `.next`/`nextjs` contract intact and delegate packaging/upload
-  through `figma make deploy-preview`
-
-Do **not** remove or rename these scripts. They must remain executable.
-
 ## Environment Variables
-
-These are injected by sboxd at runtime:
-
-- `FIGMA` - Set to `"1"` when running inside sboxd
-- `PORT` - The port to listen on (passed to `next dev` via the dev script)
-- `FIGMA_PUBLIC_URL` - The public URL of the site
-- `FIGMA_SITE_NAME` - The human-readable site name
-- `FIGMA_SITE_DESCRIPTION` - Short site description
-- `FIGMA_ASSETS_PATH` - Directory where exported Figma assets are written
-- `FIGMA_FAVICON_PATH` - Path to the exported favicon
-- `FIGMA_PREVIEW_IMAGE_PATH` - Path to the OG/social preview image
-- `FIGMA_PREVIEW_OAUTH_REDIRECT_URI` - Register verbatim with the provider
-- `FIGMA_PREVIEW_OAUTH_STATE_PREFIX` - Prefix the app's OAuth `state`
 
 Firebase variables are documented in `FIREBASE_SETUP.md`:
 

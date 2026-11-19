@@ -75,9 +75,9 @@ Public Web app variables:
 
 ## Existing Payload data
 
-Payload data and uploads remain in the existing Figma-managed backend until an
+Payload data and uploads remain in the legacy backend environment until an
 export/import is performed. The current environment has no Payload content
 export tool or credentials, so this code does not attempt to read or delete
-those records. Export applications and upload files from the current Payload
+those records. Export applications and upload files from the legacy Payload
 environment before retiring it. A data-import utility should be run only after
 that export is available and verified.

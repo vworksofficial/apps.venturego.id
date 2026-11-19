@@ -3,10 +3,14 @@
 import { useMemo, useState } from 'react'
 import { FINANCING_OPTIONS, calculateWakalahPlan, formatRupiah } from '@/lib/financing-plan'
 import { DashboardCard, DashboardIcon, DashboardScaffold } from '../_components/dashboard-ui'
+import { FormSelect } from '../../_components/form-select'
 
 export default function SimulationPage() {
   const [amount, setAmount] = useState<number>(FINANCING_OPTIONS[0].amount)
+  const [destination, setDestination] = useState<'JAPAN' | 'TURKEY'>('JAPAN')
   const plan = useMemo(() => calculateWakalahPlan(amount), [amount])
+  const adminFee = Math.round(amount * 0.05)
+  const netNafaqah = amount - adminFee
 
   return (
     <DashboardScaffold
@@ -28,46 +32,62 @@ export default function SimulationPage() {
       </DashboardCard>
 
       <section>
-        <h2 className="mb-3 text-sm font-bold text-slate-900">Pilih kebutuhan pembiayaan</h2>
-        <div className="grid grid-cols-2 gap-3">
-          {FINANCING_OPTIONS.map((option) => (
-            <button
-              className={`rounded-2xl px-4 py-4 text-left transition ${
-                amount === option.amount
-                  ? 'bg-[var(--primary)] text-white shadow-md'
-                  : 'bg-white text-slate-700 ring-1 ring-slate-200'
-              }`}
-              key={option.amount}
-              onClick={() => setAmount(option.amount)}
-              type="button"
-            >
-              <span className="text-[10px] opacity-70">Pembiayaan</span>
-              <strong className="mt-1 block text-sm">{option.label}</strong>
-            </button>
-          ))}
-        </div>
+        <h2 className="mb-3 text-sm font-bold text-slate-900">Pilih negara tujuan</h2>
+        <FormSelect
+          value={destination}
+          onChange={(value) => setDestination(value as 'JAPAN' | 'TURKEY')}
+          placeholder="Pilih negara tujuan"
+          options={[
+            { value: 'JAPAN', label: 'Jepang', destination: 'JAPAN' },
+            { value: 'TURKEY', label: 'Turki', destination: 'TURKEY' },
+          ]}
+        />
       </section>
 
-      <DashboardCard>
-        <div className="border-b border-slate-100 p-5">
-          <h2 className="text-sm font-bold text-slate-900">Rincian estimasi</h2>
-        </div>
+      <section>
+        <h2 className="mb-3 text-sm font-bold text-slate-900">Pilih kebutuhan pembiayaan</h2>
+        <FormSelect
+          value={String(amount)}
+          onChange={(value) => setAmount(Number(value))}
+          placeholder="Pilih nilai pembiayaan"
+          options={FINANCING_OPTIONS.map((option) => ({
+            value: String(option.amount),
+            label: option.label,
+          }))}
+        />
+      </section>
+
+      <section aria-labelledby="estimate-details-title">
+        <h2 className="mb-2 text-sm font-bold text-slate-900" id="estimate-details-title">
+          Rincian estimasi
+        </h2>
         {[
-          ['Nafaqah', formatRupiah(plan.nafaqahTotal)],
+          ['Negara tujuan', destination === 'JAPAN' ? 'Jepang' : 'Turki'],
+          ['Nominal pembiayaan', formatRupiah(amount)],
+          ['Jasa administrasi (5%)', formatRupiah(adminFee)],
+          ['Nafaqah setelah jasa administrasi', formatRupiah(netNafaqah)],
           ['Total ujrah', formatRupiah(plan.ujrahTotal)],
           ['Total kewajiban', formatRupiah(plan.totalObligation)],
           ['Tenor', `${plan.tenorMonths} bulan`],
           ['Angsuran terakhir', formatRupiah(plan.finalInstallment)],
         ].map(([label, value]) => (
           <div
-            className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5 text-xs last:border-0"
+            className={`flex items-center justify-between border-b border-slate-200/80 py-3 text-xs ${
+              label === 'Total kewajiban' ? 'font-bold text-slate-900' : ''
+            }`}
             key={label}
           >
-            <span className="text-slate-500">{label}</span>
-            <strong className="text-slate-800">{value}</strong>
+            <span className={label === 'Total kewajiban' ? 'text-slate-900' : 'text-slate-500'}>
+              {label}
+            </span>
+            <strong
+              className={label === 'Total kewajiban' ? 'text-[var(--primary)]' : 'text-slate-800'}
+            >
+              {value}
+            </strong>
           </div>
         ))}
-      </DashboardCard>
+      </section>
 
       <div className="flex gap-3 rounded-2xl bg-blue-50 p-4">
         <DashboardIcon name="info" className="size-5 shrink-0 text-[var(--primary)]" />

@@ -10,7 +10,6 @@ export default function StudentCardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [studentNumber, setStudentNumber] = useState('')
-  const [studentNumberError, setStudentNumberError] = useState('')
   const [applications, setApplications] = useState<UserApplicationDetail[]>([])
 
   const application = applications[0] ?? null
@@ -38,9 +37,6 @@ export default function StudentCardPage() {
         }
         if (studentProfile.ok) {
           setStudentNumber(studentProfile.studentNumber)
-          setStudentNumberError('')
-        } else {
-          setStudentNumberError(studentProfile.message)
         }
       } catch {
         if (active) setError('Kartu belum dapat dimuat. Silakan coba lagi.')
@@ -55,11 +51,7 @@ export default function StudentCardPage() {
   }, [])
 
   const displayName = application?.applicantName || '—'
-  const programLabel = application
-    ? `${application.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'} · ${
-        application.destination === 'TURKEY' ? 'Turki' : 'Jepang'
-      }`
-    : '—'
+  const destinationLabel = application?.destination === 'TURKEY' ? 'Turki' : 'Jepang'
 
   return (
     <DashboardScaffold
@@ -86,9 +78,15 @@ export default function StudentCardPage() {
         </DashboardCard>
       ) : (
         <div
-          className="relative isolate flex aspect-[1.586/1] w-full flex-col justify-between overflow-hidden rounded-[24px] bg-gradient-to-br from-[#2878ed] via-[#0b57d0] to-[#073c91] p-4 text-white shadow-[0_18px_40px_rgba(11,87,208,0.24)] print:aspect-auto print:h-[54mm] print:w-[85.6mm] print:rounded-none print:p-[4mm] print:shadow-none"
+          className="relative isolate flex aspect-[1.586/1] w-full flex-col overflow-hidden rounded-[24px] bg-white p-4 text-slate-900 shadow-[0_18px_40px_rgba(11,87,208,0.16)] ring-1 ring-slate-200 print:aspect-auto print:h-[54mm] print:w-[85.6mm] print:rounded-none print:p-[4mm] print:shadow-none"
           id="student-card"
         >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-3 -top-3 z-[1] whitespace-nowrap text-[68px] font-black leading-none tracking-[-0.075em] text-slate-200/80"
+          >
+            VentureGo
+          </div>
           <svg
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 z-0 size-full"
@@ -96,106 +94,103 @@ export default function StudentCardPage() {
             preserveAspectRatio="none"
             viewBox="0 0 400 252"
           >
-            <ellipse
-              cx="200"
-              cy="126"
-              rx="238"
-              ry="110"
-              stroke="white"
-              strokeOpacity="0.24"
-              strokeWidth="1"
-              transform="rotate(-17 200 126)"
-            />
-            <ellipse
-              cx="200"
-              cy="126"
-              rx="198"
-              ry="82"
-              stroke="white"
-              strokeOpacity="0.16"
-              strokeWidth="1"
-              transform="rotate(-17 200 126)"
-            />
-            <ellipse
-              cx="200"
-              cy="126"
-              rx="154"
-              ry="55"
-              stroke="white"
-              strokeOpacity="0.1"
-              strokeWidth="1"
-              transform="rotate(-17 200 126)"
-            />
-            <circle cx="48" cy="58" r="4" fill="#71e3b1" fillOpacity="0.9" />
-            <circle cx="335" cy="47" r="3.5" fill="#ff9a91" fillOpacity="0.9" />
-            <circle cx="354" cy="185" r="4" fill="#ffd65a" fillOpacity="0.9" />
-            <circle cx="103" cy="218" r="2.5" fill="#a9ceff" fillOpacity="0.9" />
+            <g transform="rotate(34 228 125)">
+              <ellipse
+                cx="228"
+                cy="125"
+                rx="235"
+                ry="94"
+                stroke="#f1f2f3"
+                strokeDasharray="8 5 2 10 4 7 1 6"
+                strokeOpacity=".8"
+                strokeWidth="1.5"
+              />
+              <ellipse cx="228" cy="125" rx="208" ry="77" stroke="#f1f2f3" strokeWidth="2" />
+              <ellipse cx="228" cy="125" rx="174" ry="61" stroke="#f1f2f3" strokeWidth="2" />
+              <ellipse cx="228" cy="125" rx="140" ry="46" stroke="#f1f2f3" strokeWidth="2" />
+              <ellipse cx="228" cy="125" rx="104" ry="31" stroke="#f1f2f3" strokeWidth="2" />
+              <ellipse cx="228" cy="125" rx="68" ry="17" stroke="#f1f2f3" strokeWidth="2" />
+              <circle cx="27" cy="125" r="6" fill="var(--primary)" stroke="white" strokeWidth="2" />
+              <circle
+                cx="402"
+                cy="125"
+                r="4"
+                fill="var(--dot-red)"
+                stroke="white"
+                strokeWidth="2"
+              />
+              <circle
+                cx="228"
+                cy="171"
+                r="5.5"
+                fill="var(--dot-yellow)"
+                stroke="white"
+                strokeWidth="2"
+              />
+              <circle
+                cx="313"
+                cy="142"
+                r="3.5"
+                fill="var(--primary)"
+                stroke="white"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="202"
+                cy="140"
+                r="4.5"
+                fill="var(--dot-red)"
+                stroke="white"
+                strokeWidth="1.5"
+              />
+              <circle
+                cx="228"
+                cy="142"
+                r="2.5"
+                fill="var(--primary)"
+                stroke="white"
+                strokeWidth="1"
+              />
+            </g>
           </svg>
-          <div className="relative z-10 flex items-center justify-between gap-3 border-b border-white/15 pb-2.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-white/15 ring-1 ring-white/20">
-                <img alt="" className="size-5" height={20} src="/venturego-mark.svg" width={20} />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-extrabold tracking-wide">
-                  Vworks Student Venture
-                </p>
-                <p className="text-[9px] text-blue-100">Kartu identitas siswa</p>
-              </div>
+          <div className="relative z-10 flex justify-end text-right">
+            <div className="text-[12px] font-bold leading-[1.12] text-[var(--primary)]">
+              Vworks
+              <br />
+              <span className="text-orange-600">Student Venture</span>
             </div>
-            <span className="shrink-0 text-[9px] font-semibold tracking-wide text-blue-100">
-              venturego.id
-            </span>
           </div>
 
-          <div className="relative z-10 grid min-h-0 flex-1 grid-cols-[1fr_0.9fr] items-center gap-3 py-2.5">
-            <div className="min-w-0">
-              <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-blue-100">
-                Nama siswa
-              </p>
-              <p className="mt-1 line-clamp-2 text-[15px] font-bold leading-[1.15] tracking-tight">
+          <div className="relative z-10 mt-auto mb-2 flex flex-col gap-0.5 pl-1">
+            <div className="grid grid-cols-[64px_1fr] items-center gap-1.5">
+              <span className="text-[10px] leading-[1.25] text-slate-400">Nama</span>
+              <span className="truncate text-[11px] font-medium leading-[1.25] text-slate-900">
                 {displayName}
-              </p>
-              <div className="mt-2.5 min-w-0">
-                <p className="text-[8px] font-semibold uppercase tracking-wider text-blue-200">
-                  LPK
-                </p>
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-white">
-                  {application?.lpkName || '—'}
-                </p>
-              </div>
-              <div className="mt-1.5 min-w-0">
-                <p className="text-[8px] font-semibold uppercase tracking-wider text-blue-200">
-                  Program & tujuan
-                </p>
-                <p className="mt-0.5 truncate text-[10px] font-semibold text-white">
-                  {programLabel}
-                </p>
-              </div>
+              </span>
             </div>
-            <div className="min-w-0 rounded-2xl border border-white/15 bg-white/10 px-3 py-3">
-              <p className="text-[8px] font-bold uppercase tracking-[0.14em] text-blue-100">
-                Nomor Induk Siswa
-              </p>
-              <p className="mt-1.5 break-words text-[15px] font-extrabold leading-tight tracking-[0.06em]">
+            <div className="grid grid-cols-[64px_1fr] items-center gap-1.5">
+              <span className="text-[10px] leading-[1.25] text-slate-400">NIS</span>
+              <span className="truncate text-[11px] font-medium leading-[1.25] text-slate-900">
                 {studentNumber || 'Belum tersedia'}
-              </p>
-              {!studentNumber && !studentNumberError && (
-                <p className="mt-1.5 text-[8px] leading-[14px] text-blue-100">
-                  Terbit setelah dokumen akad diterbitkan.
-                </p>
-              )}
-              {studentNumberError && (
-                <p className="mt-1.5 text-[8px] leading-[14px] text-amber-100">
-                  Nomor belum dapat dimuat.
-                </p>
-              )}
+              </span>
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-center gap-1.5">
+              <span className="text-[10px] leading-[1.25] text-slate-400">LPK Asal</span>
+              <span className="truncate text-[11px] font-medium leading-[1.25] text-slate-900">
+                {application?.lpkName || '—'}
+              </span>
+            </div>
+            <div className="grid grid-cols-[64px_1fr] items-center gap-1.5">
+              <span className="text-[10px] leading-[1.25] text-slate-400">Negara</span>
+              <span className="truncate text-[11px] font-medium leading-[1.25] text-slate-900">
+                {application ? destinationLabel : '—'}
+              </span>
             </div>
           </div>
 
-          <div className="relative z-10 flex items-center justify-between border-t border-white/15 pt-2 text-[8px] text-blue-100">
-            <span>Identitas peserta VSV</span>
-            <span className="font-semibold tracking-wide">venturego.id</span>
+          <div className="relative z-10 -mx-4 -mb-4 mt-0 flex min-h-7 items-center justify-between border-t-[3px] border-orange-600 bg-[var(--primary)] px-4 py-1.5 text-[8px] font-semibold text-white print:-mx-[4mm] print:-mb-[4mm] print:px-[4mm]">
+            <span>Kartu Identitas Siswa</span>
+            <span>Venturego.id</span>
           </div>
         </div>
       )}

@@ -2989,6 +2989,10 @@ body {
   padding-inline: 11px;
 }
 
+#student-card {
+  font-family: var(--welcome-font);
+}
+
 @media print {
   body * {
     visibility: hidden;

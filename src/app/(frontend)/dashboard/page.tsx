@@ -8,7 +8,14 @@ import { SkeletonBlock } from './_components/dashboard-ui'
 import { VaNumber } from './_components/va-number'
 import { WalletCarousel } from './_components/wallet-carousel'
 import { getWalletSummary, type VipSummary } from './vip/actions'
-import { getDashboardSummary, getProgramStats, type DashboardApplication } from './actions'
+import {
+  getDashboardSummary,
+  getProgramStats,
+  type DashboardApplication,
+  type DashboardSummaryResult,
+} from './actions'
+
+const dashboardSummaryCache = new Map<string, Extract<DashboardSummaryResult, { ok: true }>>()
 
 type IconName =
   | 'bell'
@@ -410,6 +417,13 @@ export default function DashboardPage() {
         setAccountName(user.displayName?.trim() ?? '')
         setAccountPhotoUrl(user.photoURL?.startsWith('https://') ? user.photoURL : '')
         setAccountPhotoFailed(false)
+        const cachedSummary = dashboardSummaryCache.get(user.uid)
+        if (cachedSummary) {
+          setApplication(cachedSummary.application)
+          setCanApply(cachedSummary.canApply)
+          setError('')
+          setLoading(false)
+        }
         try {
           const idToken = await user.getIdToken()
           if (!active) return
@@ -428,6 +442,7 @@ export default function DashboardPage() {
             setApplication(null)
             setCanApply(false)
           } else {
+            dashboardSummaryCache.set(user.uid, result)
             setError('')
             setApplication(result.application)
             setCanApply(result.canApply)

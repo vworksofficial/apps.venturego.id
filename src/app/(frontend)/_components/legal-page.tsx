@@ -22,7 +22,6 @@ export function LegalPage({
   returnToProfile?: boolean
 }) {
   const backHref = returnToProfile ? '/dashboard/profil' : '/'
-  const profileQuery = returnToProfile ? '?from=profile' : ''
 
   return (
     <main className="dashboard-app min-h-screen bg-[var(--canvas)]">
@@ -58,20 +57,6 @@ export function LegalPage({
             </ol>
           </div>
 
-          <nav aria-label="Dokumen legal" className="flex flex-col gap-2">
-            <Link
-              className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-xs font-semibold text-[var(--primary)] shadow-sm transition hover:bg-blue-50"
-              href={`/kebijakan-privasi${profileQuery}`}
-            >
-              Kebijakan Privasi
-            </Link>
-            <Link
-              className="rounded-2xl border border-slate-100 bg-white px-4 py-3 text-xs font-semibold text-[var(--primary)] shadow-sm transition hover:bg-blue-50"
-              href={`/syarat-layanan${profileQuery}`}
-            >
-              Syarat Layanan
-            </Link>
-          </nav>
           <p className="text-center text-[10px] leading-4 text-slate-400">
             VentureGo · Vworks Student Venture
           </p>

@@ -1,17 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
 import { isAppAccount, resolveUserDestination } from '@/lib/auth-client'
-import { RocketLoader } from '../_components/orbit-mark'
 import { DashboardBottomNav, type PrimaryRoute } from './_components/dashboard-ui'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [ready, setReady] = useState(false)
   const matchesRoute = (route: string) => pathname === route || pathname.startsWith(`${route}/`)
   const activeRoute: PrimaryRoute | null =
     matchesRoute('/dashboard/angsuran') || matchesRoute('/dashboard/pembayaran')
@@ -42,7 +40,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           router.replace('/admin')
           return
         }
-        setReady(true)
       })
     } catch {
       router.replace('/')
@@ -55,8 +52,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {ready ? children : <RocketLoader message="Menyiapkan akunmu…" />}
-      {ready && <DashboardBottomNav active={activeRoute} />}
+      {children}
+      <DashboardBottomNav active={activeRoute} />
     </>
   )
 }

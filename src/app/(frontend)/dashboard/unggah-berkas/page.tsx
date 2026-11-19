@@ -41,6 +41,7 @@ export default function UploadDocumentsPage() {
   const [loadingError, setLoadingError] = useState('')
   const [uploadError, setUploadError] = useState('')
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
+  const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null)
   const [successMessage, setSuccessMessage] = useState('')
 
   const loadApplications = useCallback(async (token: string) => {
@@ -181,6 +182,39 @@ export default function UploadDocumentsPage() {
       )
     } finally {
       setUploadingIndex(null)
+    }
+  }
+
+  const downloadVerifiedDocument = async (index: number) => {
+    if (!selectedApplication || !uploadToken) return
+    setUploadError('')
+    setSuccessMessage('')
+    setDownloadingIndex(index)
+    try {
+      const response = await fetch(
+        `/api/applicant/applications/${selectedApplication.id}/documents/${index}`,
+        { headers: { Authorization: `Bearer ${uploadToken}` } },
+      )
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as { message?: string }
+        throw new Error(result.message || 'Berkas belum dapat diunduh.')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = selectedApplication.documents[index]?.fileName || 'dokumen-terverifikasi'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : 'Berkas belum dapat diunduh. Silakan coba lagi.',
+      )
+    } finally {
+      setDownloadingIndex(null)
     }
   }
 
@@ -367,45 +401,61 @@ export default function UploadDocumentsPage() {
                             : 'Belum diunggah'}
                         </p>
                       </div>
-                      <label
-                        aria-disabled={isVerified || !selectedApplication}
-                        className={`min-w-[4.5rem] shrink-0 rounded-full px-3 py-2 text-center text-[10px] font-bold transition ${
-                          !selectedApplication || isVerified
-                            ? 'cursor-not-allowed bg-slate-300 text-white'
-                            : isReplacing
-                              ? 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
-                              : needsRevision
-                                ? 'cursor-pointer bg-amber-600 text-white'
-                                : 'cursor-pointer bg-[var(--primary)] text-white'
-                        }`}
-                        title={
-                          isVerified
-                            ? 'Dokumen sudah diverifikasi dan tidak dapat diubah'
-                            : undefined
-                        }
-                      >
-                        {isVerified
-                          ? 'Ganti'
-                          : selectedApplication
-                            ? isUploading
-                              ? 'Mengunggah…'
-                              : needsRevision
-                                ? 'Perbaiki'
-                                : isUploaded
-                                  ? 'Ganti'
-                                  : 'Unggah'
-                            : 'Belum aktif'}
-                        <input
-                          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                          className="sr-only"
-                          disabled={uploadingIndex !== null || !selectedApplication || isVerified}
-                          onChange={(event) => {
-                            void uploadDocument(index, event.target.files?.[0])
-                            event.target.value = ''
-                          }}
-                          type="file"
-                        />
-                      </label>
+                      {isVerified && selectedApplication ? (
+                        <button
+                          aria-label={`Unduh ${document.label}`}
+                          className="grid size-9 shrink-0 place-items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                          disabled={downloadingIndex !== null}
+                          onClick={() => void downloadVerifiedDocument(index)}
+                          title={downloadingIndex === index ? 'Mengunduh…' : 'Unduh dokumen'}
+                          type="button"
+                        >
+                          <DashboardIcon
+                            className="size-4"
+                            name={downloadingIndex === index ? 'clock' : 'download'}
+                          />
+                        </button>
+                      ) : (
+                        <label
+                          aria-disabled={isVerified || !selectedApplication}
+                          className={`min-w-[4.5rem] shrink-0 rounded-full px-3 py-2 text-center text-[10px] font-bold transition ${
+                            !selectedApplication || isVerified
+                              ? 'cursor-not-allowed bg-slate-300 text-white'
+                              : isReplacing
+                                ? 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                                : needsRevision
+                                  ? 'cursor-pointer bg-amber-600 text-white'
+                                  : 'cursor-pointer bg-[var(--primary)] text-white'
+                          }`}
+                          title={
+                            isVerified
+                              ? 'Dokumen sudah diverifikasi dan tidak dapat diubah'
+                              : undefined
+                          }
+                        >
+                          {isVerified
+                            ? 'Ganti'
+                            : selectedApplication
+                              ? isUploading
+                                ? 'Mengunggah…'
+                                : needsRevision
+                                  ? 'Perbaiki'
+                                  : isUploaded
+                                    ? 'Ganti'
+                                    : 'Unggah'
+                              : 'Belum aktif'}
+                          <input
+                            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                            className="sr-only"
+                            disabled={uploadingIndex !== null || !selectedApplication || isVerified}
+                            onChange={(event) => {
+                              void uploadDocument(index, event.target.files?.[0])
+                              event.target.value = ''
+                            }}
+                            type="file"
+                          />
+                        </label>
+                      )}
                     </div>
                   )
                 })}

@@ -239,7 +239,7 @@ export default function ActivityPage() {
 
   return (
     <DashboardScaffold active="riwayat" showHeader={false} title="Aktivitas">
-      <header className="space-y-1 pt-1">
+      <header className="space-y-1 pt-1 text-center">
         <h1 className="text-xl font-bold tracking-tight text-slate-950">Aktivitas</h1>
         <p className="text-xs leading-5 text-slate-500">
           Catatan program, pembayaran, dan berkas akun Anda.

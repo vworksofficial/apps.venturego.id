@@ -242,7 +242,7 @@ const handleChunk = async (request: Request, uid: string) => {
   if (ticket.appDocId) {
     const applicationRef = getFirebaseFirestore().collection('applications').doc(ticket.appDocId)
     try {
-      await getFirebaseFirestore().runTransaction(async (transaction) => {
+      const replacedFileId = await getFirebaseFirestore().runTransaction(async (transaction) => {
         const latest = await transaction.get(applicationRef)
         const data = latest.data()
         if (!latest.exists || data?.ownerFirebaseUid !== uid) {
@@ -253,6 +253,12 @@ const handleChunk = async (request: Request, uid: string) => {
         const currentDocuments = Array.isArray(data?.documents) ? data.documents : []
         const targetIndex = ticket.documentIndex
         const targetLabel = definitions[targetIndex]?.label
+        const previousDocument = currentDocuments.find(
+          (item: { documentType?: string }, index: number) =>
+            index === targetIndex || item?.documentType === targetLabel,
+        ) as { fileId?: unknown } | undefined
+        const previousFileId =
+          typeof previousDocument?.fileId === 'string' ? previousDocument.fileId : ''
         const isTargetVerified = currentDocuments.some(
           (item: { documentType?: string; status?: string }, index: number) =>
             item?.status === 'VERIFIED' &&
@@ -283,7 +289,11 @@ const handleChunk = async (request: Request, uid: string) => {
           driveFolderId: ticket.folderId,
           updatedAt: FieldValue.serverTimestamp(),
         })
+        return previousFileId
       })
+      if (replacedFileId && replacedFileId !== result.fileId) {
+        await deleteDriveFile(replacedFileId)
+      }
     } catch (error) {
       await deleteDriveFile(result.fileId)
       if (error instanceof GDriveError) return failure(error.message, statusForError(error))

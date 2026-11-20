@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
+import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
 import {
   hasValidDocumentSignature,
   isAcceptedDocumentType,
@@ -88,13 +89,8 @@ export async function POST(request: Request) {
     application.financialPlan && typeof application.financialPlan === 'object'
       ? (application.financialPlan as Record<string, unknown>)
       : {}
-  const schedule = Array.isArray(plan.schedule) ? plan.schedule : []
-  const scheduledRow = schedule.find(
-    (entry) =>
-      Boolean(entry) &&
-      typeof entry === 'object' &&
-      Number((entry as { installment?: unknown }).installment) === installmentNumber,
-  ) as { amount?: unknown } | undefined
+  const schedule = resolveInstallmentSchedule(application.product, plan)
+  const scheduledRow = schedule.find((entry) => entry.installment === installmentNumber)
   const scheduledAmount = Number(scheduledRow?.amount)
   if (!Number.isSafeInteger(scheduledAmount) || scheduledAmount < 1 || amount > scheduledAmount) {
     return errorResponse('Nominal transfer tidak boleh melebihi nilai angsuran ini.')
@@ -121,16 +117,9 @@ export async function POST(request: Request) {
   if (paidInstallments.has(installmentNumber)) {
     return errorResponse('Angsuran ini sudah tercatat lunas.', 409)
   }
-  const firstUnpaidInstallment = schedule
-    .filter(
-      (entry) =>
-        entry &&
-        typeof entry === 'object' &&
-        Number.isInteger((entry as { installment?: unknown }).installment),
-    )
-    .map((entry) => Number((entry as { installment: number }).installment))
-    .sort((left, right) => left - right)
-    .find((number) => !paidInstallments.has(number))
+  const firstUnpaidInstallment = schedule.find(
+    (entry) => !paidInstallments.has(entry.installment),
+  )?.installment
   if (firstUnpaidInstallment !== installmentNumber) {
     return errorResponse('Pembayaran hanya dapat dikirim untuk angsuran yang sedang berjalan.', 409)
   }

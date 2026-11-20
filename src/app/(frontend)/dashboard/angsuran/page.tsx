@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
-import type { FinancingCostLine, InstallmentEntry } from '@/lib/departure-financing'
+import type { FinancingCostLine } from '@/lib/departure-financing'
+import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
 import {
   calculateFullCoverBudget,
   calculateFullCoverCharges,
@@ -70,29 +71,11 @@ const readLines = (value: unknown): FinancingCostLine[] =>
       )
     : []
 
-const readSchedule = (value: unknown): InstallmentEntry[] =>
-  Array.isArray(value)
-    ? value.filter(
-        (entry): entry is InstallmentEntry =>
-          Boolean(entry) &&
-          Number.isInteger(entry.installment) &&
-          typeof entry.dueDate === 'string' &&
-          typeof entry.amount === 'number' &&
-          typeof entry.remainingBalance === 'number',
-      )
-    : []
-
 const programLabel = (application: UserApplication) =>
   application.product === 'FULL_COVER' ? 'Program Full Cover' : 'Program Dana Keberangkatan'
 
-function Icon({ name }: { name: 'details' | 'program' | 'close' }) {
+function Icon({ name }: { name: 'program' | 'close' }) {
   const paths = {
-    details: (
-      <>
-        <path d="M7 3h7l5 5v13H7z" />
-        <path d="M14 3v5h5M10 13h6M10 17h4" />
-      </>
-    ),
     program: (
       <>
         <circle cx="12" cy="12" r="9" />
@@ -143,12 +126,10 @@ function ApplicationTerms({
   const scheduleRef = useRef<HTMLElement | null>(null)
   const plan = application.financialPlan
   const isFullCover = application.product === 'FULL_COVER'
-  const verified = plan.pricingStatus === 'VERIFIED'
-  const agreed = plan.pricingStatus === 'AGREED'
   const closed = ['CANCELLED', 'REJECTED'].includes(application.status)
   const nafaqahItems = readLines(plan.nafaqahItems)
   const ujrahItems = readLines(plan.ujrahItems)
-  const schedule = readSchedule(plan.schedule)
+  const schedule = resolveInstallmentSchedule(application.product, plan)
   const applicationPayments = payments.filter(
     (payment) => payment.applicationDocId === application.id,
   )
@@ -174,11 +155,8 @@ function ApplicationTerms({
   const fullCoverMonthlyInstallment =
     Number(plan.monthlyInstallmentAfterCoe) ||
     (fullCoverTenor > 0 ? Math.floor(fullCoverObligationWithCoe / fullCoverTenor) : 0)
-  const plannedCount = Math.max(
-    schedule.length,
-    isFullCover ? fullCoverTenor : Number(plan.installmentCount) || 0,
-  )
-  const paidCount = Math.min(plannedCount, paidInstallments.size)
+  const plannedCount = schedule.length
+  const paidCount = schedule.filter((entry) => paidInstallments.has(entry.installment)).length
   const departureTotal = Number(plan.totalObligation) || 0
   const departureInstallmentCount = Number(plan.installmentCount) || 0
   const departureMonthlyInstallment =
@@ -206,21 +184,10 @@ function ApplicationTerms({
     Math.max(paidAmountFromSchedule, paidAmountFromPayments),
   )
   const progress = totalObligation > 0 ? totalPaidAmount / totalObligation : 0
-  const flexibleSchedule = Array.from({ length: Math.min(plannedCount, 36) }, (_, index) => {
-    const installment = index + 1
-    const saved = schedule.find((row) => row.installment === installment)
-    const regularAmount = isFullCover ? fullCoverMonthlyInstallment : departureMonthlyInstallment
-    const lastAmount = isFullCover
-      ? Number(plan.finalInstallmentAfterCoe) || regularAmount
-      : departureTotal - regularAmount * Math.max(departureInstallmentCount - 1, 0)
-    return {
-      installment,
-      dueDate: saved?.dueDate ?? '',
-      amount: saved?.amount ?? (installment === plannedCount ? lastAmount : regularAmount),
-      remainingBalance: saved?.remainingBalance ?? 0,
-      paid: paidInstallments.has(installment),
-    }
-  })
+  const flexibleSchedule = schedule.map((entry) => ({
+    ...entry,
+    paid: paidInstallments.has(entry.installment),
+  }))
   const firstUnpaidEntry = flexibleSchedule.find((entry) => !entry.paid)
   const firstUnpaidInstallment = firstUnpaidEntry?.installment ?? null
   const savedFirstDay = Number(firstUnpaidEntry?.dueDate.slice(8, 10))

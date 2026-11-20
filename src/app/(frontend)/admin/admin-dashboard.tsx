@@ -591,6 +591,13 @@ type InstallmentSummary = {
   dueSoon: boolean
 }
 
+const getNominalProgressPercent = (summary: InstallmentSummary) => {
+  const totalObligation =
+    summary.obligation ?? summary.schedule.reduce((sum, row) => sum + row.amount, 0)
+  if (totalObligation <= 0) return 0
+  return Math.min(100, Math.max(0, Math.round((summary.paidAmount / totalObligation) * 100)))
+}
+
 const summarizeInstallments = (
   app: FinancingApplicationRecord,
   todayIso: string,
@@ -7618,10 +7625,7 @@ export function AdminDashboard({
                           summary.nextDue && summary.overdueCount > 0
                             ? getDaysBetween(summary.nextDue.dueDate, todayIso)
                             : 0
-                        const progressPercent =
-                          summary.schedule.length > 0
-                            ? Math.round((summary.paidCount / summary.schedule.length) * 100)
-                            : 0
+                        const progressPercent = getNominalProgressPercent(summary)
                         const rowBg =
                           overdueDays > 0 ? 'bg-red-50/40' : summary.dueSoon ? 'bg-amber-50/40' : ''
                         return (
@@ -7731,10 +7735,7 @@ export function AdminDashboard({
                               summary.nextDue && summary.overdueCount > 0
                                 ? getDaysBetween(summary.nextDue.dueDate, todayIso)
                                 : 0
-                            const progressPercent =
-                              summary.schedule.length > 0
-                                ? Math.round((summary.paidCount / summary.schedule.length) * 100)
-                                : 0
+                            const progressPercent = getNominalProgressPercent(summary)
                             const rowBg =
                               overdueDays > 0
                                 ? 'bg-red-50/40 hover:bg-red-50/60'

@@ -24,6 +24,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             : null
 
   useEffect(() => {
+    // Keep browser scroll restoration from carrying a horizontal offset between dashboard routes.
+    if (window.scrollX !== 0) window.scrollTo(0, window.scrollY)
+  }, [pathname])
+
+  useEffect(() => {
     let active = true
     let unsubscribe: (() => void) | undefined
     try {

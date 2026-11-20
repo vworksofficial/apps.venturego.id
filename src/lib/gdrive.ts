@@ -397,11 +397,14 @@ export const downloadDriveFile = async (fileId: string): Promise<Uint8Array> => 
   return new Uint8Array(await response.arrayBuffer())
 }
 
-export const deleteDriveFile = async (fileId: string): Promise<void> => {
-  if (!FILE_ID_PATTERN.test(fileId)) return
+export const deleteDriveFile = async (fileId: string): Promise<boolean> => {
+  if (!FILE_ID_PATTERN.test(fileId)) return false
   try {
-    await driveFetch(`/drive/v3/files/${fileId}`, { method: 'DELETE' })
-  } catch {}
+    const response = await driveFetch(`/drive/v3/files/${fileId}`, { method: 'DELETE' })
+    return response.ok || response.status === 404
+  } catch {
+    return false
+  }
 }
 
 export const renameDriveFile = async (fileId: string, name: string): Promise<void> => {

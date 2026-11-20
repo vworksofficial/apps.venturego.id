@@ -124,6 +124,20 @@ export type AdminPaymentRecord = {
   createdAt: string | null
 }
 
+export type AdminPaymentProofRecord = {
+  id: string
+  applicationDocId: string
+  ownerFirebaseUid: string
+  applicantName: string
+  installmentNumber: number
+  amount: number
+  status: 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED' | 'REJECTING'
+  fileName: string
+  mimeType: string
+  size: number
+  submittedAt: string
+}
+
 export const APPLICATION_STATUSES = [
   'SUBMITTED',
   'ELIGIBILITY_REVIEW',

@@ -19,6 +19,7 @@ import { buildDocumentFileName } from '@/lib/documents'
 import { buildAkadDocument } from '@/lib/akad-document'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
 import { getStaffSession } from '@/lib/firebase-session'
+import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
 import { ensureStudentNumber, studentNumberSequence } from '@/lib/student-number'
 import { FINANCING_OPTIONS } from '@/lib/financing-plan'
 import {
@@ -44,6 +45,162 @@ const assertStaffDocumentId = async (
     return { staff, error: { ok: false, message: 'Pengajuan tidak valid.' } }
   }
   return { staff, error: null }
+}
+
+const assertPaymentProofId = async (proofId: string) => {
+  const staff = await getStaffSession()
+  if (!staff) return { staff, error: { ok: false as const, message: 'Sesi staf berakhir.' } }
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(proofId)) {
+    return { staff, error: { ok: false as const, message: 'Bukti pembayaran tidak valid.' } }
+  }
+  return { staff, error: null }
+}
+
+export async function approvePaymentProof(proofId: string): Promise<ActionResult> {
+  const { staff, error } = await assertPaymentProofId(proofId)
+  if (error) return error
+  try {
+    const db = getFirebaseFirestore()
+    const proofRef = db.collection('paymentProofs').doc(proofId)
+    const paymentRef = db.collection('payments').doc(`proof-${proofId}`)
+    const result = await db.runTransaction(async (transaction) => {
+      const proofSnapshot = await transaction.get(proofRef)
+      if (!proofSnapshot.exists) return 'missing'
+      const proof = proofSnapshot.data() ?? {}
+      if (proof.status !== 'PENDING_REVIEW') return 'processed'
+      const applicationDocId = String(proof.applicationDocId ?? '')
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(applicationDocId)) return 'invalid'
+      const applicationRef = db.collection('applications').doc(applicationDocId)
+      const paymentsQuery = db
+        .collection('payments')
+        .where('applicationDocId', '==', applicationDocId)
+        .limit(200)
+      const [applicationSnapshot, existingPayment, existingPayments] = await Promise.all([
+        transaction.get(applicationRef),
+        transaction.get(paymentRef),
+        transaction.get(paymentsQuery),
+      ])
+      if (!applicationSnapshot.exists) return 'application-missing'
+      if (existingPayment.exists) return 'processed'
+      const application = applicationSnapshot.data() ?? {}
+      if (application.status !== 'ACTIVE') return 'inactive'
+      const installmentNumber = Number(proof.installmentNumber)
+      const amount = Number(proof.amount)
+      if (
+        !Number.isSafeInteger(installmentNumber) ||
+        installmentNumber < 1 ||
+        !Number.isSafeInteger(amount) ||
+        amount < 1
+      )
+        return 'invalid'
+      const schedule = resolveInstallmentSchedule(
+        application.product,
+        (application.financialPlan ?? {}) as Record<string, unknown>,
+      )
+      const scheduleRow = schedule.find((row) => row.installment === installmentNumber)
+      if (!scheduleRow) return 'schedule-missing'
+      const paidSet = new Set<number>(
+        Array.isArray(application.paidInstallments)
+          ? application.paidInstallments.filter((value): value is number => Number.isInteger(value))
+          : [],
+      )
+      const priorAmount = existingPayments.docs.reduce((sum, paymentDocument) => {
+        const payment = paymentDocument.data()
+        return payment.status === 'PAID' && payment.installmentNumber === installmentNumber
+          ? sum + (Number.isSafeInteger(payment.amount) ? Number(payment.amount) : 0)
+          : sum
+      }, 0)
+      if (paidSet.has(installmentNumber) || priorAmount >= scheduleRow.amount) return 'already-paid'
+      if (amount > scheduleRow.amount - priorAmount) return 'amount-exceeds-balance'
+      const nextInstallmentAmount = priorAmount + amount
+      if (nextInstallmentAmount >= scheduleRow.amount) paidSet.add(installmentNumber)
+      const now = new Date().toISOString()
+      const applicationId = String(application.applicationId ?? '')
+      transaction.create(paymentRef, {
+        applicationDocId,
+        applicationId,
+        ownerFirebaseUid: String(proof.ownerFirebaseUid ?? application.ownerFirebaseUid ?? ''),
+        type: 'INSTALLMENT',
+        installmentNumber,
+        amount,
+        description: `Angsuran ${installmentNumber} · Bukti transfer`,
+        status: 'PAID',
+        paidAt: now,
+        paidMethod: 'BANK_TRANSFER',
+        paidChannel: 'BRI',
+        paymentProofId: proofId,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+      transaction.update(proofRef, {
+        status: 'VERIFIED',
+        reviewedAt: FieldValue.serverTimestamp(),
+        reviewedBy: staff?.email ?? staff?.uid,
+        paymentId: paymentRef.id,
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+      transaction.update(applicationRef, {
+        paidInstallments: [...paidSet].sort((a, b) => a - b),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+      return 'approved'
+    })
+    if (result === 'approved') return { ok: true }
+    const messages: Record<string, string> = {
+      missing: 'Bukti pembayaran sudah tidak tersedia.',
+      processed: 'Bukti pembayaran ini sudah diproses.',
+      invalid: 'Data bukti pembayaran tidak valid.',
+      'application-missing': 'Data siswa tidak ditemukan.',
+      inactive: 'Program siswa tidak sedang aktif.',
+      'schedule-missing': 'Jadwal angsuran tidak ditemukan untuk bukti ini.',
+      'already-paid': 'Angsuran ini sudah tercatat lunas.',
+      'amount-exceeds-balance': 'Nominal bukti melebihi sisa angsuran ini.',
+    }
+    return { ok: false, message: messages[result] ?? 'Bukti pembayaran belum dapat disetujui.' }
+  } catch {
+    return { ok: false, message: 'Bukti pembayaran belum dapat disetujui. Coba lagi.' }
+  }
+}
+
+export async function rejectAndDeletePaymentProof(proofId: string): Promise<ActionResult> {
+  const { error } = await assertPaymentProofId(proofId)
+  if (error) return error
+  const db = getFirebaseFirestore()
+  const proofRef = db.collection('paymentProofs').doc(proofId)
+  try {
+    const claim = await db.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(proofRef)
+      if (!snapshot.exists) return { result: 'missing' as const }
+      const proof = snapshot.data() ?? {}
+      if (proof.status !== 'PENDING_REVIEW') return { result: 'processed' as const }
+      const fileId = typeof proof.fileId === 'string' ? proof.fileId : ''
+      transaction.update(proofRef, { status: 'REJECTING', updatedAt: FieldValue.serverTimestamp() })
+      return { result: 'claimed' as const, fileId }
+    })
+    if (claim.result !== 'claimed') {
+      return {
+        ok: false,
+        message:
+          claim.result === 'missing'
+            ? 'Bukti pembayaran sudah tidak tersedia.'
+            : 'Bukti pembayaran ini sudah diproses.',
+      }
+    }
+    if (!claim.fileId || !(await deleteDriveFile(claim.fileId))) {
+      await proofRef
+        .update({ status: 'PENDING_REVIEW', updatedAt: FieldValue.serverTimestamp() })
+        .catch(() => {})
+      return { ok: false, message: 'Berkas bukti belum dapat dihapus dari Google Drive.' }
+    }
+    const latest = await proofRef.get()
+    if (latest.exists && latest.data()?.status === 'REJECTING') await proofRef.delete()
+    return { ok: true }
+  } catch {
+    await proofRef
+      .update({ status: 'PENDING_REVIEW', updatedAt: FieldValue.serverTimestamp() })
+      .catch(() => {})
+    return { ok: false, message: 'Bukti belum dapat dihapus. Coba lagi.' }
+  }
 }
 
 const appendFinancialHistory = (applicationData: DocumentData, entry: Record<string, unknown>) => {

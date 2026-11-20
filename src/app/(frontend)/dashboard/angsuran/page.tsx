@@ -205,6 +205,18 @@ function ApplicationTerms({
   ).padStart(2, '0')}`
   const displayedSchedule = flexibleSchedule.map((entry) => ({
     ...entry,
+    amount: entry.paid
+      ? entry.amount
+      : Math.max(
+          0,
+          entry.amount -
+            applicationPayments
+              .filter(
+                (payment) =>
+                  payment.status === 'PAID' && payment.installmentNumber === entry.installment,
+              )
+              .reduce((sum, payment) => sum + payment.amount, 0),
+        ),
     dueDate:
       firstUnpaidInstallment !== null && entry.installment >= firstUnpaidInstallment && !entry.paid
         ? addMonth(flexibleFirstDueDate, entry.installment - firstUnpaidInstallment)

@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation'
 import { AdminDashboard } from './admin-dashboard'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
 import { getStaffSession } from '@/lib/firebase-session'
-import type { AdminPaymentRecord, FinancingApplicationRecord } from '@/lib/firebase-data'
+import type {
+  AdminPaymentProofRecord,
+  AdminPaymentRecord,
+  FinancingApplicationRecord,
+} from '@/lib/firebase-data'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,11 +30,17 @@ export default async function AdminPage() {
   if (!staff) redirect('/')
 
   const db = getFirebaseFirestore()
-  const [snapshot, paymentSnapshot] = await Promise.all([
+  const [snapshot, paymentSnapshot, paymentProofSnapshot] = await Promise.all([
     db.collection('applications').orderBy('createdAt', 'desc').limit(500).get(),
     db
       .collection('payments')
       .orderBy('createdAt', 'desc')
+      .limit(500)
+      .get()
+      .catch(() => null),
+    db
+      .collection('paymentProofs')
+      .where('status', '==', 'PENDING_REVIEW')
       .limit(500)
       .get()
       .catch(() => null),
@@ -70,6 +80,38 @@ export default async function AdminPage() {
     }
   })
 
+  const paymentProofs: AdminPaymentProofRecord[] = (paymentProofSnapshot?.docs ?? []).flatMap(
+    (document) => {
+      const data = toPlainValue(document.data()) as Record<string, unknown>
+      if (
+        typeof data.applicationDocId !== 'string' ||
+        typeof data.ownerFirebaseUid !== 'string' ||
+        typeof data.applicantName !== 'string' ||
+        !Number.isInteger(data.installmentNumber) ||
+        !Number.isSafeInteger(data.amount) ||
+        typeof data.fileName !== 'string' ||
+        typeof data.mimeType !== 'string'
+      ) {
+        return []
+      }
+      return [
+        {
+          id: document.id,
+          applicationDocId: data.applicationDocId,
+          ownerFirebaseUid: data.ownerFirebaseUid,
+          applicantName: data.applicantName,
+          installmentNumber: Number(data.installmentNumber),
+          amount: Number(data.amount),
+          status: 'PENDING_REVIEW' as const,
+          fileName: data.fileName,
+          mimeType: data.mimeType,
+          size: Number.isSafeInteger(data.size) ? Number(data.size) : 0,
+          submittedAt: typeof data.submittedAt === 'string' ? data.submittedAt : '',
+        },
+      ]
+    },
+  )
+
   const todayIso = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
 
   return (
@@ -77,6 +119,7 @@ export default async function AdminPage() {
       applications={applications}
       email={staff.email ?? ''}
       payments={payments}
+      paymentProofs={paymentProofs}
       todayIso={todayIso}
     />
   )

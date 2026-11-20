@@ -92,7 +92,10 @@ export async function POST(request: Request) {
   const schedule = resolveInstallmentSchedule(application.product, plan)
   const scheduledRow = schedule.find((entry) => entry.installment === installmentNumber)
   const scheduledAmount = Number(scheduledRow?.amount)
-  if (!Number.isSafeInteger(scheduledAmount) || scheduledAmount < 1 || amount > scheduledAmount) {
+  if (!Number.isSafeInteger(scheduledAmount) || scheduledAmount < 1) {
+    return errorResponse('Jadwal angsuran tidak valid untuk pembayaran ini.', 409)
+  }
+  if (amount > scheduledAmount) {
     return errorResponse('Nominal transfer tidak boleh melebihi nilai angsuran ini.')
   }
 
@@ -108,14 +111,22 @@ export async function POST(request: Request) {
         )
       : [],
   )
+  let paidAmountForInstallment = 0
   for (const payment of paymentsSnapshot.docs) {
     const data = payment.data()
     if (data.status === 'PAID' && Number.isInteger(data.installmentNumber)) {
-      paidInstallments.add(Number(data.installmentNumber))
+      const number = Number(data.installmentNumber)
+      if (number === installmentNumber && Number.isSafeInteger(data.amount)) {
+        paidAmountForInstallment += Number(data.amount)
+      }
     }
   }
+  if (paidAmountForInstallment >= scheduledAmount) paidInstallments.add(installmentNumber)
   if (paidInstallments.has(installmentNumber)) {
     return errorResponse('Angsuran ini sudah tercatat lunas.', 409)
+  }
+  if (amount > scheduledAmount - paidAmountForInstallment) {
+    return errorResponse('Nominal transfer melebihi sisa angsuran ini.')
   }
   const firstUnpaidInstallment = schedule.find(
     (entry) => !paidInstallments.has(entry.installment),

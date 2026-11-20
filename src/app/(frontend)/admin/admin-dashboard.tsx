@@ -9,6 +9,7 @@ import { FINANCING_OPTIONS } from '@/lib/financing-plan'
 import {
   APPLICATION_STATUSES,
   PRICING_STATUSES,
+  type AdminPaymentProofRecord,
   type AdminPaymentRecord,
   type ApplicationDocumentStatus,
   type FinancingApplicationRecord,
@@ -29,6 +30,8 @@ import { AdminVipPanel } from './vip-panel'
 import { FinanceTermsFields } from './finance-terms-fields'
 import { FullCoverBudgetFields } from './full-cover-budget-fields'
 import { validateFullCoverBudget } from '@/lib/full-cover-budget'
+import { InstallmentMonitor } from './installment-monitor'
+import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
 
 const STATUS_LABELS: Record<(typeof APPLICATION_STATUSES)[number], string> = {
   SUBMITTED: 'Terkirim',
@@ -180,6 +183,7 @@ type MenuId =
   | 'contracts'
   | 'archiving'
   | 'students'
+  | 'paymentMonitor'
   | 'activeInstallments'
   | 'alumni'
   | 'vip'
@@ -248,6 +252,12 @@ const SIDEBAR_GROUPS: {
         label: 'Semua Siswa',
         subtitle: 'Direktori biodata siswa, LPK mitra, kesiapan keberangkatan, & berkas',
         defaultTab: 'documents',
+      },
+      {
+        id: 'paymentMonitor',
+        label: 'Monitor Angsuran',
+        subtitle: 'Tinjau bukti transfer siswa dan catat pembayaran yang disetujui',
+        defaultTab: 'installment-history',
       },
     ],
   },
@@ -391,6 +401,23 @@ function MenuIcon({ id }: { id: MenuId }) {
           <circle cx="9" cy="7" r="4" />
           <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" strokeLinecap="round" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0-3-3.85" strokeLinecap="round" />
+        </svg>
+      )
+    case 'paymentMonitor':
+      return (
+        <svg
+          className="size-4 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.8}
+          viewBox="0 0 24 24"
+        >
+          <rect height="17" rx="2" width="17" x="3.5" y="3.5" />
+          <path
+            d="M7 8h10M7 12h4m2.5 4.5 1.5 1.5 3-3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       )
     case 'contracts':
@@ -541,18 +568,6 @@ type InstallmentDetail = ScheduleRow & {
   isPartial: boolean
 }
 
-const readScheduleRows = (value: unknown): ScheduleRow[] => {
-  if (!Array.isArray(value)) return []
-  return value.filter(
-    (item): item is ScheduleRow =>
-      Boolean(item) &&
-      typeof item === 'object' &&
-      typeof (item as ScheduleRow).installment === 'number' &&
-      typeof (item as ScheduleRow).dueDate === 'string' &&
-      typeof (item as ScheduleRow).amount === 'number',
-  )
-}
-
 const addDaysIso = (iso: string, days: number) => {
   const date = new Date(`${iso}T00:00:00Z`)
   date.setUTCDate(date.getUTCDate() + days)
@@ -581,17 +596,16 @@ const summarizeInstallments = (
   todayIso: string,
   payments: AdminPaymentRecord[] = [],
 ): InstallmentSummary => {
-  const schedule = readScheduleRows(app.financialPlan?.schedule)
+  const schedule = resolveInstallmentSchedule(app.product, app.financialPlan ?? {})
   const paidSet = new Set(Array.isArray(app.paidInstallments) ? app.paidInstallments : [])
   const isLegacy =
     Boolean(app.legacy) ||
     (typeof app.contractScheme === 'string' && app.contractScheme.startsWith('LEGACY_'))
-  const applicationPayments = isLegacy
-    ? payments.filter(
-        (payment) =>
-          payment.applicationDocId === app.id || payment.applicationId === app.applicationId,
-      )
-    : []
+  const applicationPayments = payments.filter(
+    (payment) =>
+      payment.applicationDocId === app.id ||
+      (!payment.applicationDocId && payment.applicationId === app.applicationId),
+  )
   const paidApplicationPayments = applicationPayments.filter((payment) => payment.status === 'PAID')
   const allocatedByInstallment = new Map<number, number>()
   for (const payment of paidApplicationPayments) {
@@ -603,15 +617,8 @@ const summarizeInstallments = (
   }
   const rows: InstallmentDetail[] = schedule.map((row) => {
     const allocatedAmount = Math.min(row.amount, allocatedByInstallment.get(row.installment) ?? 0)
-    const isPaid =
-      paidSet.has(row.installment) || (isLegacy && row.amount > 0 && allocatedAmount >= row.amount)
-    const appliedAmount = isPaid
-      ? row.amount
-      : isLegacy
-        ? allocatedAmount
-        : paidSet.has(row.installment)
-          ? row.amount
-          : 0
+    const isPaid = paidSet.has(row.installment) || (row.amount > 0 && allocatedAmount >= row.amount)
+    const appliedAmount = isPaid ? row.amount : allocatedAmount
     return {
       ...row,
       appliedAmount,
@@ -640,8 +647,8 @@ const summarizeInstallments = (
   )
   const soon = addDaysIso(todayIso, 7)
   const nextDue = unpaidRows[0] ?? null
-  const overdueCount = unpaidRows.filter(
-    (row) => row.dueDate < todayIso && (isLegacy || row.isPartial),
+  const overdueCount = unpaidRows.filter((row) =>
+    Boolean(row.dueDate && row.dueDate < todayIso && (isLegacy || row.isPartial)),
   ).length
   return {
     schedule,
@@ -3317,10 +3324,10 @@ function ApplicationDrawerForm({
             const paidAmount = installmentSummary.paidAmount
             const remaining = installmentSummary.remaining
             const isStarted = paidAmount > 0
-            const legacyPayments = payments.filter(
+            const applicationPayments = payments.filter(
               (payment) =>
                 payment.applicationDocId === application.id ||
-                payment.applicationId === application.applicationId,
+                (!payment.applicationDocId && payment.applicationId === application.applicationId),
             )
 
             return (
@@ -3567,25 +3574,31 @@ function ApplicationDrawerForm({
                           </tbody>
                         </table>
                       </div>
-                      {installmentSummary.isLegacy && (
-                        <div className="border-t border-slate-100 p-4">
-                          <h4 className="mb-2 text-xs font-bold text-slate-700">
-                            Riwayat Transaksi LGC ({legacyPayments.length})
-                          </h4>
-                          {legacyPayments.length > 0 ? (
-                            <div className="overflow-x-auto rounded-xl border border-slate-200">
-                              <table className="w-full border-collapse text-left text-xs">
-                                <thead>
-                                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                    <th className="px-3 py-2">Tanggal</th>
-                                    <th className="px-3 py-2">Alokasi</th>
-                                    <th className="px-3 py-2">Keterangan</th>
-                                    <th className="px-3 py-2 text-right">Nominal</th>
-                                    <th className="px-3 py-2">Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {legacyPayments.map((payment) => (
+                      <div className="border-t border-slate-100 p-4">
+                        <h4 className="mb-2 text-xs font-bold text-slate-700">
+                          Riwayat Transaksi Angsuran (
+                          {
+                            applicationPayments.filter((payment) => payment.type === 'INSTALLMENT')
+                              .length
+                          }
+                          )
+                        </h4>
+                        {applicationPayments.some((payment) => payment.type === 'INSTALLMENT') ? (
+                          <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="w-full border-collapse text-left text-xs">
+                              <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                  <th className="px-3 py-2">Tanggal</th>
+                                  <th className="px-3 py-2">Alokasi</th>
+                                  <th className="px-3 py-2">Keterangan</th>
+                                  <th className="px-3 py-2 text-right">Nominal</th>
+                                  <th className="px-3 py-2">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {applicationPayments
+                                  .filter((payment) => payment.type === 'INSTALLMENT')
+                                  .map((payment) => (
                                     <tr
                                       className="border-b border-slate-100 last:border-0"
                                       key={payment.id}
@@ -3599,7 +3612,7 @@ function ApplicationDrawerForm({
                                           : 'Belum dialokasikan'}
                                       </td>
                                       <td className="px-3 py-2 text-slate-700">
-                                        {payment.description || 'Pembayaran legacy'}
+                                        {payment.description || 'Pembayaran angsuran'}
                                       </td>
                                       <td className="whitespace-nowrap px-3 py-2 text-right font-medium text-slate-900">
                                         {formatRupiah(payment.amount)}
@@ -3609,16 +3622,15 @@ function ApplicationDrawerForm({
                                       </td>
                                     </tr>
                                   ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-500">
-                              Belum ada transaksi legacy yang tercatat.
-                            </p>
-                          )}
-                        </div>
-                      )}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-500">
+                            Belum ada transaksi angsuran yang tercatat.
+                          </p>
+                        )}
+                      </div>
                     </>
                   )}
                 </section>
@@ -4312,11 +4324,13 @@ export function AdminDashboard({
   email,
   applications,
   payments = [],
+  paymentProofs = [],
   todayIso,
 }: {
   email: string
   applications: FinancingApplicationRecord[]
   payments?: AdminPaymentRecord[]
+  paymentProofs?: AdminPaymentProofRecord[]
   todayIso: string
 }) {
   const router = useRouter()
@@ -5060,6 +5074,8 @@ export function AdminDashboard({
         ).length
       case 'students':
         return applications.length
+      case 'paymentMonitor':
+        return paymentProofs.filter((proof) => proof.status === 'PENDING_REVIEW').length
       case 'contracts':
         return contractPrepApplications.length
       case 'archiving':
@@ -7319,7 +7335,11 @@ export function AdminDashboard({
             </div>
           )}
 
-          {/* 6. MENU: SISWA AKTIF (Outstanding & Active Students) */}
+          {activeMenu === 'paymentMonitor' && (
+            <InstallmentMonitor applications={applications} proofs={paymentProofs} />
+          )}
+
+          {/* MENU: SISWA AKTIF (Outstanding & Active Students) */}
           {activeMenu === 'activeInstallments' && (
             <div className="space-y-5">
               {/* Executive Hero Banner — Siswa Aktif */}

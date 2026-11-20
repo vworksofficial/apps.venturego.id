@@ -177,7 +177,18 @@ const setProgramFooter = async (zip: JSZip, programName: string): Promise<void> 
   const footerFile = zip.file('word/footer1.xml')
   if (!footerFile) return
   const footer = await footerFile.async('string')
-  const parafTable = /<w:tbl>[\s\S]*?<\/w:tbl>/.exec(footer)?.[0]
+  const tableStack: number[] = []
+  const tables: string[] = []
+  for (const match of footer.matchAll(/<\/?w:tbl(?:\s[^>]*)?>/g)) {
+    const position = match.index ?? 0
+    if (match[0].startsWith('</')) {
+      const start = tableStack.pop()
+      if (start !== undefined) tables.push(footer.slice(start, position + match[0].length))
+    } else {
+      tableStack.push(position)
+    }
+  }
+  const parafTable = tables[0]
   if (!parafTable) return
 
   const cellMargins =
@@ -189,7 +200,10 @@ const setProgramFooter = async (zip: JSZip, programName: string): Promise<void> 
   const pageNumberCell = `<w:tc><w:tcPr><w:tcW w:w="3212" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:fldSimple w:instr=" PAGE " w:dirty="true"><w:r><w:rPr><w:color w:val="64748B"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t>1</w:t></w:r></w:fldSimple></w:p></w:tc>`
   const rightParafCell = `<w:tc><w:tcPr><w:tcW w:w="3213" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>${parafTable}<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p></w:tc>`
   const footerLayout = `<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${outerBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="3213"/><w:gridCol w:w="3212"/><w:gridCol w:w="3213"/></w:tblGrid><w:tr>${leftProgramCell}${pageNumberCell}${rightParafCell}</w:tr></w:tbl>`
-  zip.file('word/footer1.xml', footer.replace(parafTable, footerLayout))
+  zip.file(
+    'word/footer1.xml',
+    footer.replace(/(<w:ftr(?:\s[^>]*)?>)[\s\S]*?(<\/w:ftr>)/, `$1${footerLayout}$2`),
+  )
 }
 
 const DRAFT_WATERMARK_VML =
@@ -288,7 +302,22 @@ const findTableByMarker = (xml: string, marker: string): { start: number; end: n
 }
 
 const removeDraftTemplateNotice = (xml: string): string => {
-  const notice = findTableByMarker(xml, 'Draft template.')
+  const stack: number[] = []
+  const matches: { start: number; end: number; length: number }[] = []
+  for (const match of xml.matchAll(/<\/?w:tbl(?:\s[^>]*)?>/g)) {
+    const position = match.index ?? 0
+    if (match[0].startsWith('</')) {
+      const start = stack.pop()
+      if (start !== undefined) {
+        const end = position + match[0].length
+        const table = xml.slice(start, end)
+        if (table.includes('Draft template.')) matches.push({ start, end, length: end - start })
+      }
+    } else {
+      stack.push(position)
+    }
+  }
+  const notice = matches.sort((left, right) => left.length - right.length)[0]
   return notice ? `${xml.slice(0, notice.start)}${xml.slice(notice.end)}` : xml
 }
 
@@ -296,49 +325,21 @@ const updateParagraphContaining = (
   xml: string,
   marker: string,
   replacement: string | null,
-): string =>
-  xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (paragraph) => {
+): string => {
+  return xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (paragraph) => {
     const text = Array.from(paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g), (match) =>
       unescapeXml(match[1]),
     ).join('')
     if (!text.includes(marker)) return paragraph
     if (replacement === null) return ''
-    const paragraphProperties = paragraph.match(/<w:pPr[\s\S]*?<\/w:pPr>/)?.[0] ?? ''
-    const runProperties = paragraph.match(/<w:rPr[\s\S]*?<\/w:rPr>/)?.[0] ?? ''
-    return `<w:p>${paragraphProperties}<w:r>${runProperties}<w:t xml:space="preserve">${escapeXml(replacement)}</w:t></w:r></w:p>`
+    let replaced = false
+    return paragraph.replace(/<w:t(?:\s[^>]*)?>[\s\S]*?<\/w:t>/g, (textRun) => {
+      if (replaced) return textRun
+      replaced = true
+      const opening = textRun.match(/^<w:t(?:\s[^>]*)?>/)?.[0] ?? '<w:t>'
+      return `${opening}${escapeXml(replacement)}</w:t>`
+    })
   })
-
-const WAKALAH_GUARDIAN_HEADING =
-  '<w:p><w:pPr><w:keepNext/><w:spacing w:after="0" w:before="240"/><w:jc w:val="center"/></w:pPr>' +
-  '<w:r><w:rPr><w:b w:val="false"/><w:bCs w:val="false"/><w:i w:val="false"/><w:iCs w:val="false"/></w:rPr>' +
-  '<w:t xml:space="preserve">Wali/Orang Tua Siswa</w:t></w:r></w:p>'
-
-const insertParagraphAfterContaining = (xml: string, marker: string, paragraph: string): string =>
-  xml.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g, (match) => {
-    const text = Array.from(match.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g), (m) =>
-      unescapeXml(m[1]),
-    ).join('')
-    return text.includes(marker) ? `${match}${paragraph}` : match
-  })
-
-const removeParagraphSection = (xml: string, startLabel: string, endLabel: string): string => {
-  const paragraphs = Array.from(xml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g))
-  const paragraphText = (paragraph: string) =>
-    Array.from(paragraph.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g), (match) =>
-      unescapeXml(match[1]),
-    )
-      .join('')
-      .trim()
-  const start = paragraphs.find((match) => paragraphText(match[0]).startsWith(startLabel))
-  if (!start || start.index === undefined) return xml
-  const end = paragraphs.find(
-    (match) =>
-      match.index !== undefined &&
-      match.index > start.index! &&
-      paragraphText(match[0]).startsWith(endLabel),
-  )
-  if (!end || end.index === undefined) return xml
-  return xml.slice(0, start.index) + xml.slice(end.index)
 }
 
 const splitRows = (table: string): string[] =>
@@ -727,6 +728,8 @@ const buildScheduleRowTemplates = (xml: string): string | null => {
 type ResolvedValues = {
   studentSequence: string
   issuedAt: Date
+  destinationName: string
+  destinationCode: string
   name: string
   ttl: string | null
   address: string | null
@@ -777,12 +780,16 @@ const buildCommonArrays = (values: ResolvedValues) => {
     '[bulan romawi]': [ROMAN_MONTHS[values.issuedAt.getUTCMonth()] ?? ''],
     '[tahun]': [String(values.issuedAt.getUTCFullYear())],
     '[hari]': [weekday],
-    '[nama lengkap]': [values.name],
+    // The reviewed Dana Keberangkatan template uses the applicant name in
+    // both the identity paragraph and the signature block.
+    '[nama lengkap]': [values.name, values.name],
     '[tempat, tanggal lahir]': [values.ttl],
     '[alamat sesuai KTP]': [values.address],
     '[agama]': [values.religion],
     '[nomor KTP]': [values.nik ?? '……………………'],
     '[nomor HP]': [values.phone],
+    '[negara tujuan]': Array.from({ length: 8 }, () => values.destinationName),
+    '[kode tujuan]': [values.destinationCode],
     '[mitra]': [values.lpkMitra, values.lpkMitra],
     '[nama Pihak Kedua]': [values.name],
     '[nama lengkap Pihak Kedua]': [values.name],
@@ -810,6 +817,8 @@ const resolveWakalah = (
     case '[agama]':
     case '[nomor KTP]':
     case '[nomor HP]':
+    case '[negara tujuan]':
+    case '[kode tujuan]':
     case '[mitra]':
     case '[nama Pihak Kedua]': {
       const list = common[token as keyof typeof common]
@@ -837,9 +846,9 @@ const resolveWakalah = (
     case '[hapus bila tidak ada]':
       return ''
     case '[pihak mediator, jika ada]':
-      return values.wakalahMediator ?? ''
+      return values.wakalahMediator ? ` dengan mediator ${values.wakalahMediator}` : ''
     case '[atau lembaga lain yang disepakati dan berwenang]':
-      return values.wakalahDisputeInstitution ?? ''
+      return values.wakalahDisputeInstitution ? ` atau ${values.wakalahDisputeInstitution}` : ''
     case '[nominal]':
       return at(
         values.qardhAmount > 0
@@ -887,6 +896,9 @@ const resolveJualah = (token: string, index: number, values: ResolvedValues): st
     case '[alamat sesuai KTP]':
     case '[agama]':
     case '[nomor KTP]':
+    case '[nomor HP]':
+    case '[negara tujuan]':
+    case '[kode tujuan]':
     case '[nama lengkap Pihak Kedua]': {
       const list = common[token as keyof typeof common]
       if (!Array.isArray(list)) return null
@@ -973,8 +985,28 @@ const fillTokens = (
   return xml.replace(/\[[^\[\]]{1,80}\]/g, (token) => {
     const index = counters.get(token) ?? 0
     counters.set(token, index + 1)
-    const value = resolve(token, index)
+    let value: string | null
+    value = resolve(token, index)
     return value === null ? token : escapeXml(value)
+  })
+}
+
+const ensureUniqueParagraphIds = (xml: string): string => {
+  const used = new Set<string>()
+  let nextId = 0x00010000
+  return xml.replace(/w14:paraId="([0-9a-fA-F]{8})"/g, (attribute, id: string) => {
+    if (!used.has(id)) {
+      used.add(id)
+      return attribute
+    }
+    let replacement = nextId.toString(16).toUpperCase().padStart(8, '0')
+    while (used.has(replacement)) {
+      nextId += 1
+      replacement = nextId.toString(16).toUpperCase().padStart(8, '0')
+    }
+    used.add(replacement)
+    nextId += 1
+    return `w14:paraId="${replacement}"`
   })
 }
 
@@ -997,6 +1029,8 @@ const deriveFirstPaymentDate = (application: ApplicationData): string => {
 
 const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedValues => {
   const product = readText(application.product)
+  const destinationCode = readText(application.destination) === 'TURKEY' ? 'TUR' : 'JPN'
+  const destinationName = destinationCode === 'TUR' ? 'Turki' : 'Jepang'
   const storedPlan = (application.financialPlan ?? {}) as Record<string, unknown>
   const plan = product === 'FULL_COVER' ? storedPlan : withDraft1Defaults({ ...storedPlan })
   const personal = (application.personalDetails ?? {}) as Record<string, unknown>
@@ -1054,6 +1088,8 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
     return {
       studentSequence: '',
       issuedAt,
+      destinationName,
+      destinationCode,
       name,
       ttl,
       address,
@@ -1151,6 +1187,8 @@ const resolveValues = (application: ApplicationData, issuedAt: Date): ResolvedVa
   return {
     studentSequence: '',
     issuedAt,
+    destinationName,
+    destinationCode,
     name,
     ttl,
     address,
@@ -1240,7 +1278,7 @@ export const buildAkadDocument = async (options: {
       'No. [nomor kontrak]',
       template === 'JUALAH'
         ? 'DRAFT — [nomor kontrak]/WKL-JAL-JPN/VSV-WSB/[bulan romawi]/[tahun]'
-        : 'DRAFT — [nomor kontrak]/WKL-JPN/VSV-WSB/[bulan romawi]/[tahun]',
+        : 'DRAFT — [nomor kontrak]/WKL-[kode tujuan]/VSV-WSB/[bulan romawi]/[tahun]',
     )
   } else {
     xml = removeDraftTemplateNotice(xml)
@@ -1250,43 +1288,30 @@ export const buildAkadDocument = async (options: {
   values.studentSequence = studentSequence
   xml = updateParagraphContaining(
     xml,
-    'LPK Cahaya Indonesia Langgeng',
+    'Mitra Venturego (LPK)',
     values.lpkWitnessName
       ? `LPK ${values.lpkMitra ?? 'mitra'} — ${values.lpkWitnessName}`
-      : 'Mitra Venturego (LPK)',
+      : `Mitra ${values.lpkMitra ?? 'Venturego'} (LPK)`,
   )
-  xml = updateParagraphContaining(
-    xml,
-    'bulan pertama setelah keberangkatan ke Jepang',
-    template === 'JUALAH'
-      ? `angsuran dibayar setiap tanggal ${values.installmentPaymentDay}, dimulai pada bulan siswa mulai bekerja dan menerima penghasilan di negara tujuan`
-      : 'mulai dibayar ketika siswa sudah menerima gaji kedua di negara tujuan',
-  )
+  if (template === 'JUALAH') {
+    xml = updateParagraphContaining(
+      xml,
+      'bulan pertama setelah keberangkatan ke Jepang',
+      `angsuran dibayar setiap tanggal ${values.installmentPaymentDay}, dimulai pada bulan siswa mulai bekerja dan menerima penghasilan di negara tujuan`,
+    )
+  }
 
   assertTokenCount(xml, '[nomor kontrak]', 1)
 
   if (template === 'WAKALAH') {
     xml = updateParagraphContaining(
       xml,
-      'Wali/Orang tua ',
-      values.guardianName ? `Wali/Orang tua PIHAK KEDUA: ${values.guardianName}` : null,
-    )
-    xml = insertParagraphAfterContaining(
-      xml,
-      'Mengetahui dan menyetujui:',
-      WAKALAH_GUARDIAN_HEADING,
+      'Wali/Orang Tua Siswa',
+      values.guardianName ? `Wali/Orang Tua: ${values.guardianName}` : 'Wali/Orang Tua Siswa',
     )
 
     const nafaqahItems = values.nafaqahItems
     const ujrahItems = values.ujrahItems
-    const ticketIncluded = nafaqahItems.some((item) => /tiket/i.test(item.label))
-    if (!ticketIncluded) {
-      xml = updateParagraphContaining(xml, 'Biaya tiket dan keperluan keberangkatan', null)
-    }
-    xml = removeParagraphSection(xml, 'Pasal 4', 'Pasal 5')
-    for (let pasal = 5; pasal <= 13; pasal += 1) {
-      xml = xml.replace(new RegExp(`Pasal ${pasal}(?!\\d)`, 'g'), `Pasal ${pasal - 1}`)
-    }
     if (values.qardhAmount > 0) {
       xml = updateParagraphContaining(
         xml,
@@ -1316,7 +1341,7 @@ export const buildAkadDocument = async (options: {
       const scheduleRows = schedule.map((entry) =>
         replaceTableRowCells(scheduleRowModel as string, [
           String(entry.installment),
-          '',
+          formatIsoLongDate(entry.dueDate) ?? '',
           `Rp${rp(entry.amount)}`,
           `Rp${rp(entry.remainingBalance)}`,
         ]),
@@ -1370,6 +1395,7 @@ export const buildAkadDocument = async (options: {
     xml = fillTokens(xml, (token, index) => resolveJualah(token, index, values))
   }
 
+  xml = ensureUniqueParagraphIds(xml)
   xml = addAppendixReceiptSignatureSpace(xml)
   zip.file('word/document.xml', xml)
   if (draft) {
@@ -1395,7 +1421,7 @@ export const buildAkadDocument = async (options: {
   const documentNumber =
     template === 'JUALAH'
       ? `${sequence}/WKL-JAL-JPN/VSV-WSB/${romawi}/${year}`
-      : `${sequence}/WKL-JPN/VSV-WSB/${romawi}/${year}`
+      : `${sequence}/WKL-${values.destinationCode}/VSV-WSB/${romawi}/${year}`
 
   return { bytes, documentNumber, template }
 }

@@ -632,9 +632,14 @@ export default function DashboardPage() {
                           <SkeletonBlock className="h-7 w-24 rounded-full" />
                         </div>
                         <SkeletonBlock className="h-2 w-full rounded-full" />
-                        <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+                        <div
+                          className="mt-5 grid gap-3 border-t border-slate-100 pt-4"
+                          style={{ gridTemplateColumns: application ? '1fr 3fr' : '2fr 3fr' }}
+                        >
                           <SkeletonBlock className="h-10 w-full" />
-                          <SkeletonBlock className="h-10 w-full" />
+                          <div className="border-l border-slate-100 pl-4">
+                            <SkeletonBlock className="h-10 w-full" />
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1051,22 +1056,33 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className={`grid ${canApply ? 'grid-cols-5' : 'grid-cols-4'} gap-2`}>
-              {quickActions
-                .filter((action) => canApply || action.label !== 'Ajukan baru')
-                .map((action) => (
-                  <Link
-                    className="group flex min-w-0 flex-col items-center gap-2 text-center"
-                    href={action.href}
-                    key={action.label}
-                  >
-                    <span className="grid size-13 place-items-center rounded-2xl bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-100 transition group-hover:-translate-y-0.5 group-hover:shadow-md">
-                      <Icon name={action.icon} className="size-5" />
-                    </span>
-                    <span className="text-[10px] font-semibold leading-4 text-slate-600">
-                      {action.label}
-                    </span>
-                  </Link>
-                ))}
+              {loading
+                ? Array.from({ length: canApply ? 5 : 4 }, (_, index) => (
+                    <div
+                      aria-hidden="true"
+                      className="flex min-w-0 flex-col items-center gap-2"
+                      key={index}
+                    >
+                      <SkeletonBlock className="size-13 rounded-2xl" />
+                      <SkeletonBlock className="h-2.5 w-12" />
+                    </div>
+                  ))
+                : quickActions
+                    .filter((action) => canApply || action.label !== 'Ajukan baru')
+                    .map((action) => (
+                      <Link
+                        className="group flex min-w-0 flex-col items-center gap-2 text-center"
+                        href={action.href}
+                        key={action.label}
+                      >
+                        <span className="grid size-13 place-items-center rounded-2xl bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-100 transition group-hover:-translate-y-0.5 group-hover:shadow-md">
+                          <Icon name={action.icon} className="size-5" />
+                        </span>
+                        <span className="text-[10px] font-semibold leading-4 text-slate-600">
+                          {action.label}
+                        </span>
+                      </Link>
+                    ))}
             </div>
           </section>
 
@@ -1104,15 +1120,24 @@ export default function DashboardPage() {
               {loading ? (
                 <div aria-label="Memuat alur pengajuan" className="space-y-5" role="status">
                   <span className="sr-only">Memuat alur pengajuan…</span>
-                  {progressSteps.map((item) => (
-                    <div className="flex items-center gap-4" key={item.step}>
-                      <SkeletonBlock className="size-8 shrink-0 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <SkeletonBlock className="h-3 w-2/5" />
-                        <SkeletonBlock className="h-2.5 w-4/5" />
-                      </div>
-                    </div>
-                  ))}
+                  <ol className="relative space-y-0">
+                    {progressSteps.map((item, index) => (
+                      <li className="flex gap-4" key={item.step}>
+                        <div className="flex flex-col items-center">
+                          <SkeletonBlock className="size-8 shrink-0 rounded-full" />
+                          {index < progressSteps.length - 1 && (
+                            <SkeletonBlock className="mt-1 min-h-7 w-0.5 flex-1 rounded-full" />
+                          )}
+                        </div>
+                        <div
+                          className={index < progressSteps.length - 1 ? 'flex-1 pb-5' : 'flex-1'}
+                        >
+                          <SkeletonBlock className="h-3 w-2/5" />
+                          <SkeletonBlock className="mt-1.5 h-2.5 w-4/5" />
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
               ) : (
                 <ol className="relative space-y-0">

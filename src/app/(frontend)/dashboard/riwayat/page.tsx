@@ -6,11 +6,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
 import { formatRupiah } from '@/lib/financing-plan'
 import { getUserActivityFeed, type UserApplicationDetail, type UserPaymentItem } from '../actions'
-import {
-  DashboardCardSkeleton,
-  DashboardIcon,
-  DashboardScaffold,
-} from '../_components/dashboard-ui'
+import { DashboardIcon, DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
 
 type FilterCategory = 'Semua' | 'Program' | 'Pembayaran' | 'Dokumen'
 type ActivityItem = {
@@ -281,7 +277,31 @@ export default function ActivityPage() {
         </span>
       </div>
 
-      {loading && <DashboardCardSkeleton rows={5} />}
+      {loading && (
+        <div aria-label="Memuat aktivitas" className="space-y-2" role="status">
+          <span className="sr-only">Memuat aktivitas…</span>
+          <SkeletonBlock className="mb-2 h-3 w-24" />
+          <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100">
+            {Array.from({ length: 5 }, (_, index) => (
+              <article
+                className={`flex items-center gap-3 px-3.5 py-3.5 ${index < 4 ? 'border-b border-slate-100' : ''}`}
+                key={index}
+              >
+                <SkeletonBlock className="size-10 shrink-0 rounded-2xl" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <SkeletonBlock className="h-3 w-3/5" />
+                  <SkeletonBlock className="h-2.5 w-4/5" />
+                  <SkeletonBlock className="h-2 w-12" />
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <SkeletonBlock className="h-5 w-16 rounded-full" />
+                  {index % 2 === 0 && <SkeletonBlock className="h-2.5 w-14" />}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!loading && error && (
         <section

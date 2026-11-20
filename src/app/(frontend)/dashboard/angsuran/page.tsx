@@ -15,7 +15,7 @@ import {
   type UserFinancingResult,
   type UserPaymentProof,
 } from './actions'
-import { DashboardCardSkeleton, DashboardScaffold } from '../_components/dashboard-ui'
+import { DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
 
 type UserApplication = Extract<UserFinancingResult, { ok: true }>['applications'][number]
 type UserPayment = Extract<UserFinancingResult, { ok: true }>['payments'][number]
@@ -1109,10 +1109,67 @@ export default function InstallmentsPage() {
       title="Angsuran saya"
     >
       {loading && (
-        <>
-          <DashboardCardSkeleton rows={3} />
-          <DashboardCardSkeleton rows={4} />
-        </>
+        <div aria-label="Memuat jadwal angsuran" className="-mx-5 -mt-5" role="status">
+          <span className="sr-only">Memuat jadwal angsuran…</span>
+          <section className="relative bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-5 pb-16 text-white">
+            <div className="flex flex-col items-center gap-5">
+              <div className="flex flex-col items-center gap-2">
+                <SkeletonBlock className="h-5 w-36 bg-white/25" />
+                <SkeletonBlock className="h-3 w-28 bg-white/20" />
+                <SkeletonBlock className="mt-2 h-9 w-56 rounded-full bg-white/25" />
+                <SkeletonBlock className="mt-1 h-2.5 w-48 bg-white/20" />
+              </div>
+              <div className="grid size-52 place-items-center rounded-full border-[10px] border-b-transparent border-white/25 bg-white/[0.06] sm:size-60">
+                <div className="flex flex-col items-center gap-2">
+                  <SkeletonBlock className="h-10 w-20 bg-white/25" />
+                  <SkeletonBlock className="h-3 w-12 bg-white/20" />
+                  <SkeletonBlock className="h-2.5 w-16 bg-white/20" />
+                </div>
+              </div>
+              <div className="-mt-1 flex flex-col items-center gap-2">
+                <SkeletonBlock className="h-3 w-36 bg-white/25" />
+                <SkeletonBlock className="h-3 w-32 bg-white/20" />
+              </div>
+            </div>
+          </section>
+          <section className="-mt-16 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 ring-1 ring-slate-200/70">
+            <div className="flex items-end justify-between gap-3 pb-3">
+              <div className="flex-1 space-y-2">
+                <SkeletonBlock className="h-4 w-32" />
+                <SkeletonBlock className="h-2.5 w-4/5" />
+                <SkeletonBlock className="h-2.5 w-2/5" />
+              </div>
+              <SkeletonBlock className="h-3 w-12 shrink-0" />
+            </div>
+            <div className="divide-y divide-slate-200 border-y border-slate-200">
+              {Array.from({ length: 5 }, (_, index) => (
+                <div className="flex items-center justify-between gap-3 py-3" key={index}>
+                  <div className="space-y-2">
+                    <SkeletonBlock className="h-3 w-20" />
+                    <SkeletonBlock className="h-2.5 w-24" />
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <SkeletonBlock className="h-3 w-20" />
+                    <SkeletonBlock className="h-7 w-14 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-3 border-t border-slate-200 pt-4">
+              <SkeletonBlock className="h-3 w-32" />
+              <div className="flex items-center justify-between gap-3 py-2">
+                <div className="space-y-2">
+                  <SkeletonBlock className="h-3 w-36" />
+                  <SkeletonBlock className="h-2.5 w-24" />
+                </div>
+                <div className="space-y-2">
+                  <SkeletonBlock className="h-3 w-20" />
+                  <SkeletonBlock className="h-2.5 w-14" />
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
       )}
       {error && (
         <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800" role="alert">

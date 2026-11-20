@@ -251,28 +251,54 @@ export default function ProfilePage() {
 
       <section>
         <h2 className="mb-3 text-sm font-bold text-slate-900">Menu profil</h2>
-        <DashboardCard>
-          {PROFILE_MENU.map((item) => (
-            <DashboardMenuRow
-              detail={item.detail}
-              href={item.href}
-              icon={item.icon}
-              key={item.href}
-              title={item.label}
-            />
-          ))}
-        </DashboardCard>
+        {profileLoading ? (
+          <div aria-label="Memuat menu profil" role="status">
+            <span className="sr-only">Memuat menu profil…</span>
+            <DashboardCard>
+              {PROFILE_MENU.map((item) => (
+                <div
+                  aria-hidden="true"
+                  className="flex items-center gap-3 border-b border-slate-100 p-4 last:border-b-0"
+                  key={item.href}
+                >
+                  <SkeletonBlock className="size-11 shrink-0 rounded-2xl" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <SkeletonBlock className="h-3 w-2/5" />
+                    <SkeletonBlock className="h-2.5 w-3/5" />
+                  </div>
+                  <SkeletonBlock className="size-4 shrink-0" />
+                </div>
+              ))}
+            </DashboardCard>
+          </div>
+        ) : (
+          <DashboardCard>
+            {PROFILE_MENU.map((item) => (
+              <DashboardMenuRow
+                detail={item.detail}
+                href={item.href}
+                icon={item.icon}
+                key={item.href}
+                title={item.label}
+              />
+            ))}
+          </DashboardCard>
+        )}
       </section>
 
       <section className="border-t border-slate-200 pt-4">
-        <button
-          className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
-          disabled={isLoggingOut}
-          onClick={logout}
-          type="button"
-        >
-          {isLoggingOut ? 'Keluar…' : 'Keluar dari akun'}
-        </button>
+        {profileLoading ? (
+          <SkeletonBlock className="h-12 w-full rounded-2xl" />
+        ) : (
+          <button
+            className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
+            disabled={isLoggingOut}
+            onClick={logout}
+            type="button"
+          >
+            {isLoggingOut ? 'Keluar…' : 'Keluar dari akun'}
+          </button>
+        )}
       </section>
     </DashboardScaffold>
   )

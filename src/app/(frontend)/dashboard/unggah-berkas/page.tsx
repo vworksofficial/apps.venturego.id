@@ -12,9 +12,9 @@ import { uploadToDrive } from '@/lib/upload-client'
 import { getOwnedApplications, type OwnedApplication } from './actions'
 import {
   DashboardCard,
-  DashboardCardSkeleton,
   DashboardIcon,
   DashboardScaffold,
+  SkeletonBlock,
 } from '../_components/dashboard-ui'
 
 const formatSize = (size?: number) => (size ? `${(size / 1024 / 1024).toFixed(1)} MB` : '')
@@ -226,11 +226,48 @@ export default function UploadDocumentsPage() {
       title="Unggah berkas"
     >
       {loading && (
-        <>
-          <DashboardCardSkeleton rows={2} />
-          <DashboardCardSkeleton rows={5} />
-          <DashboardCardSkeleton rows={4} />
-        </>
+        <div aria-label="Memuat dokumen" className="space-y-5" role="status">
+          <span className="sr-only">Memuat dokumen…</span>
+          <DashboardCard>
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <SkeletonBlock className="h-2.5 w-20" />
+                  <SkeletonBlock className="h-4 w-40" />
+                </div>
+                <SkeletonBlock className="h-6 w-20 rounded-full" />
+              </div>
+              <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+                <SkeletonBlock className="h-3 w-24" />
+                <SkeletonBlock className="h-3 w-28" />
+              </div>
+            </div>
+          </DashboardCard>
+          <div className="flex items-start gap-3 rounded-2xl bg-blue-50 p-4">
+            <SkeletonBlock className="size-5 shrink-0 rounded-md" />
+            <SkeletonBlock className="h-8 flex-1" />
+          </div>
+          {[3, 3, 2].map((count, groupIndex) => (
+            <section className="mt-4" key={groupIndex}>
+              <SkeletonBlock className="mb-2 ml-1 h-3 w-28" />
+              <DashboardCard>
+                {Array.from({ length: count }, (_, rowIndex) => (
+                  <div
+                    className={`flex items-center gap-3 p-4 ${rowIndex < count - 1 ? 'border-b border-slate-100' : ''}`}
+                    key={rowIndex}
+                  >
+                    <SkeletonBlock className="size-10 shrink-0 rounded-xl" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <SkeletonBlock className="h-3 w-3/5" />
+                      <SkeletonBlock className="h-2.5 w-4/5" />
+                    </div>
+                    <SkeletonBlock className="h-8 w-20 shrink-0 rounded-full" />
+                  </div>
+                ))}
+              </DashboardCard>
+            </section>
+          ))}
+        </div>
       )}
       {!loading && loadingError && (
         <div className="rounded-2xl bg-red-50 p-4 text-sm text-red-700" role="alert">

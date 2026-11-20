@@ -252,7 +252,7 @@ export function DashboardBottomNav({ active }: { active: PrimaryRoute | null }) 
   return (
     <nav
       aria-label="Navigasi utama"
-      className="fixed bottom-0 left-1/2 z-30 w-full max-w-[430px] -translate-x-1/2 pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-[430px] pb-[env(safe-area-inset-bottom)]"
     >
       <div className="flex w-full items-center rounded-t-[24px] bg-white/95 px-2 py-1.5 shadow-[0_-8px_28px_rgba(15,23,42,0.10)] ring-1 ring-slate-200/60 backdrop-blur-xl">
         {navigation.map((item) => {

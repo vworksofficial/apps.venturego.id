@@ -35,18 +35,18 @@ export function WalletCarousel({
   return (
     <section
       aria-roledescription="carousel"
-      className="overflow-hidden rounded-3xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.10)]"
+      className="w-full min-w-0 max-w-full overflow-hidden rounded-3xl bg-white shadow-[0_12px_32px_rgba(15,23,42,0.10)]"
       id={id}
     >
       <div
-        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex w-full min-w-0 max-w-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         ref={scroller}
       >
         {pages.map((page, index) => (
           <div
             aria-label={`${page.label} (${index + 1} dari ${pages.length})`}
             aria-roledescription="slide"
-            className="w-full shrink-0 snap-start snap-always p-5 pb-3"
+            className="w-full min-w-0 shrink-0 snap-start snap-always p-5 pb-3"
             key={page.key}
             role="group"
           >

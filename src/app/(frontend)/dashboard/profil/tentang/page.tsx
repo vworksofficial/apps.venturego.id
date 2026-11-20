@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import packageInfo from '../../../../../../package.json'
 import { DashboardCard, DashboardIcon, DashboardScaffold } from '../../_components/dashboard-ui'
+import { InstallAppButton } from '../../../_components/install-app-button'
 
 const FEATURES = [
   {
@@ -98,6 +99,9 @@ export default function AboutPage() {
           <p className="relative mt-3 text-[11px] leading-5 text-slate-600">
             Nomor rilis Vworks Student Venture yang sedang Anda gunakan.
           </p>
+          <div className="relative mt-4">
+            <InstallAppButton />
+          </div>
         </DashboardCard>
       </section>
 

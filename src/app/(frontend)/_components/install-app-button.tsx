@@ -12,6 +12,8 @@ type InstallableNavigator = Navigator & {
   standalone?: boolean
 }
 
+let pendingInstallPrompt: InstallPromptEvent | null = null
+
 export function InstallAppButton() {
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null)
   const [installAvailable, setInstallAvailable] = useState(false)
@@ -26,15 +28,19 @@ export function InstallAppButton() {
       window.matchMedia('(display-mode: standalone)').matches || appNavigator.standalone === true
 
     setInstalled(isStandalone)
+    setInstallPrompt(pendingInstallPrompt)
     setInstallAvailable(supportsWebInstall)
+    if (pendingInstallPrompt) setInstallAvailable(true)
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault()
-      setInstallPrompt(event as InstallPromptEvent)
+      pendingInstallPrompt = event as InstallPromptEvent
+      setInstallPrompt(pendingInstallPrompt)
       setInstallAvailable(true)
     }
     const onAppInstalled = () => {
       setInstalled(true)
+      pendingInstallPrompt = null
       setInstallPrompt(null)
     }
 
@@ -49,7 +55,7 @@ export function InstallAppButton() {
   const handleInstall = async () => {
     const appNavigator = window.navigator as InstallableNavigator
     const install = appNavigator.install
-    const prompt = installPrompt
+    const prompt = installPrompt ?? pendingInstallPrompt
     if (!install && !prompt) return
 
     setInstalling(true)
@@ -60,6 +66,7 @@ export function InstallAppButton() {
         await install.call(appNavigator)
         setInstalled(true)
       } else if (prompt) {
+        pendingInstallPrompt = null
         setInstallPrompt(null)
         await prompt.prompt()
         const { outcome } = await prompt.userChoice
@@ -81,7 +88,7 @@ export function InstallAppButton() {
     <>
       <button
         aria-live="polite"
-        className="welcome-secondary inline-flex items-center justify-center gap-2 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:cursor-default"
+        className="welcome-secondary inline-flex min-h-[58px] w-full items-center justify-center gap-2 rounded-full border border-blue-200 bg-white px-4 text-sm font-bold text-[#0b57d0] transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0] disabled:cursor-default disabled:opacity-70"
         disabled={installed || installing}
         onClick={handleInstall}
         type="button"

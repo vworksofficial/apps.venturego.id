@@ -51,7 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <>
-      {children}
+      <div className="dashboard-route-shell">{children}</div>
       <DashboardBottomNav active={activeRoute} />
     </>
   )

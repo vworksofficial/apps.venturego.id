@@ -41,12 +41,28 @@ body {
   margin: 0;
   max-width: 100%;
   overflow-x: clip;
+  overscroll-behavior-x: none;
   font-family: 'Inter Variable', Inter, Arial, Helvetica, sans-serif;
   color: var(--ink);
   background: var(--canvas);
 }
 
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.dashboard-route-shell {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 .dashboard-app {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   font-family: 'Inter Variable', Inter, Arial, Helvetica, sans-serif;
   overflow-x: clip;
 }

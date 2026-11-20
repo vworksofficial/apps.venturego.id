@@ -128,6 +128,7 @@ function ApplicationTerms({
   const scheduleStickyTopRef = useRef(128)
   const programButtonRef = useRef<HTMLButtonElement | null>(null)
   const scheduleSentinelRef = useRef<HTMLDivElement | null>(null)
+  const schedulePanelRef = useRef<HTMLElement | null>(null)
   const scheduleScrollRef = useRef<HTMLDivElement | null>(null)
   const plan = application.financialPlan
   const isFullCover = application.product === 'FULL_COVER'
@@ -325,9 +326,9 @@ function ApplicationTerms({
         }
         setSchedulePinned((current) => (current === pinned ? current : pinned))
         const scrollContent = scheduleScrollRef.current
-        const maxVisibleHeight = Math.max(160, window.innerHeight - stickyTop - 220)
+        const panelHeight = schedulePanelRef.current?.getBoundingClientRect().height ?? 0
         const reserve =
-          pinned && scrollContent ? Math.max(0, scrollContent.scrollHeight - maxVisibleHeight) : 0
+          pinned && scrollContent ? Math.max(0, window.innerHeight - stickyTop - panelHeight) : 0
         setScheduleFlowReserve((current) => (current === reserve ? current : reserve))
       })
     }
@@ -472,6 +473,7 @@ function ApplicationTerms({
         <section
           aria-label={`Jadwal angsuran ${programName}`}
           className="sticky z-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 ring-1 ring-slate-200/70"
+          ref={schedulePanelRef}
           style={{ top: scheduleStickyTop }}
         >
           <div className="flex items-end justify-between gap-3 pb-3">

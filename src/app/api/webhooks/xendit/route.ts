@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
-import { isValidXenditCallbackToken } from '@/lib/xendit'
+import { isValidXenditCallbackToken } from '@/lib/xendit-callback'
 
 const readString = (value: unknown): string => (typeof value === 'string' ? value : '')
 

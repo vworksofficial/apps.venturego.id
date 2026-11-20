@@ -11,18 +11,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter()
   const pathname = usePathname()
   const matchesRoute = (route: string) => pathname === route || pathname.startsWith(`${route}/`)
-  const activeRoute: PrimaryRoute | null =
-    matchesRoute('/dashboard/angsuran') || matchesRoute('/dashboard/pembayaran')
-      ? 'angsuran'
-      : matchesRoute('/dashboard/riwayat')
-        ? 'riwayat'
-        : matchesRoute('/dashboard/unggah-berkas')
-          ? 'berkas'
-          : matchesRoute('/dashboard/profil') || matchesRoute('/dashboard/dokumen')
-            ? 'profil'
-            : pathname === '/dashboard' || pathname === '/dashboard/'
-              ? 'home'
-              : null
+  const activeRoute: PrimaryRoute | null = matchesRoute('/dashboard/angsuran')
+    ? 'angsuran'
+    : matchesRoute('/dashboard/riwayat')
+      ? 'riwayat'
+      : matchesRoute('/dashboard/unggah-berkas')
+        ? 'berkas'
+        : matchesRoute('/dashboard/profil') || matchesRoute('/dashboard/dokumen')
+          ? 'profil'
+          : pathname === '/dashboard' || pathname === '/dashboard/'
+            ? 'home'
+            : null
 
   useEffect(() => {
     let active = true

@@ -200,7 +200,7 @@ const progressSteps = [
 ]
 
 const quickActions = [
-  { label: 'Bayar angsuran', icon: 'receipt' as const, href: '/dashboard/pembayaran' },
+  { label: 'Bayar angsuran', icon: 'receipt' as const, href: '/dashboard/angsuran' },
   { label: 'Simulasi', icon: 'wallet' as const, href: '/dashboard/simulasi' },
   { label: 'Ajukan baru', icon: 'plus' as const, href: '/?step=1' },
   { label: 'Bantuan', icon: 'help' as const, href: '/dashboard/bantuan' },

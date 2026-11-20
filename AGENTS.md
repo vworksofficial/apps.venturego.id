@@ -82,7 +82,7 @@ This project uses Next.js App Router route groups:
 - `src/lib/` - Shared utilities (`firebase-client.ts`, `firebase-admin.ts`,
   `firebase-session.ts`, `firebase-data.ts`, `financing-plan.ts`,
   `departure-financing.ts`, `documents.ts`, `gdrive.ts`, `upload-client.ts`,
-  `xendit.ts`)
+  `xendit-callback.ts`)
 - `firestore.rules`, `firebase.json` - Firebase security and emulator
   configuration
 
@@ -205,11 +205,12 @@ Firebase variables are documented in `FIREBASE_SETUP.md`:
   `GDRIVE_OAUTH_CLIENT_SECRET`, `GDRIVE_REFRESH_TOKEN` (OAuth client for Drive
   access as the file owner; root `VSV.VentureGo.id [database]` folder auto-created)
 
-Xendit payment gateway variables are documented in `XENDIT_SETUP.md`:
+Xendit callback configuration is documented in `XENDIT_SETUP.md`:
 
-- Server-only: `XENDIT_SECRET_KEY`, `XENDIT_CALLBACK_TOKEN` (invoice creation
-  and webhook verification for `/dashboard/pembayaran`; never expose them or
-  prefix them with `NEXT_PUBLIC_`)
+- Server-only: `XENDIT_CALLBACK_TOKEN` for verifying existing invoice callbacks
+  and forwarding callbacks from the shared Xendit account. New invoice checkout
+  is no longer offered by this app. Never expose the token or prefix it with
+  `NEXT_PUBLIC_`.
 
 Do not ask the user to paste secret values into chat, code, comments, or docs.
 Do not print, log, summarize, or expose secret values. Treat saved environment

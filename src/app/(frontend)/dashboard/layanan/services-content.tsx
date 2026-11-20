@@ -59,7 +59,7 @@ const services: {
   detail: string
 }[] = [
   {
-    href: '/dashboard/pembayaran',
+    href: '/dashboard/angsuran',
     icon: 'receipt',
     title: 'Bayar angsuran',
     detail: 'Selesaikan tagihan berikutnya',

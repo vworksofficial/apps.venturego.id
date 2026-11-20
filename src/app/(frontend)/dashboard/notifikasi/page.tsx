@@ -105,7 +105,7 @@ export default function NotificationsPage() {
           title: `Jadwal Angsuran ke-${nextUnpaid.installment}`,
           detail: `Tagihan ${formatRupiah(nextUnpaid.amount)} untuk ${app.applicationId} jatuh tempo pada ${nextUnpaid.dueDate}.`,
           time: nextUnpaid.dueDate,
-          href: '/dashboard/pembayaran',
+          href: '/dashboard/angsuran',
           important: true,
         })
       }
@@ -157,7 +157,7 @@ export default function NotificationsPage() {
           title: 'Pembayaran diterima',
           detail: `${payment.description || 'Pembayaran'} sebesar ${formatRupiah(payment.amount)} telah dikonfirmasi lunas.`,
           time: formatDateShort(payment.paidAt ?? payment.createdAt),
-          href: '/dashboard/pembayaran',
+          href: '/dashboard/angsuran',
           important: false,
         })
       } else if (payment.status === 'PENDING') {
@@ -167,7 +167,7 @@ export default function NotificationsPage() {
           title: 'Menunggu penyelesaian pembayaran',
           detail: `Tagihan ${formatRupiah(payment.amount)} (${payment.description}) masih menunggu pembayaran.`,
           time: formatDateShort(payment.createdAt),
-          href: '/dashboard/pembayaran',
+          href: payment.invoiceUrl ?? '/dashboard/angsuran',
           important: true,
         })
       }

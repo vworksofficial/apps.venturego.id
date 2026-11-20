@@ -11,11 +11,11 @@ import {
 const FAQ_ITEMS = [
   {
     q: 'Bagaimana cara membayar angsuran?',
-    a: 'Buka menu Bayar Angsuran (/dashboard/pembayaran), pilih jadwal angsuran yang ingin dibayar, lalu selesaikan pembayaran melalui Virtual Account (BCA, Mandiri, BNI, BRI) atau QRIS di halaman Xendit.',
+    a: 'Buka Angsuran (/dashboard/angsuran), pilih angsuran yang aktif, transfer ke rekening VentureGo, lalu unggah bukti transfer pada form pembayaran. Admin akan memeriksa bukti tersebut.',
   },
   {
     q: 'Kapan pembayaran saya diverifikasi?',
-    a: 'Pembayaran melalui Virtual Account dan QRIS Xendit dikonfirmasi secara otomatis oleh sistem segera setelah transaksi berhasil.',
+    a: 'Bukti transfer akan berstatus Menunggu verifikasi sampai admin selesai memeriksanya. Status angsuran diperbarui setelah pembayaran dikonfirmasi.',
   },
   {
     q: 'Bagaimana melihat rincian akad dan dokumen saya?',

@@ -20,7 +20,7 @@ import { DashboardCardSkeleton, DashboardScaffold } from '../_components/dashboa
 type UserApplication = Extract<UserFinancingResult, { ok: true }>['applications'][number]
 type UserPayment = Extract<UserFinancingResult, { ok: true }>['payments'][number]
 type PopupKind = 'details' | 'program' | 'payment' | null
-const SCHEDULE_STICKY_TOP = 128
+const SCHEDULE_OVERLAP = 64
 
 const formatRupiah = (value: unknown) =>
   `Rp${(typeof value === 'number' && Number.isFinite(value) ? value : 0).toLocaleString('id-ID')}`
@@ -123,7 +123,12 @@ function ApplicationTerms({
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
   const [copiedItem, setCopiedItem] = useState('')
   const [schedulePinned, setSchedulePinned] = useState(false)
-  const scheduleRef = useRef<HTMLElement | null>(null)
+  const [scheduleFlowReserve, setScheduleFlowReserve] = useState(0)
+  const [scheduleStickyTop, setScheduleStickyTop] = useState(128)
+  const scheduleStickyTopRef = useRef(128)
+  const programButtonRef = useRef<HTMLButtonElement | null>(null)
+  const scheduleSentinelRef = useRef<HTMLDivElement | null>(null)
+  const scheduleScrollRef = useRef<HTMLDivElement | null>(null)
   const plan = application.financialPlan
   const isFullCover = application.product === 'FULL_COVER'
   const closed = ['CANCELLED', 'REJECTED'].includes(application.status)
@@ -299,17 +304,45 @@ function ApplicationTerms({
   }, [popup])
 
   useEffect(() => {
-    const updateSchedulePosition = () => {
-      const scheduleElement = scheduleRef.current
-      if (!scheduleElement) return
-      setSchedulePinned(scheduleElement.getBoundingClientRect().top <= SCHEDULE_STICKY_TOP)
+    let frame = 0
+    const measureStickyTop = () => {
+      const programButtonBottom = programButtonRef.current?.getBoundingClientRect().bottom
+      const stickyTop = Math.max(0, Math.ceil((programButtonBottom ?? 120) + 8))
+      scheduleStickyTopRef.current = stickyTop
+      setScheduleStickyTop((current) => (current === stickyTop ? current : stickyTop))
     }
+    const updateSchedulePosition = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const sentinel = scheduleSentinelRef.current
+        if (!sentinel) return
+        const stickyTop = scheduleStickyTopRef.current
+        // The sentinel stays in normal flow. Include the panel's overlap offset
+        // so fast scrolls activate the bounded inner list before it reaches the button.
+        const pinned = sentinel.getBoundingClientRect().top <= stickyTop + SCHEDULE_OVERLAP
+        if (!pinned && scheduleScrollRef.current?.scrollTop) {
+          scheduleScrollRef.current.scrollTop = 0
+        }
+        setSchedulePinned((current) => (current === pinned ? current : pinned))
+        const scrollContent = scheduleScrollRef.current
+        const maxVisibleHeight = Math.max(160, window.innerHeight - stickyTop - 220)
+        const reserve =
+          pinned && scrollContent ? Math.max(0, scrollContent.scrollHeight - maxVisibleHeight) : 0
+        setScheduleFlowReserve((current) => (current === reserve ? current : reserve))
+      })
+    }
+    measureStickyTop()
     updateSchedulePosition()
     window.addEventListener('scroll', updateSchedulePosition, { passive: true })
-    window.addEventListener('resize', updateSchedulePosition)
+    const onResize = () => {
+      measureStickyTop()
+      updateSchedulePosition()
+    }
+    window.addEventListener('resize', onResize)
     return () => {
+      cancelAnimationFrame(frame)
       window.removeEventListener('scroll', updateSchedulePosition)
-      window.removeEventListener('resize', updateSchedulePosition)
+      window.removeEventListener('resize', onResize)
     }
   }, [])
 
@@ -345,6 +378,7 @@ function ApplicationTerms({
                 aria-label={`Lihat informasi ${programName}`}
                 className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-[#0b57d0] shadow-sm transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
                 onClick={() => setPopup('program')}
+                ref={programButtonRef}
                 type="button"
               >
                 <Icon name="program" />
@@ -433,142 +467,173 @@ function ApplicationTerms({
         </section>
       </article>
 
-      <section
-        aria-label={`Jadwal angsuran ${programName}`}
-        className={`sticky top-[128px] z-10 -mx-5 -mt-12 space-y-3 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 shadow-[0_-10px_24px_rgba(15,23,42,0.08)] ${schedulePinned ? 'dashboard-schedule-scroll max-h-[calc(100dvh-258px)] overflow-y-auto overscroll-y-auto' : 'overflow-visible'}`}
-        ref={scheduleRef}
-      >
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">Jadwal angsuran</h3>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Angsuran pertama dibayarkan setelah siswa menerima gaji pertama bekerja di negara
-              tujuan.
-            </p>
-            <p className="mt-1 text-[11px] font-medium text-slate-600">
-              Tanggal keberangkatan: {departureDateLabel}
-            </p>
+      <div aria-hidden="true" className="h-px" ref={scheduleSentinelRef} />
+      <div className="relative -mx-5 -mt-16 [overflow-anchor:none]">
+        <section
+          aria-label={`Jadwal angsuran ${programName}`}
+          className="sticky z-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 ring-1 ring-slate-200/70"
+          style={{ top: scheduleStickyTop }}
+        >
+          <div className="flex items-end justify-between gap-3 pb-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900">Jadwal angsuran</h3>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Angsuran pertama dibayarkan setelah siswa menerima gaji pertama bekerja di negara
+                tujuan.
+              </p>
+              <p className="mt-1 text-[11px] font-medium text-slate-600">
+                Tanggal keberangkatan: {departureDateLabel}
+              </p>
+            </div>
+            {plannedCount > 0 && (
+              <span className="shrink-0 text-[10px] font-medium text-slate-500">
+                {paidCount}/{plannedCount} lunas
+              </span>
+            )}
           </div>
-          {plannedCount > 0 && (
-            <span className="shrink-0 text-[10px] font-medium text-slate-500">
-              {paidCount}/{plannedCount} lunas
-            </span>
-          )}
-        </div>
-        {closed ? (
-          <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
-            Jadwal angsuran tidak berlaku untuk pengajuan yang ditutup.
-          </p>
-        ) : displayedSchedule.length > 0 ? (
-          <div className="divide-y divide-slate-200 border-y border-slate-200">
-            {displayedSchedule.map((entry) => {
-              const proof = pendingProofFor(entry.installment)
-              const isNext = entry.installment === firstUnpaidInstallment
-              const canPay = application.status === 'ACTIVE' && isNext && !entry.paid && !proof
-              return (
-                <div
-                  className="flex items-center justify-between gap-3 py-3"
-                  key={entry.installment}
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-800">
-                      Angsuran {entry.installment}
-                    </p>
-                    <p className="mt-1 text-[10px] text-slate-500">{formatDate(entry.dueDate)}</p>
-                    {proof && (
-                      <p className="mt-1 text-[10px] font-medium text-amber-700">
-                        Bukti terkirim · menunggu verifikasi
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <strong className="text-xs text-slate-800">{formatRupiah(entry.amount)}</strong>
-                    {entry.paid ? (
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
-                        Lunas
-                      </span>
-                    ) : (
-                      <button
-                        className="rounded-full bg-[#0b57d0] px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-[#0847ae] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                        disabled={!canPay}
-                        onClick={() => openPayment(entry.installment, entry.amount)}
-                        type="button"
-                      >
-                        {proof ? 'Diproses' : 'Bayar'}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
-            Jadwal angsuran belum dicantumkan dalam rincian akad.
-          </p>
-        )}
-      </section>
+          <div
+            className={`dashboard-schedule-scroll space-y-3 [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
+            ref={scheduleScrollRef}
+            style={
+              schedulePinned
+                ? { maxHeight: `calc(100dvh - ${scheduleStickyTop + 220}px)` }
+                : undefined
+            }
+          >
+            {closed ? (
+              <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
+                Jadwal angsuran tidak berlaku untuk pengajuan yang ditutup.
+              </p>
+            ) : displayedSchedule.length > 0 ? (
+              <div className="divide-y divide-slate-200 border-y border-slate-200">
+                {displayedSchedule.map((entry) => {
+                  const proof = pendingProofFor(entry.installment)
+                  const isNext = entry.installment === firstUnpaidInstallment
+                  const canPay = application.status === 'ACTIVE' && isNext && !entry.paid && !proof
+                  return (
+                    <div
+                      className="flex items-center justify-between gap-3 py-3"
+                      key={entry.installment}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-800">
+                          Angsuran {entry.installment}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {formatDate(entry.dueDate)}
+                        </p>
+                        {proof && (
+                          <p className="mt-1 text-[10px] font-medium text-amber-700">
+                            Bukti terkirim · menunggu verifikasi
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <strong className="text-xs text-slate-800">
+                          {formatRupiah(entry.amount)}
+                        </strong>
+                        {entry.paid ? (
+                          <span className="rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
+                            Lunas
+                          </span>
+                        ) : (
+                          <button
+                            className="rounded-full bg-[#0b57d0] px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-[#0847ae] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                            disabled={!canPay}
+                            onClick={() => openPayment(entry.installment, entry.amount)}
+                            type="button"
+                          >
+                            {proof ? 'Diproses' : 'Bayar'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
+                Jadwal angsuran belum dicantumkan dalam rincian akad.
+              </p>
+            )}
 
-      <section aria-label={`Riwayat pembayaran ${programName}`} className="space-y-2">
-        <h3 className="text-sm font-bold text-slate-900">Riwayat pembayaran</h3>
-        {applicationPayments.length === 0 && paymentProofs.length === 0 ? (
-          <p className="border-y border-slate-200 py-3 text-xs text-slate-500">
-            Belum ada pembayaran atau bukti transfer yang tercatat.
-          </p>
-        ) : (
-          <div className="divide-y divide-slate-200 border-y border-slate-200">
-            {applicationPayments.map((payment) => (
-              <div className="flex items-center justify-between gap-3 py-3" key={payment.id}>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-slate-800">
-                    {payment.installmentNumber
-                      ? `Angsuran ${payment.installmentNumber}`
-                      : payment.description || 'Pembayaran'}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    {formatDate(payment.paidAt ?? payment.createdAt?.slice(0, 10))}
-                    {payment.paidMethod ? ` · ${payment.paidMethod}` : ''}
-                  </p>
+            <div
+              aria-label={`Riwayat pembayaran ${programName}`}
+              className="space-y-2 border-t border-slate-200 pt-4"
+            >
+              <h4 className="text-xs font-bold text-slate-800">Riwayat pembayaran</h4>
+              {applicationPayments.length === 0 && paymentProofs.length === 0 ? (
+                <p className="py-2 text-xs text-slate-500">
+                  Belum ada pembayaran atau bukti transfer yang tercatat.
+                </p>
+              ) : (
+                <div className="divide-y divide-slate-200">
+                  {applicationPayments.map((payment) => (
+                    <div className="flex items-center justify-between gap-3 py-3" key={payment.id}>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-slate-800">
+                          {payment.installmentNumber
+                            ? `Angsuran ${payment.installmentNumber}`
+                            : payment.description || 'Pembayaran'}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {formatDate(payment.paidAt ?? payment.createdAt?.slice(0, 10))}
+                          {payment.paidMethod ? ` · ${payment.paidMethod}` : ''}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs font-bold text-slate-800">
+                          {formatRupiah(payment.amount)}
+                        </p>
+                        <span className="text-[10px] font-medium text-slate-500">
+                          {payment.status === 'PAID'
+                            ? 'Berhasil'
+                            : payment.status === 'PENDING'
+                              ? 'Menunggu pembayaran'
+                              : payment.status === 'EXPIRED'
+                                ? 'Kedaluwarsa'
+                                : 'Gagal'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {paymentProofs.map((proof) => (
+                    <div className="flex items-center justify-between gap-3 py-3" key={proof.id}>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-800">
+                          Bukti transfer · Angsuran {proof.installmentNumber}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {formatDate(proof.submittedAt)}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs font-bold text-slate-800">
+                          {formatRupiah(proof.amount)}
+                        </p>
+                        <span
+                          className={`text-[10px] font-medium ${proof.status === 'VERIFIED' ? 'text-emerald-700' : proof.status === 'REJECTED' ? 'text-rose-700' : 'text-amber-700'}`}
+                        >
+                          {proof.status === 'VERIFIED'
+                            ? 'Terverifikasi'
+                            : proof.status === 'REJECTED'
+                              ? 'Perlu perbaikan'
+                              : 'Menunggu verifikasi'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-xs font-bold text-slate-800">{formatRupiah(payment.amount)}</p>
-                  <span className="text-[10px] font-medium text-slate-500">
-                    {payment.status === 'PAID'
-                      ? 'Berhasil'
-                      : payment.status === 'PENDING'
-                        ? 'Menunggu pembayaran'
-                        : payment.status === 'EXPIRED'
-                          ? 'Kedaluwarsa'
-                          : 'Gagal'}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {paymentProofs.map((proof) => (
-              <div className="flex items-center justify-between gap-3 py-3" key={proof.id}>
-                <div>
-                  <p className="text-xs font-semibold text-slate-800">
-                    Bukti transfer · Angsuran {proof.installmentNumber}
-                  </p>
-                  <p className="mt-1 text-[10px] text-slate-500">{formatDate(proof.submittedAt)}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-xs font-bold text-slate-800">{formatRupiah(proof.amount)}</p>
-                  <span
-                    className={`text-[10px] font-medium ${proof.status === 'VERIFIED' ? 'text-emerald-700' : proof.status === 'REJECTED' ? 'text-rose-700' : 'text-amber-700'}`}
-                  >
-                    {proof.status === 'VERIFIED'
-                      ? 'Terverifikasi'
-                      : proof.status === 'REJECTED'
-                        ? 'Perlu perbaikan'
-                        : 'Menunggu verifikasi'}
-                  </span>
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        )}
-      </section>
+        </section>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none"
+          style={{ height: scheduleFlowReserve }}
+        />
+      </div>
 
       {popup && (
         <div

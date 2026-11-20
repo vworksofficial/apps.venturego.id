@@ -1,10 +1,14 @@
 {
-  "name": "VentureGo",
+  "id": "/",
+  "name": "Vworks Student Venture",
   "short_name": "VentureGo",
+  "description": "Aplikasi pengajuan dan pemantauan pembiayaan siswa VentureGo.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0b57d0",
   "theme_color": "#0b57d0",
+  "categories": ["education", "finance"],
   "icons": [
     {
       "src": "/icon-192.png",

@@ -24,6 +24,7 @@ import {
 import { uploadToDrive } from '@/lib/upload-client'
 import { OrbitMark, RocketLoader } from './_components/orbit-mark'
 import { FormSelect } from './_components/form-select'
+import { InstallAppButton } from './_components/install-app-button'
 
 // Efek riak (ripple) ala Material/Google: lingkaran menyebar dari titik sentuh.
 const triggerRipple = (event: React.PointerEvent<HTMLElement>) => {
@@ -769,6 +770,7 @@ export default function HomePage() {
                     {pendingSignIn === 'google' ? 'Menghubungkan…' : 'Masuk dengan Google'}
                   </span>
                 </button>
+                <InstallAppButton />
               </div>
               {signInError && (
                 <p className="error-message" role="alert">

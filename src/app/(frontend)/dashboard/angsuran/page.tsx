@@ -326,15 +326,30 @@ function ApplicationTerms({
         }
         setSchedulePinned((current) => (current === pinned ? current : pinned))
         const scrollContent = scheduleScrollRef.current
-        const panelHeight = schedulePanelRef.current?.getBoundingClientRect().height ?? 0
+        const panel = schedulePanelRef.current
+        const currentPanelHeight = panel?.getBoundingClientRect().height ?? 0
+        const currentScrollHeight = scrollContent?.getBoundingClientRect().height ?? 0
+        const maxVisibleHeight = Math.max(160, window.innerHeight - stickyTop - 220)
+        // Reserve space for the panel after it is pinned, not its unbounded
+        // natural height, so the sticky boundary cannot jump during the switch.
+        const panelChromeHeight = Math.max(0, currentPanelHeight - currentScrollHeight)
+        const targetPanelHeight =
+          panelChromeHeight + Math.min(scrollContent?.scrollHeight ?? 0, maxVisibleHeight)
         const reserve =
-          pinned && scrollContent ? Math.max(0, window.innerHeight - stickyTop - panelHeight) : 0
+          pinned && scrollContent && panel
+            ? Math.max(0, window.innerHeight - stickyTop - targetPanelHeight)
+            : 0
         setScheduleFlowReserve((current) => (current === reserve ? current : reserve))
       })
     }
     measureStickyTop()
     updateSchedulePosition()
     window.addEventListener('scroll', updateSchedulePosition, { passive: true })
+    const resizeObserver = new ResizeObserver(() => {
+      measureStickyTop()
+      updateSchedulePosition()
+    })
+    if (programButtonRef.current) resizeObserver.observe(programButtonRef.current)
     const onResize = () => {
       measureStickyTop()
       updateSchedulePosition()
@@ -344,6 +359,7 @@ function ApplicationTerms({
       cancelAnimationFrame(frame)
       window.removeEventListener('scroll', updateSchedulePosition)
       window.removeEventListener('resize', onResize)
+      resizeObserver.disconnect()
     }
   }, [])
 

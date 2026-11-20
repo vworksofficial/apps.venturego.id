@@ -257,34 +257,32 @@ export function DashboardBottomNav({ active }: { active: PrimaryRoute | null }) 
       <div className="flex w-full items-center rounded-t-[24px] bg-white/95 px-2 py-1.5 shadow-[0_-8px_28px_rgba(15,23,42,0.10)] ring-1 ring-slate-200/60 backdrop-blur-xl">
         {navigation.map((item) => {
           const isActive = active === item.key
-          const isHome = item.key === 'home'
           return (
             <Link
               aria-current={isActive ? 'page' : undefined}
               className="group flex min-w-0 flex-1 flex-col items-center gap-0 rounded-xl px-1 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
               href={item.href}
               key={item.key}
+              onClick={() => {
+                if (window.scrollX !== 0) window.scrollTo(0, window.scrollY)
+              }}
             >
               <span className="grid h-10 w-full place-items-center">
                 <span
                   className={
-                    isHome && isActive
-                      ? 'grid size-12 -translate-y-1.5 place-items-center rounded-2xl brand-fill text-white shadow-[0_4px_12px_rgba(11,87,208,0.24)] ring-2 ring-blue-100 transition group-hover:opacity-90'
-                      : isActive
-                        ? 'grid size-9 place-items-center rounded-2xl brand-fill text-white shadow-sm transition group-hover:opacity-90'
-                        : 'grid size-9 place-items-center rounded-2xl text-slate-400 transition group-hover:bg-slate-100 group-hover:text-slate-600'
+                    isActive
+                      ? 'grid size-9 place-items-center rounded-2xl brand-fill text-white shadow-sm transition group-hover:opacity-90'
+                      : 'grid size-9 place-items-center rounded-2xl text-slate-400 transition group-hover:bg-slate-100 group-hover:text-slate-600'
                   }
                 >
-                  <DashboardIcon name={item.icon} className={isHome ? 'size-6' : 'size-5'} />
+                  <DashboardIcon name={item.icon} className="size-5" />
                 </span>
               </span>
               <span
                 className={
-                  isHome && isActive
-                    ? 'text-[11px] font-extrabold text-[var(--primary)]'
-                    : isActive
-                      ? 'text-[10px] font-bold text-[var(--primary)]'
-                      : `text-[10px] font-semibold ${isHome ? 'text-slate-500' : 'text-slate-400'}`
+                  isActive
+                    ? 'text-[10px] font-bold text-[var(--primary)]'
+                    : 'text-[10px] font-semibold text-slate-400'
                 }
               >
                 {item.label}

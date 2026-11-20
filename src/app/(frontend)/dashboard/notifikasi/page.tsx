@@ -110,18 +110,8 @@ export default function NotificationsPage() {
         })
       }
 
-      // 2. Verified offer awaiting acceptance
-      if (app.pricingStatus === 'VERIFIED' && !app.acceptedAt) {
-        list.push({
-          id: `offer-${app.id}`,
-          icon: 'document',
-          title: 'Rincian biaya terverifikasi tersedia',
-          detail: `Tinjau dan setujui rincian Nafaqah & Ujrah untuk pengajuan ${app.applicationId}.`,
-          time: formatDateShort(app.updatedAt ?? app.createdAt),
-          href: '/dashboard/angsuran',
-          important: true,
-        })
-      } else if (app.pricingStatus === 'AGREED') {
+      // 2. Final agreement status
+      if (app.pricingStatus === 'AGREED') {
         list.push({
           id: `agreed-${app.id}`,
           icon: 'check',
@@ -147,22 +137,7 @@ export default function NotificationsPage() {
         })
       }
 
-      // 4. Support request responses
-      for (const [idx, req] of app.supportRequests.entries()) {
-        if (req.response) {
-          list.push({
-            id: `sup-${app.id}-${idx}`,
-            icon: 'info',
-            title: 'Tanggapan permohonan keringanan',
-            detail: req.response,
-            time: formatDateShort(req.requestedAt),
-            href: '/dashboard/angsuran',
-            important: true,
-          })
-        }
-      }
-
-      // 5. Application status notification
+      // 3. Application status notification
       list.push({
         id: `status-${app.id}`,
         icon: 'document',

@@ -104,17 +104,6 @@ export type FinancingApplicationRecord = {
   documents: ApplicationDocumentRecord[]
   understandsWakalah: boolean
   acceptsDataProcessing: boolean
-  userFinancingAcceptance?: {
-    acceptedAt: string
-    offerSnapshot: Record<string, unknown>
-  }
-  supportRequests?: {
-    type: 'PAYMENT_RELIEF'
-    message: string
-    requestedAt: string
-    status: 'OPEN' | 'REVIEWED'
-    response?: string
-  }[]
   internalNotes?: string
   departureDate?: string
 }

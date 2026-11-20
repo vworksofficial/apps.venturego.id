@@ -359,6 +359,9 @@ export function FinanceTermsFields({
               defaultValue={String(financialPlan.lpkWitnessName ?? '')}
               placeholder="Nama saksi dari LPK"
             />
+            <span className="block text-[10px] font-normal leading-4 text-slate-500">
+              Opsional. Jika dikosongkan, naskah mencantumkan Mitra Venturego (LPK).
+            </span>
           </label>
         )}
       </div>

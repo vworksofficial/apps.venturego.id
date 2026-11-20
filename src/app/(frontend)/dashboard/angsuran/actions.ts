@@ -1,46 +1,59 @@
 'use server'
 
-import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
 import type { FinancingApplicationRecord } from '@/lib/firebase-data'
+
+type UserFinancingPayment = {
+  id: string
+  applicationDocId: string
+  installmentNumber: number | null
+  amount: number
+  description: string
+  status: 'PENDING' | 'PAID' | 'EXPIRED' | 'FAILED'
+  paidAt: string | null
+  paidMethod: string | null
+  createdAt: string | null
+}
+
+export type UserPaymentProof = {
+  id: string
+  applicationDocId: string
+  installmentNumber: number
+  amount: number
+  status: 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED'
+  submittedAt: string | null
+}
 
 type UserFinancingApplication = Pick<
   FinancingApplicationRecord,
   | 'id'
   | 'applicationId'
+  | 'product'
   | 'applicantName'
+  | 'lpkName'
+  | 'destination'
   | 'status'
+  | 'eligibility'
+  | 'departureDate'
   | 'departureDetails'
   | 'financialPlan'
-  | 'userFinancingAcceptance'
-  | 'supportRequests'
+  | 'paidInstallments'
 >
 
 export type UserFinancingResult =
-  | { ok: true; applications: UserFinancingApplication[] }
+  | {
+      ok: true
+      applications: UserFinancingApplication[]
+      payments: UserFinancingPayment[]
+      paymentProofs: UserPaymentProof[]
+    }
   | { ok: false; message: string }
-
-export type FinancingActionResult = { ok: true } | { ok: false; message: string }
-
-type UserSupportRequest = NonNullable<FinancingApplicationRecord['supportRequests']>[number]
 
 const isGoogleIdentity = async (token: string) => {
   if (!token || token.length > 10_000) return null
   const identity = await getFirebaseAuth().verifyIdToken(token)
   return isAllowedSignInProvider(identity.firebase?.sign_in_provider) ? identity : null
-}
-
-const isSupportRequest = (value: unknown): value is UserSupportRequest => {
-  if (!value || typeof value !== 'object') return false
-  const request = value as Record<string, unknown>
-  return (
-    request.type === 'PAYMENT_RELIEF' &&
-    typeof request.message === 'string' &&
-    typeof request.requestedAt === 'string' &&
-    ['OPEN', 'REVIEWED'].includes(String(request.status)) &&
-    (request.response === undefined || typeof request.response === 'string')
-  )
 }
 
 const toPlainValue = (value: unknown): unknown => {
@@ -58,21 +71,55 @@ const toPlainValue = (value: unknown): unknown => {
   )
 }
 
+const readPayment = (id: string, value: unknown): UserFinancingPayment | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const data = value as Record<string, unknown>
+  if (typeof data.applicationDocId !== 'string') return null
+  return {
+    id,
+    applicationDocId: data.applicationDocId,
+    installmentNumber:
+      Number.isInteger(data.installmentNumber) && Number(data.installmentNumber) > 0
+        ? Number(data.installmentNumber)
+        : null,
+    amount: typeof data.amount === 'number' && Number.isSafeInteger(data.amount) ? data.amount : 0,
+    description: typeof data.description === 'string' ? data.description : '',
+    status:
+      data.status === 'PAID' || data.status === 'EXPIRED' || data.status === 'FAILED'
+        ? data.status
+        : 'PENDING',
+    paidAt: typeof data.paidAt === 'string' ? data.paidAt : null,
+    paidMethod: typeof data.paidMethod === 'string' ? data.paidMethod : null,
+    createdAt: typeof data.createdAt === 'string' ? data.createdAt : null,
+  }
+}
+
 export async function getOwnedFinancingApplications(token: string): Promise<UserFinancingResult> {
   try {
     const identity = await isGoogleIdentity(token)
     if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
 
-    const snapshot = await getFirebaseFirestore()
-      .collection('applications')
-      .where('ownerFirebaseUid', '==', identity.uid)
-      .get()
-    const applications = snapshot.docs.flatMap((document) => {
+    const firestore = getFirebaseFirestore()
+    const [applicationSnapshot, paymentSnapshot, proofSnapshot] = await Promise.all([
+      firestore.collection('applications').where('ownerFirebaseUid', '==', identity.uid).get(),
+      firestore
+        .collection('payments')
+        .where('ownerFirebaseUid', '==', identity.uid)
+        .limit(100)
+        .get(),
+      firestore
+        .collection('paymentProofs')
+        .where('ownerFirebaseUid', '==', identity.uid)
+        .limit(100)
+        .get(),
+    ])
+
+    const applications = applicationSnapshot.docs.flatMap((document) => {
       const data = toPlainValue(document.data()) as Record<string, unknown>
       if (
         typeof data.applicationId !== 'string' ||
         typeof data.applicantName !== 'string' ||
-        data.product !== 'DEPARTURE_BRIDGING' ||
+        !['DEPARTURE_BRIDGING', 'FULL_COVER'].includes(String(data.product)) ||
         !data.financialPlan ||
         typeof data.financialPlan !== 'object'
       ) {
@@ -82,140 +129,62 @@ export async function getOwnedFinancingApplications(token: string): Promise<User
         {
           id: document.id,
           applicationId: data.applicationId,
+          product: data.product as FinancingApplicationRecord['product'],
           applicantName: data.applicantName,
+          lpkName: typeof data.lpkName === 'string' ? data.lpkName : '',
+          destination: (data.destination === 'TURKEY'
+            ? 'TURKEY'
+            : 'JAPAN') as FinancingApplicationRecord['destination'],
           status: typeof data.status === 'string' ? data.status : 'SUBMITTED',
+          eligibility:
+            data.eligibility && typeof data.eligibility === 'object'
+              ? (data.eligibility as Record<string, unknown>)
+              : {},
+          departureDate: typeof data.departureDate === 'string' ? data.departureDate : undefined,
           departureDetails:
             data.departureDetails && typeof data.departureDetails === 'object'
               ? (data.departureDetails as Record<string, unknown>)
               : null,
           financialPlan: data.financialPlan as Record<string, unknown>,
-          userFinancingAcceptance:
-            data.userFinancingAcceptance &&
-            typeof data.userFinancingAcceptance === 'object' &&
-            typeof (data.userFinancingAcceptance as { acceptedAt?: unknown }).acceptedAt ===
-              'string'
-              ? (data.userFinancingAcceptance as FinancingApplicationRecord['userFinancingAcceptance'])
-              : undefined,
-          supportRequests: Array.isArray(data.supportRequests)
-            ? data.supportRequests.filter(isSupportRequest)
+          paidInstallments: Array.isArray(data.paidInstallments)
+            ? data.paidInstallments.filter(
+                (installment): installment is number =>
+                  Number.isInteger(installment) && Number(installment) > 0,
+              )
             : [],
         },
       ]
     })
-    return { ok: true, applications }
-  } catch {
-    return { ok: false, message: 'Rincian pembiayaan belum dapat dimuat. Silakan coba lagi.' }
-  }
-}
 
-export async function acceptFinancingOffer(
-  token: string,
-  applicationId: string,
-): Promise<FinancingActionResult> {
-  try {
-    const identity = await isGoogleIdentity(token)
-    if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
-    if (!/^[A-Za-z0-9_-]{1,128}$/.test(applicationId)) {
-      return { ok: false, message: 'Pengajuan tidak valid.' }
-    }
+    const payments = paymentSnapshot.docs
+      .map((document) => readPayment(document.id, toPlainValue(document.data())))
+      .filter((payment): payment is UserFinancingPayment => payment !== null)
+      .sort((a, b) => (b.paidAt ?? b.createdAt ?? '').localeCompare(a.paidAt ?? a.createdAt ?? ''))
 
-    const applicationRef = getFirebaseFirestore().collection('applications').doc(applicationId)
-    await getFirebaseFirestore().runTransaction(async (transaction) => {
-      const application = await transaction.get(applicationRef)
-      const data = application.data()
-      const plan = data?.financialPlan
+    const paymentProofs = proofSnapshot.docs.flatMap((document) => {
+      const data = toPlainValue(document.data()) as Record<string, unknown>
       if (
-        !application.exists ||
-        data?.ownerFirebaseUid !== identity.uid ||
-        data?.product !== 'DEPARTURE_BRIDGING' ||
-        ['CANCELLED', 'REJECTED'].includes(data?.status) ||
-        plan?.pricingStatus !== 'VERIFIED' ||
-        !plan?.offerSnapshot ||
-        typeof plan.offerSnapshot !== 'object'
+        typeof data.applicationDocId !== 'string' ||
+        !Number.isInteger(data.installmentNumber) ||
+        !Number.isSafeInteger(data.amount) ||
+        !['PENDING_REVIEW', 'VERIFIED', 'REJECTED'].includes(String(data.status))
       ) {
-        throw new Error('OFFER_NOT_READY')
+        return []
       }
-      if (data.userFinancingAcceptance) throw new Error('OFFER_ALREADY_ACCEPTED')
-      transaction.update(applicationRef, {
-        userFinancingAcceptance: {
-          acceptedAt: new Date().toISOString(),
-          offerSnapshot: plan.offerSnapshot,
+      return [
+        {
+          id: document.id,
+          applicationDocId: data.applicationDocId,
+          installmentNumber: Number(data.installmentNumber),
+          amount: Number(data.amount),
+          status: data.status as UserPaymentProof['status'],
+          submittedAt: typeof data.submittedAt === 'string' ? data.submittedAt : null,
         },
-        updatedAt: FieldValue.serverTimestamp(),
-      })
+      ]
     })
-    return { ok: true }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'OFFER_ALREADY_ACCEPTED') {
-      return { ok: false, message: 'Persetujuan atas penawaran ini sudah tercatat.' }
-    }
-    if (error instanceof Error && error.message === 'OFFER_NOT_READY') {
-      return {
-        ok: false,
-        message:
-          'Penawaran belum terverifikasi atau sudah berubah. Muat ulang rincian terlebih dahulu.',
-      }
-    }
-    return { ok: false, message: 'Persetujuan belum dapat disimpan. Silakan coba lagi.' }
-  }
-}
 
-export async function requestFinancingSupport(
-  token: string,
-  applicationId: string,
-  message: string,
-): Promise<FinancingActionResult> {
-  try {
-    const identity = await isGoogleIdentity(token)
-    if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
-    if (
-      !/^[A-Za-z0-9_-]{1,128}$/.test(applicationId) ||
-      typeof message !== 'string' ||
-      message.trim().length < 10 ||
-      message.length > 1_000
-    ) {
-      return { ok: false, message: 'Jelaskan permohonan keringanan minimal 10 karakter.' }
-    }
-
-    const applicationRef = getFirebaseFirestore().collection('applications').doc(applicationId)
-    await getFirebaseFirestore().runTransaction(async (transaction) => {
-      const application = await transaction.get(applicationRef)
-      const data = application.data()
-      if (
-        !application.exists ||
-        data?.ownerFirebaseUid !== identity.uid ||
-        data?.product !== 'DEPARTURE_BRIDGING' ||
-        ['CANCELLED', 'REJECTED'].includes(data?.status) ||
-        !['VERIFIED', 'AGREED'].includes(data?.financialPlan?.pricingStatus)
-      ) {
-        throw new Error('APPLICATION_NOT_READY')
-      }
-      const previous = Array.isArray(data.supportRequests) ? data.supportRequests : []
-      if (previous.length >= 10) throw new Error('REQUEST_LIMIT')
-      transaction.update(applicationRef, {
-        supportRequests: [
-          ...previous,
-          {
-            type: 'PAYMENT_RELIEF',
-            message: message.trim(),
-            requestedAt: new Date().toISOString(),
-            status: 'OPEN',
-          },
-        ],
-        updatedAt: FieldValue.serverTimestamp(),
-      })
-    })
-    return { ok: true }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'REQUEST_LIMIT') {
-      return {
-        ok: false,
-        message: 'Batas permohonan tercapai. Hubungi tim VentureGo untuk bantuan.',
-      }
-    }
-    if (error instanceof Error && error.message === 'APPLICATION_NOT_READY') {
-      return { ok: false, message: 'Pengajuan belum memiliki rincian biaya terverifikasi.' }
-    }
-    return { ok: false, message: 'Permohonan belum dapat dikirim. Silakan coba lagi.' }
+    return { ok: true, applications, payments, paymentProofs }
+  } catch {
+    return { ok: false, message: 'Rincian angsuran belum dapat dimuat. Silakan coba lagi.' }
   }
 }

@@ -51,6 +51,22 @@ body {
   overflow-x: clip;
 }
 
+.dashboard-schedule-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.dashboard-schedule-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.payment-amount-input:focus,
+.payment-amount-input:focus-visible {
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+}
+
 .dashboard-app h1,
 .dashboard-app h2,
 .dashboard-app h3,

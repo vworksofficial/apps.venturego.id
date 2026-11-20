@@ -76,7 +76,6 @@ export type UserApplicationDetail = {
     size: number | null
     uploadedAt: string | null
   } | null
-  acceptedAt: string | null
   createdAt: string | null
   updatedAt: string | null
   personalDetails: {
@@ -95,12 +94,6 @@ export type UserApplicationDetail = {
     understandsWakalah: boolean
     acceptsDataProcessing: boolean
   }
-  supportRequests: {
-    message: string
-    requestedAt: string
-    status: 'OPEN' | 'REVIEWED'
-    response: string | null
-  }[]
 }
 
 export type UserPaymentItem = {
@@ -562,28 +555,6 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
           return [{ installment, dueDate, amount, paid: paidSet.has(installment) }]
         })
 
-        const rawSupport = Array.isArray(data.supportRequests) ? data.supportRequests : []
-        const supportRequests = rawSupport.flatMap((req) => {
-          if (!req || typeof req !== 'object') return []
-          const item = req as Record<string, unknown>
-          if (typeof item.message !== 'string' || typeof item.requestedAt !== 'string') return []
-          return [
-            {
-              message: item.message,
-              requestedAt: item.requestedAt,
-              status: item.status === 'REVIEWED' ? ('REVIEWED' as const) : ('OPEN' as const),
-              response: typeof item.response === 'string' && item.response ? item.response : null,
-            },
-          ]
-        })
-
-        const acceptance =
-          data.userFinancingAcceptance &&
-          typeof data.userFinancingAcceptance === 'object' &&
-          typeof (data.userFinancingAcceptance as { acceptedAt?: unknown }).acceptedAt === 'string'
-            ? String((data.userFinancingAcceptance as { acceptedAt: string }).acceptedAt)
-            : null
-
         const agreementDocument =
           data.agreementPdf && typeof data.agreementPdf === 'object'
             ? (data.agreementPdf as Record<string, unknown>)
@@ -632,7 +603,6 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
                   uploadedAt: readTimestampIso(agreementDocument.uploadedAt),
                 }
               : null,
-          acceptedAt: acceptance,
           createdAt: readTimestampIso(data.createdAt),
           updatedAt: readTimestampIso(data.updatedAt),
           personalDetails: {
@@ -653,7 +623,6 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
             understandsWakalah: data.understandsWakalah === true,
             acceptsDataProcessing: data.acceptsDataProcessing === true,
           },
-          supportRequests,
         }
         return [detail]
       })

@@ -574,7 +574,6 @@ type InstallmentSummary = {
   nextDue: InstallmentDetail | null
   overdueCount: number
   dueSoon: boolean
-  openRelief: number
 }
 
 const summarizeInstallments = (
@@ -644,7 +643,6 @@ const summarizeInstallments = (
   const overdueCount = unpaidRows.filter(
     (row) => row.dueDate < todayIso && (isLegacy || row.isPartial),
   ).length
-  const openRelief = (app.supportRequests ?? []).filter((req) => req.status === 'OPEN').length
   return {
     schedule,
     rows,
@@ -662,7 +660,6 @@ const summarizeInstallments = (
       nextDue.dueDate >= todayIso &&
       nextDue.dueDate <= soon,
     ),
-    openRelief,
   }
 }
 
@@ -1083,7 +1080,7 @@ function ApplicationDrawerForm({
   const issueAkad = () => {
     if (
       !window.confirm(
-        'Terbitkan dokumen akad? NIS akan diterbitkan dan rincian biaya terkunci permanen.',
+        'Terbitkan dokumen akad? NIS akan diterbitkan, status angsuran menjadi Aktif, dan rincian biaya terkunci.',
       )
     ) {
       return
@@ -2227,25 +2224,6 @@ function ApplicationDrawerForm({
                 </div>
               )}
 
-              {!akadIssued && application.product === 'DEPARTURE_BRIDGING' && (
-                <label className="block space-y-1 text-xs font-semibold text-slate-600">
-                  <span>Referensi akad final yang sudah ditandatangani</span>
-                  <input
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-normal text-slate-900 focus:border-[#0b57d0] focus:outline-none"
-                    defaultValue={String(application.financialPlan?.finalAgreementReference ?? '')}
-                    maxLength={300}
-                    name="finalAgreementReference"
-                    placeholder="Nomor dokumen akad final / tautan arsip (wajib untuk mengunci status biaya Disepakati)"
-                  />
-                </label>
-              )}
-
-              {akadIssueError && (
-                <p className="text-xs text-red-700" role="alert">
-                  {akadIssueError}
-                </p>
-              )}
-
               <div className="flex flex-wrap items-center gap-2 border-t border-slate-200/70 pt-3">
                 <button
                   className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
@@ -2273,6 +2251,27 @@ function ApplicationDrawerForm({
                   </button>
                 )}
               </div>
+              {akadIssueError && (
+                <div
+                  className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-xs leading-5 text-red-800"
+                  role="alert"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.8}
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 8v4m0 4h.01" />
+                  </svg>
+                  <p>{akadIssueError}</p>
+                </div>
+              )}
               {!akadIssued && !akadGateOpen && (
                 <p className="text-[11px] text-amber-700">
                   Status biaya harus Terverifikasi sebelum dokumen dapat diterbitkan.
@@ -2729,7 +2728,7 @@ function ApplicationDrawerForm({
                 <div className="min-w-0 flex-1 pb-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h4 className="text-xs font-bold text-slate-900">
-                      Penerbitan Naskah Dokumen Akad Resmi
+                      Penerbitan Akad & Aktivasi Angsuran
                     </h4>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -2748,8 +2747,9 @@ function ApplicationDrawerForm({
                       <>
                         Dokumen akad resmi terbit dengan nomor kontrak{' '}
                         <strong>{akadMeta?.documentNumber}</strong> (NIS:{' '}
-                        <strong>{akadMeta?.studentNumber}</strong>). Siap dicetak untuk proses tanda
-                        tangan basah bersama pemohon dan wali.
+                        <strong>{akadMeta?.studentNumber}</strong>). Status angsuran kini Aktif;
+                        naskah siap dicetak untuk proses tanda tangan basah bersama pemohon dan
+                        wali.
                       </>
                     ) : (
                       'Naskah dokumen akad resmi (.docx) belum diterbitkan. Dapat diterbitkan langsung di tab Draft Akad setelah rincian biaya terverifikasi oleh staf.'
@@ -2763,16 +2763,14 @@ function ApplicationDrawerForm({
                 <div className="flex flex-col items-center self-stretch">
                   <div
                     className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-4 ring-white shadow-xs ${
-                      application.status === 'ACTIVE' || application.status === 'COMPLETED'
+                      agreementPdfCurrent
                         ? 'bg-emerald-600 text-white'
-                        : agreementPdfCurrent
-                          ? 'bg-teal-600 text-white'
-                          : application.status === 'CANCELLED' || application.status === 'REJECTED'
-                            ? 'bg-rose-600 text-white'
-                            : 'bg-slate-300 text-slate-700'
+                        : application.status === 'CANCELLED' || application.status === 'REJECTED'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-300 text-slate-700'
                     }`}
                   >
-                    {application.status === 'ACTIVE' || application.status === 'COMPLETED' ? (
+                    {agreementPdfCurrent ? (
                       <svg
                         aria-hidden="true"
                         className="size-3.5"
@@ -2791,7 +2789,7 @@ function ApplicationDrawerForm({
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h4 className="text-xs font-bold text-slate-900">
-                      Tanda Tangan Basah, Unggah Salinan PDF, & Realisasi Aktif
+                      Arsip Salinan Akad Bertanda Tangan Basah
                     </h4>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
@@ -2803,15 +2801,15 @@ function ApplicationDrawerForm({
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    {application.status === 'ACTIVE'
-                      ? 'Pembiayaan aktif berjalan. Folder Google Drive siswa telah dipromosikan (hijau) dan jadwal angsuran aktif dipantau.'
-                      : application.status === 'COMPLETED'
-                        ? 'Kewajiban pembiayaan siswa telah tuntas selesai sepenuhnya.'
-                        : application.status === 'CANCELLED' || application.status === 'REJECTED'
-                          ? 'Pengajuan telah ditutup/dibatalkan.'
-                          : agreementPdfCurrent
-                            ? 'Salinan PDF bertandatangan basah telah tersimpan. Pengajuan siap dipindahkan ke status "Aktif".'
-                            : 'Kumpulkan tanda tangan fisik pada naskah akad, unggah salinan PDF pindaian di bawah, lalu ubah status ke "Aktif".'}
+                    {application.status === 'COMPLETED'
+                      ? 'Kewajiban pembiayaan siswa telah tuntas selesai sepenuhnya.'
+                      : application.status === 'CANCELLED' || application.status === 'REJECTED'
+                        ? 'Pengajuan telah ditutup/dibatalkan.'
+                        : agreementPdfCurrent
+                          ? 'Salinan akad bertanda tangan basah telah tersimpan di arsip.'
+                          : application.status === 'ACTIVE'
+                            ? 'Angsuran aktif sejak dokumen akad diterbitkan. Unggah salinan bertanda tangan basah untuk melengkapi arsip.'
+                            : 'Setelah akad ditandatangani, unggah salinan pindaian bertanda tangan basah untuk melengkapi arsip.'}
                   </p>
                 </div>
               </div>
@@ -4468,6 +4466,7 @@ export function AdminDashboard({
     () =>
       filteredApplications.filter((app) => {
         if (isLegacyApplication(app)) return false
+        if (app.status === 'ACTIVE' || app.status === 'COMPLETED') return false
         const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
         return pricing === 'VERIFIED' || pricing === 'AGREED'
       }),
@@ -4498,7 +4497,6 @@ export function AdminDashboard({
     let pendingReview = 0
     let activeCount = 0
     let agreedTotalVolume = 0
-    let openReliefCount = 0
     let pendingApprovalCount = 0
     let contractPrepCount = 0
 
@@ -4528,7 +4526,6 @@ export function AdminDashboard({
       ) {
         agreedTotalVolume += obligation
       }
-      openReliefCount += (app.supportRequests ?? []).filter((r) => r.status === 'OPEN').length
     }
 
     const totalPaidVolume = payments
@@ -4545,7 +4542,6 @@ export function AdminDashboard({
       activeCount,
       agreedTotalVolume,
       totalPaidVolume,
-      openReliefCount,
     }
   }, [applications, payments])
 
@@ -4713,12 +4709,10 @@ export function AdminDashboard({
   const activeInstallmentMetrics = useMemo(() => {
     let overdue = 0
     let dueSoon = 0
-    let openRelief = 0
     let totalRemaining = 0
     for (const { summary } of activeInstallmentSummaries) {
       if (summary.overdueCount > 0) overdue += 1
       else if (summary.dueSoon) dueSoon += 1
-      openRelief += summary.openRelief
       totalRemaining += summary.remaining
     }
     return {
@@ -4726,7 +4720,6 @@ export function AdminDashboard({
       totalRemaining,
       overdue,
       dueSoon,
-      openRelief,
     }
   }, [activeInstallmentSummaries])
 
@@ -4805,11 +4798,6 @@ export function AdminDashboard({
     const fullCoverCount = filteredApplications.filter((app) => app.product === 'FULL_COVER').length
     const japanCount = filteredApplications.filter((app) => app.destination === 'JAPAN').length
     const turkeyCount = filteredApplications.filter((app) => app.destination === 'TURKEY').length
-    const openReliefCount = filteredApplications.reduce(
-      (sum, app) =>
-        sum + (app.supportRequests ?? []).filter((request) => request.status === 'OPEN').length,
-      0,
-    )
     const agreedObligation = filteredApplications.reduce((sum, app) => {
       const obligation = app.financialPlan?.totalObligation
       return app.financialPlan?.pricingStatus === 'AGREED' &&
@@ -4827,7 +4815,6 @@ export function AdminDashboard({
       paidVolume: paidPayments.reduce((sum, payment) => sum + payment.amount, 0),
       agreedObligation,
       alumniCount: alumniSummaries.length,
-      openReliefCount,
       statusGroups: statusGroups.map((group) => ({
         ...group,
         percent: (group.count / groupMax) * 100,
@@ -5695,8 +5682,7 @@ export function AdminDashboard({
                     {formatRupiah(dashboardAnalytics.paidVolume)}
                   </strong>
                   <span className="mt-1 block text-[11px] text-amber-700">
-                    {dashboardAnalytics.alumniCount} alumnus · {dashboardAnalytics.openReliefCount}{' '}
-                    keringanan terbuka
+                    {dashboardAnalytics.alumniCount} alumnus
                   </span>
                 </button>
               </div>
@@ -5962,18 +5948,6 @@ export function AdminDashboard({
                     <span className="text-xs font-medium text-slate-700">Jatuh tempo ≤ 7 hari</span>
                     <strong className="text-sm text-amber-700">
                       {activeInstallmentMetrics.dueSoon}
-                    </strong>
-                  </button>
-                  <button
-                    className="flex items-center justify-between rounded-lg border border-blue-100 bg-white px-3 py-3 text-left hover:bg-blue-50/50"
-                    onClick={() => setActiveMenu('activeInstallments')}
-                    type="button"
-                  >
-                    <span className="text-xs font-medium text-slate-700">
-                      Permohonan keringanan
-                    </span>
-                    <strong className="text-sm text-[#0b57d0]">
-                      {activeInstallmentMetrics.openRelief}
                     </strong>
                   </button>
                 </div>

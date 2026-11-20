@@ -218,49 +218,6 @@ const validateFullCoverApproval = (
   return null
 }
 
-export async function updateSupportRequest(
-  documentId: string,
-  requestIndex: number,
-  status: string,
-  response: string,
-): Promise<ActionResult> {
-  const { staff, error } = await assertStaffDocumentId(documentId)
-  if (error) return error
-  if (!Number.isInteger(requestIndex) || requestIndex < 0 || requestIndex > 99) {
-    return { ok: false, message: 'Permohonan tidak valid.' }
-  }
-  if (!['OPEN', 'REVIEWED'].includes(status)) {
-    return { ok: false, message: 'Pilih status permohonan yang valid.' }
-  }
-  if (typeof response !== 'string' || response.length > 1_000) {
-    return { ok: false, message: 'Tanggapan maksimal 1.000 karakter.' }
-  }
-  try {
-    const applicationRef = getFirebaseFirestore().collection('applications').doc(documentId)
-    const application = await applicationRef.get()
-    if (!application.exists) return { ok: false, message: 'Pengajuan tidak ditemukan.' }
-    const currentRequests = application.data()?.supportRequests
-    if (!Array.isArray(currentRequests) || requestIndex >= currentRequests.length) {
-      return {
-        ok: false,
-        message: 'Permohonan tidak ditemukan. Muat ulang halaman sebelum menyimpan.',
-      }
-    }
-    const supportRequests = currentRequests.map(
-      (request: Record<string, unknown>, index: number) =>
-        index === requestIndex ? { ...request, status, response: response.trim() } : request,
-    )
-    await applicationRef.update({
-      supportRequests,
-      updatedAt: FieldValue.serverTimestamp(),
-      updatedBy: staff?.email ?? staff?.uid,
-    })
-    return { ok: true }
-  } catch {
-    return { ok: false, message: 'Permohonan belum dapat disimpan. Coba lagi.' }
-  }
-}
-
 export async function saveFinancialPlan(
   documentId: string,
   financialValues: Record<string, string>,
@@ -541,12 +498,6 @@ export async function saveFinancialPlan(
       if (installmentCount > 0 && !schedule) {
         return { ok: false, message: 'Jadwal angsuran tidak valid.' }
       }
-      if (currentPricingStatus === 'AGREED' && !finalAgreementReference) {
-        return {
-          ok: false,
-          message: 'Status Disepakati memerlukan referensi akad final yang telah ditandatangani.',
-        }
-      }
       const offerSnapshot = {
         principal: derived.principal,
         nafaqahItems: derived.nafaqahItems,
@@ -566,21 +517,12 @@ export async function saveFinancialPlan(
       const offerChanged = serializeStable(previousOffer ?? null) !== serializeStable(offerSnapshot)
       const effectiveAgreementReference =
         offerChanged || currentPricingStatus === 'ESTIMATED' ? '' : finalAgreementReference
-      if (currentPricingStatus === 'AGREED' && !finalAgreementReference) {
-        return {
-          ok: false,
-          message: 'Status Disepakati memerlukan referensi akad final yang telah ditandatangani.',
-        }
-      }
       Object.assign(nextFinancialPlan, offerSnapshot, {
         offerSnapshot,
         pricingStatus: currentPricingStatus,
         finalAgreementReference: effectiveAgreementReference,
         settlementNotes,
       })
-      if (currentPricingStatus === 'ESTIMATED' || offerChanged) {
-        updateValues.userFinancingAcceptance = FieldValue.delete()
-      }
       if (
         applicationData.status === 'CANCELLED' &&
         currentPricingStatus === 'AGREED' &&
@@ -648,9 +590,6 @@ export async function saveFinancialPlan(
       const previousOffer = applicationData.financialPlan?.offerSnapshot
       const offerChanged = serializeStable(previousOffer ?? null) !== serializeStable(fcSnapshot)
       Object.assign(nextFinancialPlan, { offerSnapshot: fcSnapshot })
-      if (offerChanged) {
-        updateValues.userFinancingAcceptance = FieldValue.delete()
-      }
       const nextPricingStatus =
         currentPricingStatus === 'AGREED' && offerChanged ? 'VERIFIED' : currentPricingStatus
       fullCoverNextPricingStatus = nextPricingStatus
@@ -1046,7 +985,6 @@ export async function approveApplicationPricing(
         ...buildApprovalUpdateValues(
           applicationData,
           offerSnapshot,
-          offerChanged,
           'VERIFIED',
           staff,
           effectiveReference,
@@ -1125,13 +1063,7 @@ export async function approveApplicationPricing(
       }
       await applicationRef.update({
         financialPlan: nextPlan,
-        ...buildApprovalUpdateValues(
-          applicationData,
-          offerSnapshot,
-          offerChanged,
-          'VERIFIED',
-          staff,
-        ),
+        ...buildApprovalUpdateValues(applicationData, offerSnapshot, 'VERIFIED', staff),
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: staff?.email ?? staff?.uid,
       })
@@ -1149,16 +1081,12 @@ type StaffContext = { email?: string; uid: string } | null
 const buildApprovalUpdateValues = (
   applicationData: DocumentData,
   offerSnapshot: Record<string, unknown>,
-  offerChanged: boolean,
   pricingStatus: string,
   staff: StaffContext,
   finalAgreementReference?: string,
   settlementNotes?: string,
 ): Record<string, unknown> => {
   const values: Record<string, unknown> = {}
-  if (offerChanged) {
-    values.userFinancingAcceptance = FieldValue.delete()
-  }
   values.financialPlanHistory = appendFinancialHistory(applicationData, {
     changedAt: new Date().toISOString(),
     changedBy: staff?.email ?? staff?.uid,
@@ -1197,13 +1125,6 @@ export async function setApplicationPricingAgreed(documentId: string): Promise<A
         String(plan.refundEvidenceReference ?? '').trim(),
       )
       if (approvalError) return { ok: false, message: approvalError }
-      if (!finalAgreementReference) {
-        return {
-          ok: false,
-          message:
-            'Isi referensi akad final yang sudah ditandatangani pada tab Draft Akad sebelum menyetujui.',
-        }
-      }
       offerSnapshot = (plan.offerSnapshot as Record<string, unknown>) ?? {}
     } else if (product === 'FULL_COVER') {
       const approvalError = validateFullCoverApproval(applicationData, plan)
@@ -1266,7 +1187,6 @@ export async function revertApplicationPricingToEstimated(
         settlementNotes:
           'Persetujuan nominal dibatalkan oleh staf. Pengajuan dikembalikan ke menu Pengajuan untuk ditinjau ulang.',
       }),
-      userFinancingAcceptance: FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: staff?.email ?? staff?.uid,
     })
@@ -1325,6 +1245,12 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
     const application = await applicationRef.get()
     if (!application.exists) return { ok: false, message: 'Pengajuan tidak ditemukan.' }
     const applicationData = application.data() ?? {}
+    if (['REJECTED', 'CANCELLED', 'COMPLETED'].includes(String(applicationData.status ?? ''))) {
+      return {
+        ok: false,
+        message: 'Pengajuan yang sudah ditutup tidak dapat diterbitkan akadnya.',
+      }
+    }
     const plan = { ...(applicationData.financialPlan ?? {}) } as Record<string, unknown>
     if (plan.akadDocument) {
       return { ok: false, message: 'Dokumen akad sudah terbit untuk pengajuan ini.' }
@@ -1335,12 +1261,6 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
         ok: false,
         message: 'Terbitkan dokumen akad setelah rincian biaya berstatus Terverifikasi.',
       }
-    }
-    if (
-      applicationData.product === 'DEPARTURE_BRIDGING' &&
-      !String(plan.lpkWitnessName ?? '').trim()
-    ) {
-      return { ok: false, message: 'Isi nama perwakilan LPK sebagai saksi pada tab Draft Akad.' }
     }
     const product = String(applicationData.product ?? '')
     if (product === 'DEPARTURE_BRIDGING') {
@@ -1434,15 +1354,19 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
       issuedBy: staff?.email ?? staff?.uid,
     }
 
-    let linked = false
+    let linkResult: 'linked' | 'already-issued' | 'closed' = 'already-issued'
     try {
-      linked = await firestore.runTransaction(async (transaction) => {
+      linkResult = await firestore.runTransaction(async (transaction) => {
         const latest = await transaction.get(applicationRef)
         const latestData = latest.data()
-        if (!latest.exists || latestData?.financialPlan?.akadDocument) return false
+        if (!latest.exists || latestData?.financialPlan?.akadDocument) return 'already-issued'
+        if (['REJECTED', 'CANCELLED', 'COMPLETED'].includes(String(latestData?.status ?? ''))) {
+          return 'closed'
+        }
         const latestPlan = { ...(latestData?.financialPlan ?? {}) } as Record<string, unknown>
         if (product === 'DEPARTURE_BRIDGING') withDraft1Defaults(latestPlan)
         transaction.update(applicationRef, {
+          status: 'ACTIVE',
           financialPlan: {
             ...latestPlan,
             ...(String(latestPlan.finalAgreementReference ?? '').trim()
@@ -1454,7 +1378,7 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
           updatedAt: FieldValue.serverTimestamp(),
           updatedBy: staff?.email ?? staff?.uid,
         })
-        return true
+        return 'linked'
       })
     } catch {
       try {
@@ -1467,16 +1391,19 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
         message: 'Dokumen sudah dibuat, tetapi belum dapat disimpan ke pengajuan. Coba lagi.',
       }
     }
-    if (!linked) {
+    if (linkResult !== 'linked') {
       try {
         await deleteDriveFile(uploaded.fileId)
       } catch {
         // best-effort cleanup
       }
+      if (linkResult === 'closed') {
+        return { ok: false, message: 'Pengajuan telah ditutup; akad tidak diterbitkan.' }
+      }
       return { ok: false, message: 'Dokumen akad sudah terbit untuk pengajuan ini.' }
     }
 
-    if (String(applicationData.status) === 'ACTIVE' && ownerUid && applicantName.trim()) {
+    if (ownerUid && applicantName.trim()) {
       const currentDocuments = Array.isArray(applicationData.documents)
         ? applicationData.documents
         : []
@@ -1487,6 +1414,14 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
           fileName: typeof document.fileName === 'string' ? document.fileName : '',
           label: String(document.documentType ?? ''),
         }))
+      const agreementPdf = applicationData.agreementPdf
+      if (agreementPdf && typeof agreementPdf.fileId === 'string') {
+        driveFiles.push({
+          fileId: String(agreementPdf.fileId),
+          fileName: typeof agreementPdf.fileName === 'string' ? agreementPdf.fileName : '',
+          label: 'Akad Wakalah bil Ujrah',
+        })
+      }
       driveFiles.push({ fileId: uploaded.fileId, fileName, label })
       await promoteApplicationFolder({
         folderId,

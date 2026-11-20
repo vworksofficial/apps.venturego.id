@@ -3,7 +3,7 @@ import 'server-only'
 import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseFirestore } from './firebase-admin'
 
-export const STUDENT_NUMBER_PATTERN = /^VSV-\d{4,}-\d{4}$/
+export const STUDENT_NUMBER_PATTERN = /^VSV-(\d{4,})-\d{4}$/
 
 const getJakartaYear = () =>
   new Intl.DateTimeFormat('en', { timeZone: 'Asia/Jakarta', year: 'numeric' }).format(new Date())

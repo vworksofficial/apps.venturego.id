@@ -22,10 +22,6 @@ const FAQ_ITEMS = [
     a: 'Rincian biaya Nafaqah, Ujrah, dan jadwal angsuran tersedia di menu Angsuran (/dashboard/angsuran), sedangkan arsip berkas dan bukti bayar dapat dilihat di menu Dokumen Saya (/dashboard/dokumen).',
   },
   {
-    q: 'Bagaimana jika saya membutuhkan keringanan pembayaran?',
-    a: 'Pada menu Angsuran (/dashboard/angsuran), Anda dapat mengajukan permohonan keringanan beserta alasannya untuk ditinjau langsung oleh tim operasional VentureGo.',
-  },
-  {
     q: 'Bagaimana cara memperbarui data diri?',
     a: 'Buka Profil → Data Diri, tekan Ubah Data, perbarui kolom yang tersedia, lalu tekan Simpan. Perubahan hanya berlaku untuk pengajuan yang sedang dipilih.',
   },
@@ -57,12 +53,6 @@ export default function HelpPage() {
       <section>
         <h2 className="mb-3 text-sm font-bold text-slate-900">Akses bantuan</h2>
         <DashboardCard>
-          <DashboardMenuRow
-            detail="Ajukan keringanan jadwal di menu Angsuran"
-            href="/dashboard/angsuran"
-            icon="phone"
-            title="Permohonan keringanan cicilan"
-          />
           <DashboardMenuRow
             detail="vworksofficial@gmail.com"
             href="mailto:vworksofficial@gmail.com"

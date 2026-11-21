@@ -343,7 +343,7 @@ function ApplicationTerms({
         // so fast scrolls activate the bounded inner list before it reaches the button.
         const pinned = sentinel.getBoundingClientRect().top <= stickyTop + SCHEDULE_OVERLAP
         if (!pinned && scheduleScrollRef.current?.scrollTop) {
-          scheduleScrollRef.current.scrollTop = 0
+          scheduleScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
         }
         setSchedulePinned((current) => (current === pinned ? current : pinned))
         const scrollContent = scheduleScrollRef.current
@@ -509,7 +509,7 @@ function ApplicationTerms({
       <div className="relative -mx-5 -mt-16 [overflow-anchor:none]">
         <section
           aria-label={`Jadwal angsuran ${programName}`}
-          className="sticky z-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 ring-1 ring-slate-200/70"
+          className={`sticky z-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 transition-[box-shadow,border-radius] duration-300 ease-out ${schedulePinned ? 'rounded-b-2xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-slate-200/70' : 'ring-1 ring-slate-200/70'}`}
           ref={schedulePanelRef}
           style={{ top: scheduleStickyTop }}
         >
@@ -557,7 +557,7 @@ function ApplicationTerms({
             </div>
           )}
           <div
-            className={`dashboard-schedule-scroll space-y-3 [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
+            className={`dashboard-schedule-scroll space-y-3 transition-[max-height] duration-300 ease-out [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
             ref={scheduleScrollRef}
             style={
               schedulePinned
@@ -722,7 +722,7 @@ function ApplicationTerms({
         </section>
         <div
           aria-hidden="true"
-          className="pointer-events-none"
+          className="pointer-events-none transition-[height] duration-200 ease-out"
           style={{ height: scheduleFlowReserve }}
         />
       </div>

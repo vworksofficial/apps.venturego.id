@@ -27,7 +27,7 @@ export type FullCoverBudgetTotals = {
 
 export const calculateFullCoverCharges = (nafaqahTotal: number) => ({
   ujrahTotal: Math.round(nafaqahTotal * 0.1),
-  jualaTotal: Math.round(nafaqahTotal * 0.5),
+  jualaTotal: Math.round(nafaqahTotal * 0.3),
 })
 
 export const FULL_COVER_BUDGET_DEFAULTS = {

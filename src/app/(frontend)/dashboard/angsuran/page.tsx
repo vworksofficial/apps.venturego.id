@@ -10,6 +10,7 @@ import {
   calculateFullCoverCharges,
   normalizeFullCoverBudget,
 } from '@/lib/full-cover-budget'
+import { COMPANY_BANK_ACCOUNT } from '@/lib/company-accounts'
 import {
   getOwnedFinancingApplications,
   type UserFinancingResult,
@@ -108,13 +109,21 @@ function ApplicationTerms({
   application,
   payments,
   initialProofs,
+  onRefresh,
+  refreshing,
 }: {
   application: UserApplication
   payments: UserPayment[]
   initialProofs: UserPaymentProof[]
+  onRefresh?: () => void
+  refreshing?: boolean
 }) {
   const [popup, setPopup] = useState<PopupKind>(null)
   const [paymentProofs, setPaymentProofs] = useState(initialProofs)
+
+  useEffect(() => {
+    setPaymentProofs(initialProofs)
+  }, [initialProofs])
   const [selectedInstallment, setSelectedInstallment] = useState<number | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentFile, setPaymentFile] = useState<File | null>(null)
@@ -521,6 +530,32 @@ function ApplicationTerms({
               </span>
             )}
           </div>
+          {!['ACTIVE', 'COMPLETED'].includes(application.status) && (
+            <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-blue-200/80 bg-blue-50/70 p-3 text-xs text-blue-900">
+              <svg
+                aria-hidden="true"
+                className="mt-0.5 size-4 shrink-0 text-[#0b57d0]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                />
+              </svg>
+              <div>
+                <p className="font-semibold text-slate-900">Pembayaran Angsuran Belum Dibuka</p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+                  Jadwal di bawah merupakan simulasi rencana pembiayaan. Pembayaran angsuran baru
+                  dapat dilakukan setelah naskah akad resmi diterbitkan oleh admin dan masa kerja
+                  Anda dimulai.
+                </p>
+              </div>
+            </div>
+          )}
           <div
             className={`dashboard-schedule-scroll space-y-3 [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
             ref={scheduleScrollRef}
@@ -591,7 +626,34 @@ function ApplicationTerms({
               aria-label={`Riwayat pembayaran ${programName}`}
               className="space-y-2 border-t border-slate-200 pt-4"
             >
-              <h4 className="text-xs font-bold text-slate-800">Riwayat pembayaran</h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-slate-800">Riwayat pembayaran</h4>
+                {onRefresh && (
+                  <button
+                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0] transition hover:bg-blue-50 disabled:opacity-50"
+                    disabled={refreshing}
+                    onClick={onRefresh}
+                    title="Segarkan data angsuran dan status bukti transfer"
+                    type="button"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className={`size-3 ${refreshing ? 'animate-spin' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+                      />
+                    </svg>
+                    <span>{refreshing ? 'Memperbarui…' : 'Segarkan Status'}</span>
+                  </button>
+                )}
+              </div>
               {applicationPayments.length === 0 && paymentProofs.length === 0 ? (
                 <p className="py-2 text-xs text-slate-500">
                   Belum ada pembayaran atau bukti transfer yang tercatat.
@@ -842,18 +904,22 @@ function ApplicationTerms({
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-700">
                         Transfer ke rekening
                       </p>
-                      <p className="mt-1 text-sm font-bold text-slate-900">Bank BRI</p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">
+                        {COMPANY_BANK_ACCOUNT.bankName}
+                      </p>
                     </div>
                     <div className="flex items-center justify-between gap-3 border-t border-blue-100 pt-3">
                       <div>
                         <p className="text-[10px] text-slate-500">Nomor rekening</p>
                         <p className="font-mono text-sm font-bold tracking-wide text-slate-900">
-                          044301001341566
+                          {COMPANY_BANK_ACCOUNT.accountNumber}
                         </p>
                       </div>
                       <button
                         className="rounded-full border border-blue-200 bg-white px-3 py-1.5 text-[10px] font-bold text-[#0b57d0]"
-                        onClick={() => void copyValue('044301001341566', 'account')}
+                        onClick={() =>
+                          void copyValue(COMPANY_BANK_ACCOUNT.accountNumber, 'account')
+                        }
                         type="button"
                       >
                         {copiedItem === 'account' ? 'Tersalin' : 'Salin rekening'}
@@ -863,7 +929,7 @@ function ApplicationTerms({
                       <div>
                         <p className="text-[10px] text-slate-500">Atas nama</p>
                         <p className="text-xs font-semibold text-slate-900">
-                          PT Vworks Kolaborasi Bersama
+                          {COMPANY_BANK_ACCOUNT.accountHolder}
                         </p>
                       </div>
                     </div>
@@ -1079,6 +1145,7 @@ export default function InstallmentsPage() {
   const [payments, setPayments] = useState<UserPayment[]>([])
   const [paymentProofs, setPaymentProofs] = useState<UserPaymentProof[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
   const loadApplications = useCallback(async (idToken: string) => {
@@ -1095,6 +1162,18 @@ export default function InstallmentsPage() {
     setPayments(result.payments)
     setPaymentProofs(result.paymentProofs)
   }, [])
+
+  const handleRefresh = useCallback(async () => {
+    const user = getFirebaseClientAuth().currentUser
+    if (!user) return
+    setRefreshing(true)
+    try {
+      const idToken = await user.getIdToken()
+      await loadApplications(idToken)
+    } finally {
+      setRefreshing(false)
+    }
+  }, [loadApplications])
 
   useEffect(() => {
     let active = true
@@ -1214,7 +1293,9 @@ export default function InstallmentsPage() {
           application={application}
           initialProofs={paymentProofs.filter((proof) => proof.applicationDocId === application.id)}
           key={application.id}
+          onRefresh={handleRefresh}
           payments={payments}
+          refreshing={refreshing}
         />
       ))}
     </DashboardScaffold>

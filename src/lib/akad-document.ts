@@ -98,36 +98,30 @@ const setHeaderCompanyIdentity = async (zip: JSZip): Promise<void> => {
   const headerFile = zip.file('word/header1.xml')
   if (!headerFile) return
   const header = await headerFile.async('string')
-  const existingCompanyTable = header.includes('PT VWORKS KOLABORASI BERSAMA')
-    ? /<w:tbl>[\s\S]*?<\/w:tbl>/.exec(header)?.[0]
-    : undefined
-  const logoParagraph = existingCompanyTable
-    ? /<w:p>[\s\S]*?<\/w:p>/.exec(existingCompanyTable)?.[0]
-    : /<w:p>[\s\S]*?<\/w:p>/.exec(header)?.[0]
-  if (!logoParagraph) return
+  const relsXml = await zip.file('word/_rels/header1.xml.rels')?.async('string')
 
-  const leftParagraph = logoParagraph
-    .replace(
-      /<w:pPr>[\s\S]*?<\/w:pPr>/,
-      '<w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr>',
-    )
-    .replace('<w:r><w:tab/></w:r>', '<w:r><w:t xml:space="preserve"> </w:t></w:r>')
-    .replaceAll('1866900', '1225296')
-    .replaceAll('619125', '406400')
-    .replaceAll('<w:sz w:val="24"/>', '<w:sz w:val="26"/>')
-    .replaceAll('<w:szCs w:val="24"/>', '<w:szCs w:val="26"/>')
-    .replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (_match, properties: string) => {
-      const brandProperties = properties
-        .replace(/<w:color\b[^>]*\/>/g, '')
-        .replace(/<w:bCs?\b[^>]*\/>/g, '')
-      return `<w:rPr>${brandProperties}<w:b/><w:bCs/><w:color w:val="0B57D0"/></w:rPr>`
-    })
+  // Find logo rId
+  const blipMatch = /<a:blip\b[^>]*r:embed="([^"]+)"/.exec(header)
+  let logoRid = blipMatch?.[1]
+  if (!logoRid && relsXml) {
+    const relMatch =
+      /<Relationship\b[^>]*\bId="([^"]+)"[^>]*\bTarget="[^"]*image[0-9]*\.(?:png|jpg|jpeg)"/i.exec(
+        relsXml,
+      )
+    logoRid = relMatch?.[1] ?? 'rId1'
+  }
+  const targetRid = logoRid ?? 'rId1'
 
   const cellMargins =
     '<w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tcMar>'
   const noBorders = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
     .map((side) => `<w:${side} w:val="nil"/>`)
     .join('')
+
+  const colLogo = `<w:tc><w:tcPr><w:tcW w:w="2050" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="1225296" cy="406400"/><wp:effectExtent b="0" l="0" r="0" t="0"/><wp:docPr id="1" name="Logo" descr="Logo VentureGo"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="image1.png" descr="Logo VentureGo"/><pic:cNvPicPr preferRelativeResize="0"/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${targetRid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1225296" cy="406400"/></a:xfrm><a:prstGeom prst="rect"/><a:ln/></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p></w:tc>`
+
+  const colBrand = `<w:tc><w:tcPr><w:tcW w:w="3388" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr><w:p><w:pPr><w:jc w:val="left"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Google Sans" w:hAnsi="Google Sans" w:cs="Google Sans"/><w:b/><w:bCs/><w:color w:val="0B57D0"/><w:sz w:val="26"/><w:szCs w:val="26"/></w:rPr><w:t>Vworks</w:t><w:br/><w:t>Student Venture</w:t></w:r></w:p></w:tc>`
+
   const companyRun = (
     text: string,
     options: { size: number; bold?: boolean; italic?: boolean; color: string; before?: number },
@@ -138,12 +132,13 @@ const setHeaderCompanyIdentity = async (zip: JSZip): Promise<void> => {
     options: { size: number; bold?: boolean; italic?: boolean; color: string; before?: number },
   ) =>
     `<w:p><w:pPr><w:jc w:val="right"/><w:spacing w:before="${options.before ?? 0}" w:after="0" w:line="220" w:lineRule="auto"/></w:pPr>${companyRun(text, options)}</w:p>`
+
   const companyParagraphs = [
     companyLine('PT VWORKS KOLABORASI BERSAMA', {
       size: 18,
       bold: true,
       color: '0B57D0',
-      before: 100,
+      before: 60,
     }),
     companyLine('Your Partner to Leap Together', { size: 16, bold: true, color: '0B57D0' }),
     companyLine('Perum Bumi Dieng Indah 2, Blok G5 No. 2 & 3, RW 4', {
@@ -156,11 +151,19 @@ const setHeaderCompanyIdentity = async (zip: JSZip): Promise<void> => {
     }),
     companyLine('082213072665', { size: 12, color: '000000' }),
   ].join('')
-  const leftCell = `<w:tc><w:tcPr><w:tcW w:w="5438" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${leftParagraph}</w:tc>`
-  const rightCell = `<w:tc><w:tcPr><w:tcW w:w="4642" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${companyParagraphs}</w:tc>`
-  const headerTable = `<w:tbl><w:tblPr><w:tblW w:w="10080" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${noBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="5438"/><w:gridCol w:w="4642"/></w:tblGrid><w:tr>${leftCell}${rightCell}</w:tr></w:tbl>`
-  const previousHeaderContent = existingCompanyTable ?? logoParagraph
-  zip.file('word/header1.xml', header.replace(previousHeaderContent, headerTable))
+
+  const colCompany = `<w:tc><w:tcPr><w:tcW w:w="4642" w:type="dxa"/><w:vAlign w:val="center"/>${cellMargins}</w:tcPr>${companyParagraphs}</w:tc>`
+
+  const headerTable = `<w:tbl><w:tblPr><w:tblW w:w="10080" w:type="dxa"/><w:jc w:val="center"/><w:tblLayout w:type="fixed"/><w:tblBorders>${noBorders}</w:tblBorders></w:tblPr><w:tblGrid><w:gridCol w:w="2050"/><w:gridCol w:w="3388"/><w:gridCol w:w="4642"/></w:tblGrid><w:tr>${colLogo}${colBrand}${colCompany}</w:tr></w:tbl>`
+
+  let nextHeader = header
+  if (header.includes('<w:tbl')) {
+    nextHeader = header.replace(/<w:tbl[\s\S]*?<\/w:tbl>/, headerTable)
+  } else {
+    nextHeader = header.replace(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/, headerTable)
+  }
+
+  zip.file('word/header1.xml', nextHeader)
 }
 
 export const refreshAkadPreviewHeader = async (bytes: Uint8Array): Promise<Uint8Array> => {
@@ -1398,6 +1401,13 @@ export const buildAkadDocument = async (options: {
   xml = ensureUniqueParagraphIds(xml)
   xml = addAppendixReceiptSignatureSpace(xml)
   zip.file('word/document.xml', xml)
+
+  const currentHeader = await zip.file('word/header1.xml')?.async('string')
+  if (currentHeader && !currentHeader.includes('PT VWORKS KOLABORASI BERSAMA')) {
+    await recolorHeaderLogo(zip)
+  }
+  await setHeaderCompanyIdentity(zip)
+
   if (draft) {
     const headerFile = zip.file('word/header1.xml')
     if (!headerFile) throw new Error(TEMPLATE_ERROR)

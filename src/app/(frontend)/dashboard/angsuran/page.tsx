@@ -21,7 +21,6 @@ import { DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
 type UserApplication = Extract<UserFinancingResult, { ok: true }>['applications'][number]
 type UserPayment = Extract<UserFinancingResult, { ok: true }>['payments'][number]
 type PopupKind = 'details' | 'program' | 'payment' | null
-const SCHEDULE_OVERLAP = 64
 
 const formatRupiah = (value: unknown) =>
   `Rp${(typeof value === 'number' && Number.isFinite(value) ? value : 0).toLocaleString('id-ID')}`
@@ -131,14 +130,7 @@ function ApplicationTerms({
   const [paymentError, setPaymentError] = useState('')
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
   const [copiedItem, setCopiedItem] = useState('')
-  const [schedulePinned, setSchedulePinned] = useState(false)
-  const [scheduleStickyTop, setScheduleStickyTop] = useState(128)
-  const scheduleStickyTopRef = useRef(128)
-  const articleRef = useRef<HTMLElement | null>(null)
   const programButtonRef = useRef<HTMLButtonElement | null>(null)
-  const scheduleSentinelRef = useRef<HTMLDivElement | null>(null)
-  const schedulePanelRef = useRef<HTMLElement | null>(null)
-  const scheduleScrollRef = useRef<HTMLDivElement | null>(null)
   const plan = application.financialPlan
   const isFullCover = application.product === 'FULL_COVER'
   const closed = ['CANCELLED', 'REJECTED'].includes(application.status)
@@ -326,53 +318,6 @@ function ApplicationTerms({
   }, [popup])
 
   useEffect(() => {
-    let frame = 0
-    const measureStickyTop = () => {
-      const articleTop = articleRef.current?.getBoundingClientRect().top ?? 0
-      const programButtonBottom = programButtonRef.current?.getBoundingClientRect().bottom ?? 120
-      const relativeBottom = Math.max(0, programButtonBottom - articleTop)
-      const stickyTop = Math.max(0, Math.ceil(relativeBottom + 8))
-      scheduleStickyTopRef.current = stickyTop
-      setScheduleStickyTop((current) => (current === stickyTop ? current : stickyTop))
-    }
-    const updateSchedulePosition = () => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => {
-        measureStickyTop()
-        const sentinel = scheduleSentinelRef.current
-        if (!sentinel) return
-        const stickyTop = scheduleStickyTopRef.current
-        // The sentinel stays in normal flow. Include the panel's overlap offset
-        // so fast scrolls activate the bounded inner list before it reaches the button.
-        const pinned = sentinel.getBoundingClientRect().top <= stickyTop + SCHEDULE_OVERLAP
-        if (!pinned && scheduleScrollRef.current?.scrollTop) {
-          scheduleScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
-        }
-        setSchedulePinned((current) => (current === pinned ? current : pinned))
-      })
-    }
-    measureStickyTop()
-    updateSchedulePosition()
-    window.addEventListener('scroll', updateSchedulePosition, { passive: true })
-    const resizeObserver = new ResizeObserver(() => {
-      measureStickyTop()
-      updateSchedulePosition()
-    })
-    if (programButtonRef.current) resizeObserver.observe(programButtonRef.current)
-    const onResize = () => {
-      measureStickyTop()
-      updateSchedulePosition()
-    }
-    window.addEventListener('resize', onResize)
-    return () => {
-      cancelAnimationFrame(frame)
-      window.removeEventListener('scroll', updateSchedulePosition)
-      window.removeEventListener('resize', onResize)
-      resizeObserver.disconnect()
-    }
-  }, [])
-
-  useEffect(() => {
     if (popup !== 'payment' || !paymentFile) {
       setPaymentPreviewUrl('')
       return
@@ -384,331 +329,299 @@ function ApplicationTerms({
 
   return (
     <>
-      <article className="sticky top-0 z-0 -mx-5 -mt-5" ref={articleRef}>
-        <section className="relative overflow-hidden rounded-none bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-5 pb-14 text-white sm:px-6 sm:pt-6 sm:pb-16">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full border border-white/10"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-2 -top-10 size-44 rounded-full border border-white/10"
-          />
-          <div className="relative flex flex-col items-center gap-5">
-            <div className="min-w-0 flex-1 text-center">
-              <h2 className="truncate text-lg font-extrabold sm:text-xl">
-                {application.applicantName}
-              </h2>
-              <p className="mt-0.5 text-[11px] text-blue-100">{application.applicationId}</p>
-              <button
-                aria-label={`Lihat informasi ${programName}`}
-                className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-[#0b57d0] shadow-sm transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
-                onClick={() => setPopup('program')}
-                ref={programButtonRef}
-                type="button"
-              >
-                <Icon name="program" />
-                <span className="truncate">{programName}</span>
-                <svg
-                  aria-hidden="true"
-                  className="size-3.5 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="m9 18 6-6-6-6"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                  />
-                </svg>
-              </button>
-              <p className="mt-3 text-[11px] text-blue-100">
-                {application.status === 'ACTIVE'
-                  ? 'Pembiayaan aktif. Pembayaran dimulai sesuai ketentuan akad.'
-                  : application.status === 'COMPLETED'
-                    ? 'Seluruh kewajiban program ini telah selesai.'
-                    : 'Rincian progres dan angsuran program Anda.'}
-              </p>
-            </div>
+      <header className="sticky top-0 z-20 -mx-5 -mt-5 bg-[#0b57d0] px-5 pt-5 pb-3 text-white shadow-sm">
+        <div className="flex flex-col items-center text-center">
+          <h2 className="truncate text-lg font-extrabold sm:text-xl">
+            {application.applicantName}
+          </h2>
+          <p className="mt-0.5 text-[11px] text-blue-100">{application.applicationId}</p>
+          <button
+            aria-label={`Lihat informasi ${programName}`}
+            className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-[#0b57d0] shadow-sm transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
+            onClick={() => setPopup('program')}
+            ref={programButtonRef}
+            type="button"
+          >
+            <Icon name="program" />
+            <span className="truncate">{programName}</span>
+            <svg aria-hidden="true" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
+              <path
+                d="m9 18 6-6-6-6"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+              />
+            </svg>
+          </button>
+          <p className="mt-2 text-[11px] text-blue-100">
+            {application.status === 'ACTIVE'
+              ? 'Pembiayaan aktif. Pembayaran dimulai sesuai ketentuan akad.'
+              : application.status === 'COMPLETED'
+                ? 'Seluruh kewajiban program ini telah selesai.'
+                : 'Rincian progres dan angsuran program Anda.'}
+          </p>
+        </div>
+      </header>
 
-            <div className="flex flex-col items-center">
-              <div className="relative grid size-52 shrink-0 place-items-center sm:size-60">
-                <svg
-                  aria-hidden="true"
-                  className="absolute inset-0 size-full"
-                  viewBox="0 0 120 120"
-                >
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="35"
-                    fill="currentColor"
-                    className="text-white/[0.06]"
-                  />
-                  <path
-                    d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="butt"
-                    strokeWidth="7"
-                    className="text-white/25"
-                  />
-                  {progress > 0 && (
-                    <path
-                      d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
-                      fill="none"
-                      pathLength={2 * Math.PI * 52 * 0.9}
-                      stroke="currentColor"
-                      strokeDasharray={`${2 * Math.PI * 52 * 0.9 * progress} ${2 * Math.PI * 52}`}
-                      strokeLinecap="round"
-                      strokeWidth="7.5"
-                      className="text-emerald-200 transition-[stroke-dasharray] duration-700"
-                    />
-                  )}
-                </svg>
-                <div className="-translate-y-1 text-center">
-                  <strong className="block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
-                    {totalObligation > 0 ? `${Math.round(progress * 100)}%` : '—'}
-                  </strong>
-                  <span className="mt-2 block text-[10px] font-semibold text-blue-50">
-                    {paidCount}/{plannedCount || '—'}
-                  </span>
-                  <span className="mt-0.5 block text-[9px] text-blue-100">angsuran</span>
-                </div>
-              </div>
-              <p className="-mt-1 text-center text-[11px] font-semibold text-emerald-100">
-                {formatRupiah(totalPaidAmount)} / {formatRupiah(totalObligation)}
-              </p>
-              <button
-                className="rounded-full px-3 py-1 !text-[11px] font-semibold text-white/90 underline decoration-white/50 underline-offset-4 transition hover:text-white"
-                onClick={() => setPopup('details')}
-                type="button"
-              >
-                Rincian Pembiayaan
-              </button>
-            </div>
-          </div>
-        </section>
-      </article>
-
-      <div aria-hidden="true" className="h-px" ref={scheduleSentinelRef} />
-      <div className="relative -mx-5 -mt-16 -mb-32 [overflow-anchor:none]">
-        <section
-          aria-label={`Jadwal angsuran ${programName}`}
-          className={`sticky z-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 transition-[box-shadow,border-radius] duration-300 ease-out ${schedulePinned ? 'rounded-b-2xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-slate-200/70' : 'ring-1 ring-slate-200/70'}`}
-          ref={schedulePanelRef}
-          style={{ top: scheduleStickyTop }}
-        >
-          <div className="flex items-end justify-between gap-3 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Jadwal angsuran</h3>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Angsuran pertama dibayarkan setelah siswa menerima gaji pertama bekerja di negara
-                tujuan.
-              </p>
-              <p className="mt-1 text-[11px] font-medium text-slate-600">
-                Tanggal keberangkatan: {departureDateLabel}
-              </p>
-            </div>
-            {plannedCount > 0 && (
-              <span className="shrink-0 text-[10px] font-medium text-slate-500">
-                {paidCount}/{plannedCount} lunas
-              </span>
-            )}
-          </div>
-          {!['ACTIVE', 'COMPLETED'].includes(application.status) && (
-            <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-blue-200/80 bg-blue-50/70 p-3 text-xs text-blue-900">
-              <svg
-                aria-hidden="true"
-                className="mt-0.5 size-4 shrink-0 text-[#0b57d0]"
+      <section className="relative z-0 -mx-5 overflow-hidden bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-2 pb-14 text-white sm:px-6 sm:pb-16">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full border border-white/10"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-2 -top-10 size-44 rounded-full border border-white/10"
+        />
+        <div className="flex flex-col items-center">
+          <div className="relative grid size-52 shrink-0 place-items-center sm:size-60">
+            <svg aria-hidden="true" className="absolute inset-0 size-full" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="35" fill="currentColor" className="text-white/[0.06]" />
+              <path
+                d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth={2}
-                viewBox="0 0 24 24"
-              >
+                strokeLinecap="butt"
+                strokeWidth="7"
+                className="text-white/25"
+              />
+              {progress > 0 && (
                 <path
+                  d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
+                  fill="none"
+                  pathLength={2 * Math.PI * 52 * 0.9}
+                  stroke="currentColor"
+                  strokeDasharray={`${2 * Math.PI * 52 * 0.9 * progress} ${2 * Math.PI * 52}`}
                   strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+                  strokeWidth="7.5"
+                  className="text-emerald-200 transition-[stroke-dasharray] duration-700"
                 />
-              </svg>
-              <div>
-                <p className="font-semibold text-slate-900">Pembayaran Angsuran Belum Dibuka</p>
-                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
-                  Jadwal di bawah merupakan simulasi rencana pembiayaan. Pembayaran angsuran baru
-                  dapat dilakukan setelah naskah akad resmi diterbitkan oleh admin dan masa kerja
-                  Anda dimulai.
-                </p>
-              </div>
-            </div>
-          )}
-          <div
-            className={`dashboard-schedule-scroll space-y-3 [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
-            ref={scheduleScrollRef}
-            style={
-              schedulePinned
-                ? { maxHeight: `calc(100dvh - ${scheduleStickyTop + 220}px)` }
-                : undefined
-            }
-          >
-            {closed ? (
-              <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
-                Jadwal angsuran tidak berlaku untuk pengajuan yang ditutup.
-              </p>
-            ) : displayedSchedule.length > 0 ? (
-              <div className="divide-y divide-slate-200 border-y border-slate-200">
-                {displayedSchedule.map((entry) => {
-                  const proof = pendingProofFor(entry.installment)
-                  const isNext = entry.installment === firstUnpaidInstallment
-                  const canPay = application.status === 'ACTIVE' && isNext && !entry.paid && !proof
-                  return (
-                    <div
-                      className="flex items-center justify-between gap-3 py-3"
-                      key={entry.installment}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-800">
-                          Angsuran {entry.installment}
-                        </p>
-                        <p className="mt-1 text-[10px] text-slate-500">
-                          {formatDate(entry.dueDate)}
-                        </p>
-                        {proof && (
-                          <p className="mt-1 text-[10px] font-medium text-amber-700">
-                            Bukti terkirim · menunggu verifikasi
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <strong className="text-xs text-slate-800">
-                          {formatRupiah(entry.amount)}
-                        </strong>
-                        {entry.paid ? (
-                          <span className="rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
-                            Lunas
-                          </span>
-                        ) : (
-                          <button
-                            className="rounded-full bg-[#0b57d0] px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-[#0847ae] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                            disabled={!canPay}
-                            onClick={() => openPayment(entry.installment, entry.amount)}
-                            type="button"
-                          >
-                            {proof ? 'Diproses' : 'Bayar'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
-                Jadwal angsuran belum dicantumkan dalam rincian akad.
-              </p>
-            )}
-
-            <div
-              aria-label={`Riwayat pembayaran ${programName}`}
-              className="space-y-2 border-t border-slate-200 pt-4"
-            >
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-800">Riwayat pembayaran</h4>
-                {onRefresh && (
-                  <button
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0] transition hover:bg-blue-50 disabled:opacity-50"
-                    disabled={refreshing}
-                    onClick={onRefresh}
-                    title="Segarkan data angsuran dan status bukti transfer"
-                    type="button"
-                  >
-                    <svg
-                      aria-hidden="true"
-                      className={`size-3 ${refreshing ? 'animate-spin' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
-                      />
-                    </svg>
-                    <span>{refreshing ? 'Memperbarui…' : 'Segarkan Status'}</span>
-                  </button>
-                )}
-              </div>
-              {applicationPayments.length === 0 && paymentProofs.length === 0 ? (
-                <p className="py-2 text-xs text-slate-500">
-                  Belum ada pembayaran atau bukti transfer yang tercatat.
-                </p>
-              ) : (
-                <div className="divide-y divide-slate-200">
-                  {applicationPayments.map((payment) => (
-                    <div className="flex items-center justify-between gap-3 py-3" key={payment.id}>
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-slate-800">
-                          {payment.installmentNumber
-                            ? `Angsuran ${payment.installmentNumber}`
-                            : payment.description || 'Pembayaran'}
-                        </p>
-                        <p className="mt-1 text-[10px] text-slate-500">
-                          {formatDate(payment.paidAt ?? payment.createdAt?.slice(0, 10))}
-                          {payment.paidMethod ? ` · ${payment.paidMethod}` : ''}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs font-bold text-slate-800">
-                          {formatRupiah(payment.amount)}
-                        </p>
-                        <span className="text-[10px] font-medium text-slate-500">
-                          {payment.status === 'PAID'
-                            ? 'Berhasil'
-                            : payment.status === 'PENDING'
-                              ? 'Menunggu pembayaran'
-                              : payment.status === 'EXPIRED'
-                                ? 'Kedaluwarsa'
-                                : 'Gagal'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {paymentProofs.map((proof) => (
-                    <div className="flex items-center justify-between gap-3 py-3" key={proof.id}>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-800">
-                          Bukti transfer · Angsuran {proof.installmentNumber}
-                        </p>
-                        <p className="mt-1 text-[10px] text-slate-500">
-                          {formatDate(proof.submittedAt)}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs font-bold text-slate-800">
-                          {formatRupiah(proof.amount)}
-                        </p>
-                        <span
-                          className={`text-[10px] font-medium ${proof.status === 'VERIFIED' ? 'text-emerald-700' : proof.status === 'REJECTED' ? 'text-rose-700' : 'text-amber-700'}`}
-                        >
-                          {proof.status === 'VERIFIED'
-                            ? 'Terverifikasi'
-                            : proof.status === 'REJECTED'
-                              ? 'Perlu perbaikan'
-                              : 'Menunggu verifikasi'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               )}
+            </svg>
+            <div className="-translate-y-1 text-center">
+              <strong className="block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
+                {totalObligation > 0 ? `${Math.round(progress * 100)}%` : '—'}
+              </strong>
+              <span className="mt-2 block text-[10px] font-semibold text-blue-50">
+                {paidCount}/{plannedCount || '—'}
+              </span>
+              <span className="mt-0.5 block text-[9px] text-blue-100">angsuran</span>
             </div>
           </div>
-        </section>
-      </div>
+          <p className="-mt-1 text-center text-[11px] font-semibold text-emerald-100">
+            {formatRupiah(totalPaidAmount)} / {formatRupiah(totalObligation)}
+          </p>
+          <button
+            className="rounded-full px-3 py-1 !text-[11px] font-semibold text-white/90 underline decoration-white/50 underline-offset-4 transition hover:text-white"
+            onClick={() => setPopup('details')}
+            type="button"
+          >
+            Rincian Pembiayaan
+          </button>
+        </div>
+      </section>
+
+      <section
+        aria-label={`Jadwal angsuran ${programName}`}
+        className="relative z-10 -mx-5 -mt-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-8 shadow-sm ring-1 ring-slate-200/70"
+      >
+        <div className="flex items-end justify-between gap-3 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Jadwal angsuran</h3>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Angsuran pertama dibayarkan setelah siswa menerima gaji pertama bekerja di negara
+              tujuan.
+            </p>
+            <p className="mt-1 text-[11px] font-medium text-slate-600">
+              Tanggal keberangkatan: {departureDateLabel}
+            </p>
+          </div>
+          {plannedCount > 0 && (
+            <span className="shrink-0 text-[10px] font-medium text-slate-500">
+              {paidCount}/{plannedCount} lunas
+            </span>
+          )}
+        </div>
+        {!['ACTIVE', 'COMPLETED'].includes(application.status) && (
+          <div className="mb-3 flex items-start gap-2.5 rounded-xl border border-blue-200/80 bg-blue-50/70 p-3 text-xs text-blue-900">
+            <svg
+              aria-hidden="true"
+              className="mt-0.5 size-4 shrink-0 text-[#0b57d0]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"
+              />
+            </svg>
+            <div>
+              <p className="font-semibold text-slate-900">Pembayaran Angsuran Belum Dibuka</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+                Jadwal di bawah merupakan simulasi rencana pembiayaan. Pembayaran angsuran baru
+                dapat dilakukan setelah naskah akad resmi diterbitkan oleh admin dan masa kerja Anda
+                dimulai.
+              </p>
+            </div>
+          </div>
+        )}
+        <div className="space-y-3">
+          {closed ? (
+            <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
+              Jadwal angsuran tidak berlaku untuk pengajuan yang ditutup.
+            </p>
+          ) : displayedSchedule.length > 0 ? (
+            <div className="divide-y divide-slate-200 border-y border-slate-200">
+              {displayedSchedule.map((entry) => {
+                const proof = pendingProofFor(entry.installment)
+                const isNext = entry.installment === firstUnpaidInstallment
+                const canPay = application.status === 'ACTIVE' && isNext && !entry.paid && !proof
+                return (
+                  <div
+                    className="flex items-center justify-between gap-3 py-3"
+                    key={entry.installment}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800">
+                        Angsuran {entry.installment}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">{formatDate(entry.dueDate)}</p>
+                      {proof && (
+                        <p className="mt-1 text-[10px] font-medium text-amber-700">
+                          Bukti terkirim · menunggu verifikasi
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <strong className="text-xs text-slate-800">
+                        {formatRupiah(entry.amount)}
+                      </strong>
+                      {entry.paid ? (
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700">
+                          Lunas
+                        </span>
+                      ) : (
+                        <button
+                          className="rounded-full bg-[#0b57d0] px-3 py-1.5 text-[10px] font-bold text-white transition hover:bg-[#0847ae] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                          disabled={!canPay}
+                          onClick={() => openPayment(entry.installment, entry.amount)}
+                          type="button"
+                        >
+                          {proof ? 'Diproses' : 'Bayar'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="border-y border-slate-200 py-4 text-xs text-slate-500">
+              Jadwal angsuran belum dicantumkan dalam rincian akad.
+            </p>
+          )}
+
+          <div
+            aria-label={`Riwayat pembayaran ${programName}`}
+            className="space-y-2 border-t border-slate-200 pt-4"
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800">Riwayat pembayaran</h4>
+              {onRefresh && (
+                <button
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0] transition hover:bg-blue-50 disabled:opacity-50"
+                  disabled={refreshing}
+                  onClick={onRefresh}
+                  title="Segarkan data angsuran dan status bukti transfer"
+                  type="button"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className={`size-3 ${refreshing ? 'animate-spin' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
+                    />
+                  </svg>
+                  <span>{refreshing ? 'Memperbarui…' : 'Segarkan Status'}</span>
+                </button>
+              )}
+            </div>
+            {applicationPayments.length === 0 && paymentProofs.length === 0 ? (
+              <p className="py-2 text-xs text-slate-500">
+                Belum ada pembayaran atau bukti transfer yang tercatat.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-200">
+                {applicationPayments.map((payment) => (
+                  <div className="flex items-center justify-between gap-3 py-3" key={payment.id}>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-slate-800">
+                        {payment.installmentNumber
+                          ? `Angsuran ${payment.installmentNumber}`
+                          : payment.description || 'Pembayaran'}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        {formatDate(payment.paidAt ?? payment.createdAt?.slice(0, 10))}
+                        {payment.paidMethod ? ` · ${payment.paidMethod}` : ''}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-bold text-slate-800">
+                        {formatRupiah(payment.amount)}
+                      </p>
+                      <span className="text-[10px] font-medium text-slate-500">
+                        {payment.status === 'PAID'
+                          ? 'Berhasil'
+                          : payment.status === 'PENDING'
+                            ? 'Menunggu pembayaran'
+                            : payment.status === 'EXPIRED'
+                              ? 'Kedaluwarsa'
+                              : 'Gagal'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {paymentProofs.map((proof) => (
+                  <div className="flex items-center justify-between gap-3 py-3" key={proof.id}>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800">
+                        Bukti transfer · Angsuran {proof.installmentNumber}
+                      </p>
+                      <p className="mt-1 text-[10px] text-slate-500">
+                        {formatDate(proof.submittedAt)}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-xs font-bold text-slate-800">
+                        {formatRupiah(proof.amount)}
+                      </p>
+                      <span
+                        className={`text-[10px] font-medium ${proof.status === 'VERIFIED' ? 'text-emerald-700' : proof.status === 'REJECTED' ? 'text-rose-700' : 'text-amber-700'}`}
+                      >
+                        {proof.status === 'VERIFIED'
+                          ? 'Terverifikasi'
+                          : proof.status === 'REJECTED'
+                            ? 'Perlu perbaikan'
+                            : 'Menunggu verifikasi'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {popup && (
         <div

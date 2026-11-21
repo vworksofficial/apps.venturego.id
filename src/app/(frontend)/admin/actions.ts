@@ -1610,7 +1610,7 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
       const application = applicationSnapshot.data() ?? {}
       const plan = (application.financialPlan ?? {}) as Record<string, unknown>
       const akadDocument = plan.akadDocument
-      if (application.status !== 'ACTIVE' || !akadDocument || typeof akadDocument !== 'object') {
+      if (!akadDocument || typeof akadDocument !== 'object') {
         return { outcome: 'not-issued' as const }
       }
 
@@ -1618,7 +1618,6 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
         transaction.get(db.collection('payments').where('applicationDocId', '==', documentId)),
         transaction.get(db.collection('paymentProofs').where('applicationDocId', '==', documentId)),
       ])
-      if (application.agreementPdf) return { outcome: 'signed-document' as const }
       if (
         (Array.isArray(application.paidInstallments) && application.paidInstallments.length > 0) ||
         payments.docs.some((payment) => payment.data().status === 'PAID')
@@ -1639,12 +1638,16 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
         return { outcome: 'student-number-mismatch' as const }
       }
 
+      const agreementPdf = application.agreementPdf as Record<string, unknown> | undefined
+      const agreementPdfFileId = typeof agreementPdf?.fileId === 'string' ? agreementPdf.fileId : ''
+
       const nextPlan = { ...plan }
       delete nextPlan.akadDocument
       delete nextPlan.finalAgreementReference
       transaction.update(applicationRef, {
         status: 'CONTRACT_PREPARATION',
         financialPlan: nextPlan,
+        ...(agreementPdf ? { agreementPdf: FieldValue.delete() } : {}),
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: staff?.email ?? staff?.uid,
       })
@@ -1662,6 +1665,7 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
         akadDocument: akadDocument as Record<string, unknown>,
         finalAgreementReference: plan.finalAgreementReference,
         fileId: String((akadDocument as Record<string, unknown>).driveFileId ?? ''),
+        agreementPdfFileId,
         applicantName:
           typeof application.applicantName === 'string' ? application.applicantName : '',
         lpkName: typeof application.lpkName === 'string' ? application.lpkName : '',
@@ -1672,16 +1676,23 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
     if (result.outcome !== 'cancelled') {
       const messages = {
         missing: 'Pengajuan tidak ditemukan.',
-        'not-issued': 'Akad tidak sedang terbit atau status siswa bukan Aktif.',
-        'signed-document':
-          'Pembatalan ditolak karena PDF akad bertanda tangan basah sudah diunggah.',
-        'payments-exist': 'Pembatalan ditolak karena sudah ada pembayaran angsuran tercatat.',
+        'not-issued': 'Dokumen akad belum diterbitkan untuk pengajuan ini.',
+        'payments-exist':
+          'Pembatalan ditolak karena siswa sudah mulai melakukan pembayaran angsuran.',
         'pending-proof':
           'Selesaikan pemeriksaan bukti pembayaran yang masih menunggu terlebih dahulu.',
         'student-number-mismatch':
           'NIS pada dokumen berbeda dari NIS profil siswa. Pembatalan dihentikan.',
       }
       return { ok: false, message: messages[result.outcome] }
+    }
+
+    if (result.agreementPdfFileId) {
+      try {
+        await deleteDriveFile(result.agreementPdfFileId)
+      } catch {
+        // best-effort cleanup
+      }
     }
 
     if (!result.fileId || !(await deleteDriveFile(result.fileId))) {

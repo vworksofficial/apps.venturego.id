@@ -4507,6 +4507,7 @@ export function AdminDashboard({
       filteredApplications.filter((app) => {
         if (isLegacyApplication(app)) return false
         if (app.status === 'ACTIVE' || app.status === 'COMPLETED') return false
+        if (Boolean(app.financialPlan?.akadDocument)) return false
         const pricing = String(app.financialPlan?.pricingStatus ?? 'ESTIMATED')
         return pricing === 'VERIFIED' || pricing === 'AGREED'
       }),
@@ -4515,15 +4516,19 @@ export function AdminDashboard({
 
   const archivingApplications = useMemo(
     () =>
-      filteredApplications.filter(
-        (app) =>
-          !isLegacyApplication(app) &&
-          (Boolean(app.financialPlan?.akadDocument) ||
-            Boolean(app.agreementPdf) ||
-            (Array.isArray(app.akadPhotos) && app.akadPhotos.length > 0) ||
-            app.financialPlan?.pricingStatus === 'VERIFIED' ||
-            app.financialPlan?.pricingStatus === 'AGREED'),
-      ),
+      filteredApplications.filter((app) => {
+        if (isLegacyApplication(app)) return false
+        const hasDocx = Boolean(app.financialPlan?.akadDocument)
+        if (!hasDocx) return false
+
+        const hasPdf = Boolean(app.agreementPdf)
+        const hasPhotos = Array.isArray(app.akadPhotos) && app.akadPhotos.length > 0
+        const hasDeparture = Boolean(app.departureDate)
+
+        // Siswa hilang dari antrean pengarsipan jika seluruh dokumen arsip sudah lengkap diunggah
+        const isComplete = hasDocx && hasPdf && hasPhotos && hasDeparture
+        return !isComplete
+      }),
     [filteredApplications],
   )
 
@@ -6332,8 +6337,8 @@ export function AdminDashboard({
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
-                        <th className="whitespace-nowrap px-4 py-3">ID Pengajuan</th>
                         <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
+                        <th className="whitespace-nowrap px-4 py-3">Status</th>
                         <th className="whitespace-nowrap px-4 py-3">Naskah Akad (.docx)</th>
                         <th className="whitespace-nowrap px-4 py-3">Salinan PDF Basah</th>
                         <th className="whitespace-nowrap px-4 py-3">Foto Dokumentasi</th>
@@ -6346,8 +6351,9 @@ export function AdminDashboard({
                       {archivingApplications.length === 0 ? (
                         <tr>
                           <td className="px-4 py-8 text-center text-slate-400" colSpan={8}>
-                            Belum ada berkas pengarsipan akad. Pengajuan yang telah disetujui
-                            nominalnya akan tampil di sini untuk pengarsipan.
+                            Belum ada berkas pengarsipan yang perlu dilengkapi. Pengajuan yang
+                            naskah akadnya telah terbit akan tampil di sini hingga seluruh berkas
+                            arsip lengkap diunggah.
                           </td>
                         </tr>
                       ) : (
@@ -6363,29 +6369,47 @@ export function AdminDashboard({
                             ? app.akadPhotos.length
                             : 0
                           const hasPhotos = photoCount > 0
+                          const hasDeparture = Boolean(app.departureDate)
+
+                          const hasStartedInstallments =
+                            (Array.isArray(app.paidInstallments) &&
+                              app.paidInstallments.length > 0) ||
+                            payments.some(
+                              (p) =>
+                                (p.applicationDocId === app.id ||
+                                  (!p.applicationDocId && p.applicationId === app.applicationId)) &&
+                                p.status === 'PAID',
+                            )
 
                           let completenessLabel = 'Menunggu'
                           let completenessBadge = 'bg-slate-100 text-slate-600'
-                          if (hasDocx && hasPdf && hasPhotos) {
+                          if (hasDocx && hasPdf && hasPhotos && hasDeparture) {
                             completenessLabel = 'Lengkap'
                             completenessBadge =
                               'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                          } else if (hasDocx || hasPdf || hasPhotos) {
+                          } else if (hasDocx || hasPdf || hasPhotos || hasDeparture) {
                             completenessLabel = 'Sebagian'
                             completenessBadge = 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
                           }
 
                           return (
                             <tr className="hover:bg-slate-50/80" key={app.id}>
-                              <td
-                                className="whitespace-nowrap px-4 py-3 font-bold text-[#0b57d0]"
-                                title={app.applicationId}
-                              >
-                                {formatDisplayApplicationId(app.applicationId)}
-                              </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 <p className="font-semibold text-slate-900">{app.applicantName}</p>
                                 <p className="text-[11px] text-slate-400">{app.lpkName}</p>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                {hasStartedInstallments ? (
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                                    Aktif
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-[#0b57d0] ring-1 ring-inset ring-blue-200">
+                                    <span className="size-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                    Siap Mengangsur
+                                  </span>
+                                )}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 {hasDocx ? (
@@ -6494,17 +6518,21 @@ export function AdminDashboard({
                                     variant="primary"
                                   />
                                   <button
-                                    aria-label={`Batalkan penerbitan akad ${app.applicantName}`}
+                                    aria-label={
+                                      hasStartedInstallments
+                                        ? 'Tidak dapat dibatalkan karena siswa sudah mulai mengangsur'
+                                        : `Batalkan penerbitan akad ${app.applicantName}`
+                                    }
                                     className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                                    disabled={!hasDocx || app.status !== 'ACTIVE'}
+                                    disabled={hasStartedInstallments || !hasDocx}
                                     onClick={() => {
                                       setCancelAkadTarget(app)
                                       setCancelAkadError('')
                                     }}
                                     title={
-                                      hasDocx && app.status === 'ACTIVE'
-                                        ? 'Batalkan penerbitan akad'
-                                        : 'Tersedia untuk akad yang sudah terbit dan berstatus Aktif'
+                                      hasStartedInstallments
+                                        ? 'Tidak dapat dibatalkan karena siswa sudah mulai mengangsur (status Aktif)'
+                                        : 'Batalkan penerbitan akad dan kembalikan ke Persiapan Akad'
                                     }
                                     type="button"
                                   >
@@ -8227,8 +8255,8 @@ export function AdminDashboard({
               <p className="mt-1.5">
                 File DOCX akad di Google Drive dan NIS pada profil siswa akan dihapus. Nomor urut
                 NIS yang dicabut tidak digunakan ulang; penghapusan ini tidak dapat dipulihkan.
-                Pembatalan tidak dapat dilakukan jika PDF bertanda tangan sudah diunggah, pembayaran
-                sudah tercatat, atau bukti pembayaran masih menunggu pemeriksaan.
+                Pembatalan tidak dapat dilakukan jika pembayaran angsuran sudah tercatat atau bukti
+                pembayaran masih menunggu pemeriksaan.
               </p>
             </div>
             {cancelAkadError && (

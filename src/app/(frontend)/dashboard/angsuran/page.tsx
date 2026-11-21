@@ -406,8 +406,8 @@ function ApplicationTerms({
             aria-hidden="true"
             className="pointer-events-none absolute -right-2 -top-10 size-44 rounded-full border border-white/10"
           />
-          <div className="relative flex flex-col items-center gap-5 sm:flex-row sm:justify-between">
-            <div className="min-w-0 flex-1 text-center sm:text-left">
+          <div className="relative flex flex-col items-center gap-5">
+            <div className="min-w-0 flex-1 text-center">
               <h2 className="truncate text-lg font-extrabold sm:text-xl">
                 {application.applicantName}
               </h2>

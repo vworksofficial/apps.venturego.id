@@ -1336,7 +1336,7 @@ export const buildAkadDocument = async (options: {
       scheduleRowModel = null
     }
 
-    const expectedTanggal = scheduleRebuilt ? 3 : 5
+    const expectedTanggal = scheduleRebuilt ? 3 : 4
     assertTokenCount(xml, '[tanggal]', expectedTanggal)
 
     const lampiranNafaqahItems = [

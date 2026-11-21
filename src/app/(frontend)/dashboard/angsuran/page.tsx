@@ -132,7 +132,6 @@ function ApplicationTerms({
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
   const [copiedItem, setCopiedItem] = useState('')
   const [schedulePinned, setSchedulePinned] = useState(false)
-  const [scheduleFlowReserve, setScheduleFlowReserve] = useState(0)
   const [scheduleStickyTop, setScheduleStickyTop] = useState(128)
   const scheduleStickyTopRef = useRef(128)
   const articleRef = useRef<HTMLElement | null>(null)
@@ -350,21 +349,6 @@ function ApplicationTerms({
           scheduleScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
         }
         setSchedulePinned((current) => (current === pinned ? current : pinned))
-        const scrollContent = scheduleScrollRef.current
-        const panel = schedulePanelRef.current
-        const currentPanelHeight = panel?.getBoundingClientRect().height ?? 0
-        const currentScrollHeight = scrollContent?.getBoundingClientRect().height ?? 0
-        const maxVisibleHeight = Math.max(160, window.innerHeight - stickyTop - 220)
-        // Reserve space for the panel after it is pinned, not its unbounded
-        // natural height, so the sticky boundary cannot jump during the switch.
-        const panelChromeHeight = Math.max(0, currentPanelHeight - currentScrollHeight)
-        const targetPanelHeight =
-          panelChromeHeight + Math.min(scrollContent?.scrollHeight ?? 0, maxVisibleHeight)
-        const reserve =
-          pinned && scrollContent && panel
-            ? Math.max(0, window.innerHeight - stickyTop - targetPanelHeight)
-            : 0
-        setScheduleFlowReserve((current) => (current === reserve ? current : reserve))
       })
     }
     measureStickyTop()
@@ -510,7 +494,7 @@ function ApplicationTerms({
       </article>
 
       <div aria-hidden="true" className="h-px" ref={scheduleSentinelRef} />
-      <div className="relative -mx-5 -mt-16 [overflow-anchor:none]">
+      <div className="relative -mx-5 -mt-16 -mb-32 [overflow-anchor:none]">
         <section
           aria-label={`Jadwal angsuran ${programName}`}
           className={`sticky z-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 transition-[box-shadow,border-radius] duration-300 ease-out ${schedulePinned ? 'rounded-b-2xl shadow-[0_8px_30px_rgba(0,0,0,0.08)] ring-1 ring-slate-200/70' : 'ring-1 ring-slate-200/70'}`}
@@ -724,11 +708,6 @@ function ApplicationTerms({
             </div>
           </div>
         </section>
-        <div
-          aria-hidden="true"
-          className="pointer-events-none"
-          style={{ height: scheduleFlowReserve }}
-        />
       </div>
 
       {popup && (

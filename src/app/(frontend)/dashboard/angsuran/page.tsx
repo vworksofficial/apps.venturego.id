@@ -336,6 +336,7 @@ function ApplicationTerms({
     const updateSchedulePosition = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
+        measureStickyTop()
         const sentinel = scheduleSentinelRef.current
         if (!sentinel) return
         const stickyTop = scheduleStickyTopRef.current

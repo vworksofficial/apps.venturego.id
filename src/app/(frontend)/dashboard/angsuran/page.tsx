@@ -329,42 +329,7 @@ function ApplicationTerms({
 
   return (
     <>
-      <header className="sticky top-0 z-20 -mx-5 -mt-5 bg-[#0b57d0] px-5 pt-5 pb-3 text-white shadow-sm">
-        <div className="flex flex-col items-center text-center">
-          <h2 className="truncate text-lg font-extrabold sm:text-xl">
-            {application.applicantName}
-          </h2>
-          <p className="mt-0.5 text-[11px] text-blue-100">{application.applicationId}</p>
-          <button
-            aria-label={`Lihat informasi ${programName}`}
-            className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-[#0b57d0] shadow-sm transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
-            onClick={() => setPopup('program')}
-            ref={programButtonRef}
-            type="button"
-          >
-            <Icon name="program" />
-            <span className="truncate">{programName}</span>
-            <svg aria-hidden="true" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
-              <path
-                d="m9 18 6-6-6-6"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-              />
-            </svg>
-          </button>
-          <p className="mt-2 text-[11px] text-blue-100">
-            {application.status === 'ACTIVE'
-              ? 'Pembiayaan aktif. Pembayaran dimulai sesuai ketentuan akad.'
-              : application.status === 'COMPLETED'
-                ? 'Seluruh kewajiban program ini telah selesai.'
-                : 'Rincian progres dan angsuran program Anda.'}
-          </p>
-        </div>
-      </header>
-
-      <section className="relative z-0 -mx-5 overflow-hidden bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-2 pb-14 text-white sm:px-6 sm:pb-16">
+      <section className="relative -mx-5 -mt-5 overflow-hidden bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-5 pb-14 text-white sm:px-6 sm:pb-16">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full border border-white/10"
@@ -373,51 +338,86 @@ function ApplicationTerms({
           aria-hidden="true"
           className="pointer-events-none absolute -right-2 -top-10 size-44 rounded-full border border-white/10"
         />
-        <div className="flex flex-col items-center">
-          <div className="relative grid size-52 shrink-0 place-items-center sm:size-60">
-            <svg aria-hidden="true" className="absolute inset-0 size-full" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="35" fill="currentColor" className="text-white/[0.06]" />
-              <path
-                d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="butt"
-                strokeWidth="7"
-                className="text-white/25"
-              />
-              {progress > 0 && (
+        <div className="flex flex-col items-center gap-5 text-center">
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-extrabold sm:text-xl">
+              {application.applicantName}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-blue-100">{application.applicationId}</p>
+            <button
+              aria-label={`Lihat informasi ${programName}`}
+              className="mt-3 inline-flex max-w-full items-center gap-2 rounded-full bg-white px-3.5 py-2 text-xs font-bold text-[#0b57d0] shadow-sm transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:scale-[0.98]"
+              onClick={() => setPopup('program')}
+              ref={programButtonRef}
+              type="button"
+            >
+              <Icon name="program" />
+              <span className="truncate">{programName}</span>
+              <svg aria-hidden="true" className="size-3.5 shrink-0" fill="none" viewBox="0 0 24 24">
+                <path
+                  d="m9 18 6-6-6-6"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
+            </button>
+            <p className="mt-2 text-[11px] text-blue-100">
+              {application.status === 'ACTIVE'
+                ? 'Pembiayaan aktif. Pembayaran dimulai sesuai ketentuan akad.'
+                : application.status === 'COMPLETED'
+                  ? 'Seluruh kewajiban program ini telah selesai.'
+                  : 'Rincian progres dan angsuran program Anda.'}
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center">
+            <div className="relative grid size-52 shrink-0 place-items-center sm:size-60">
+              <svg aria-hidden="true" className="absolute inset-0 size-full" viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="35" fill="currentColor" className="text-white/[0.06]" />
                 <path
                   d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
                   fill="none"
-                  pathLength={2 * Math.PI * 52 * 0.9}
                   stroke="currentColor"
-                  strokeDasharray={`${2 * Math.PI * 52 * 0.9 * progress} ${2 * Math.PI * 52}`}
-                  strokeLinecap="round"
-                  strokeWidth="7.5"
-                  className="text-emerald-200 transition-[stroke-dasharray] duration-700"
+                  strokeLinecap="butt"
+                  strokeWidth="7"
+                  className="text-white/25"
                 />
-              )}
-            </svg>
-            <div className="-translate-y-1 text-center">
-              <strong className="block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
-                {totalObligation > 0 ? `${Math.round(progress * 100)}%` : '—'}
-              </strong>
-              <span className="mt-2 block text-[10px] font-semibold text-blue-50">
-                {paidCount}/{plannedCount || '—'}
-              </span>
-              <span className="mt-0.5 block text-[9px] text-blue-100">angsuran</span>
+                {progress > 0 && (
+                  <path
+                    d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
+                    fill="none"
+                    pathLength={2 * Math.PI * 52 * 0.9}
+                    stroke="currentColor"
+                    strokeDasharray={`${2 * Math.PI * 52 * 0.9 * progress} ${2 * Math.PI * 52}`}
+                    strokeLinecap="round"
+                    strokeWidth="7.5"
+                    className="text-emerald-200 transition-[stroke-dasharray] duration-700"
+                  />
+                )}
+              </svg>
+              <div className="-translate-y-1 text-center">
+                <strong className="block text-4xl font-extrabold leading-none tracking-tight sm:text-5xl">
+                  {totalObligation > 0 ? `${Math.round(progress * 100)}%` : '—'}
+                </strong>
+                <span className="mt-2 block text-[10px] font-semibold text-blue-50">
+                  {paidCount}/{plannedCount || '—'}
+                </span>
+                <span className="mt-0.5 block text-[9px] text-blue-100">angsuran</span>
+              </div>
             </div>
+            <p className="-mt-1 text-center text-[11px] font-semibold text-emerald-100">
+              {formatRupiah(totalPaidAmount)} / {formatRupiah(totalObligation)}
+            </p>
+            <button
+              className="rounded-full px-3 py-1 !text-[11px] font-semibold text-white/90 underline decoration-white/50 underline-offset-4 transition hover:text-white"
+              onClick={() => setPopup('details')}
+              type="button"
+            >
+              Rincian Pembiayaan
+            </button>
           </div>
-          <p className="-mt-1 text-center text-[11px] font-semibold text-emerald-100">
-            {formatRupiah(totalPaidAmount)} / {formatRupiah(totalObligation)}
-          </p>
-          <button
-            className="rounded-full px-3 py-1 !text-[11px] font-semibold text-white/90 underline decoration-white/50 underline-offset-4 transition hover:text-white"
-            onClick={() => setPopup('details')}
-            type="button"
-          >
-            Rincian Pembiayaan
-          </button>
         </div>
       </section>
 

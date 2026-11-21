@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **21 November 2026** (Halaman /dashboard/angsuran diperbarui: arsitektur scroll disederhanakan menjadi native single scroll dengan sticky header murni CSS; menghapus listener scroll JS, sentinel, dan scroll-trap ganda yang memicu flickering/berkedip cepat dan offside. Scrollbar halaman kini menyatu secara proporsional dari atas ke bawah tanpa sisa semu; sentralisasi rekening operasional Bank BRI, banner edukasi pra-akad, dan tombol Segarkan Status interaktif. Kriteria menu Siswa Aktif diperketat: hanya pengajuan berstatus ACTIVE dengan akad terbit atau Legacy dengan sisa kewajiban yang masuk ke Siswa Aktif; data yang dikembalikan otomatis keluar dari daftar.)
+Terakhir diperbarui: **21 November 2026** (Halaman /dashboard/angsuran diperbarui: header dan gauge disatukan kembali dalam satu box hero biru utuh tanpa pemisah/gap putih dengan latar gradien berkesinambungan; arsitektur scroll disederhanakan menjadi native single scroll yang mulus, stabil, dan bebas flickering. Sentralisasi rekening operasional Bank BRI, banner edukasi pra-akad, dan tombol Segarkan Status interaktif. Kriteria menu Siswa Aktif diperketat: hanya pengajuan berstatus ACTIVE dengan akad terbit atau Legacy dengan sisa kewajiban yang masuk ke Siswa Aktif; data yang dikembalikan otomatis keluar dari daftar.)
 
 ---
 

@@ -452,17 +452,7 @@ const mergeNafaqahServiceRows = (rows: string[], amount: number): string[] => {
 }
 
 const addAppendixReceiptSignatureSpace = (xml: string): string => {
-  const location = findTableByMarker(xml, 'Penyerah')
-  if (!location) return xml
-  const table = xml.slice(location.start, location.end)
-  const rows = splitRows(table)
-  if (rows.length < 3) return xml
-  const spacer = '<w:p/>'.repeat(5)
-  const nextRows = rows.map((row, index) =>
-    index === 1 ? row.replace(/<\/w:tc>/g, `${spacer}</w:tc>`) : row,
-  )
-  const nextTable = reassembleTable(table, nextRows)
-  return xml.slice(0, location.start) + nextTable + xml.slice(location.end)
+  return xml
 }
 
 const emphasizeRow = (row: string): string =>
@@ -640,6 +630,7 @@ const applyFullCoverCostTable = (xml: string, values: ResolvedValues): string =>
   const ujrahTemplate = findRow('Jasa perwakilan')
   const ujrahSubtotal = findRow('Subtotal Ujrah')
   const jualaTemplate = findRow('Imbalan penempatan')
+  const jualaSubtotal = findRow("Subtotal Ju'alah")
   const totalTemplate = findRow('TOTAL KEWAJIBAN PIHAK KEDUA')
   if (
     !header ||
@@ -648,6 +639,7 @@ const applyFullCoverCostTable = (xml: string, values: ResolvedValues): string =>
     !ujrahTemplate ||
     !ujrahSubtotal ||
     !jualaTemplate ||
+    !jualaSubtotal ||
     !totalTemplate
   ) {
     throw new Error(TEMPLATE_ERROR)
@@ -682,6 +674,7 @@ const applyFullCoverCostTable = (xml: string, values: ResolvedValues): string =>
       `Rp${rp(values.jualaTotal)}`,
       "Ju'l, dibayar jika COE terbit",
     ]),
+    fillAmountCell(jualaSubtotal, values.jualaTotal) as string,
     fillAmountCell(totalTemplate, values.totalIfCoe) as string,
   ]
   const nextTable = reassembleTable(table, rebuiltRows)
@@ -694,10 +687,11 @@ const APPENDIX_DOCUMENT_REQUIREMENTS = [
   'Ijazah SD/MI',
   'Ijazah SMP/MTs/SLTP',
   'Ijazah SMA/MA/SLTA',
+  '',
 ]
 
 const applyAppendixDocumentsTable = (xml: string): string => {
-  const location = findTableByMarker(xml, 'Akta Kelahiran')
+  const location = findTableByMarker(xml, 'Asli/Fotokopi')
   if (!location) throw new Error(TEMPLATE_ERROR)
   const table = xml.slice(location.start, location.end)
   const rows = splitRows(table)
@@ -840,8 +834,6 @@ const resolveWakalah = (
     case '[jumlah]':
       return at(
         [
-          values.languageMonths,
-          values.skillMonths,
           String(values.installmentCount),
           String(values.wakalahDocumentReturnBusinessDays),
           String(values.wakalahWrittenWarningCount),
@@ -924,7 +916,7 @@ const resolveJualah = (token: string, index: number, values: ResolvedValues): st
         Array.from({ length: 4 }, () => rp(values.nafaqahTotal)),
         index,
       )
-    case '[ju&apos;l]':
+    case "[ju'l]":
       return at(
         Array.from({ length: 6 }, () => rp(values.jualaTotal)),
         index,
@@ -1313,7 +1305,7 @@ export const buildAkadDocument = async (options: {
       )
     }
     assertTokenCount(xml, '[nominal]', values.qardhAmount > 0 ? 6 : 5)
-    assertTokenCount(xml, '[jumlah]', 6)
+    assertTokenCount(xml, '[jumlah]', 4)
 
     xml = updateParagraphContaining(
       xml,
@@ -1334,7 +1326,7 @@ export const buildAkadDocument = async (options: {
       const scheduleRows = schedule.map((entry) =>
         replaceTableRowCells(scheduleRowModel as string, [
           String(entry.installment),
-          formatIsoLongDate(entry.dueDate) ?? '',
+          '',
           `Rp${rp(entry.amount)}`,
           `Rp${rp(entry.remainingBalance)}`,
         ]),

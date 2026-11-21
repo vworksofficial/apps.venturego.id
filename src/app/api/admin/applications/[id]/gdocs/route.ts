@@ -97,6 +97,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       status: 302,
     })
   } catch (error) {
+    console.error('GDOCS ERROR STACK:', error)
     const message =
       error instanceof Error ? error.message : 'Gagal membuka draft akad di Google Docs.'
     return new Response(

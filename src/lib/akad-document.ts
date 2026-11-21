@@ -521,7 +521,13 @@ const fillAmountCell = (row: string | null, amount: number): string | null => {
   if (!row) return null
   let filled = false
   return row.replace(/<w:tc(?:\s[^>]*)?>[\s\S]*?<\/w:tc>/g, (cell) => {
-    if (!filled && cell.includes('Rp[ ]')) {
+    if (
+      !filled &&
+      (cell.includes('Rp[ ]') ||
+        cell.includes('Rp[nominal]') ||
+        cell.includes('Rp[total]') ||
+        /Rp(?:\d|\[)/.test(cell))
+    ) {
       filled = true
       return setCellText(cell, `Rp${rp(amount)}`)
     }
@@ -960,16 +966,16 @@ const resolveJualah = (token: string, index: number, values: ResolvedValues): st
       )
     case '[angsuran]':
       return at([rp(values.monthlyAfterCoe)], index)
-    case '[nominal]':
-      return at(
-        [
-          rp(values.languageAllowanceMonthly),
-          rp(values.skillAllowanceMonthly),
-          rp(values.departureAllowanceAmount),
-          rp(values.commitmentCompensationAmount),
-        ],
-        index,
-      )
+    case '[nominal]': {
+      const list = [
+        rp(values.languageAllowanceMonthly),
+        rp(values.skillAllowanceMonthly),
+        rp(values.departureAllowanceAmount),
+        rp(values.commitmentCompensationAmount),
+        rp(values.jualaTotal),
+      ]
+      return index < list.length ? list[index] : list[list.length - 1]
+    }
     default:
       return null
   }

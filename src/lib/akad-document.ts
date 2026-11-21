@@ -1292,13 +1292,6 @@ export const buildAkadDocument = async (options: {
 
   const values = resolveValues(application, documentDate)
   values.studentSequence = studentSequence
-  xml = updateParagraphContaining(
-    xml,
-    'Mitra Venturego (LPK)',
-    values.lpkWitnessName
-      ? `LPK ${values.lpkMitra ?? 'mitra'} — ${values.lpkWitnessName}`
-      : `Mitra ${values.lpkMitra ?? 'Venturego'} (LPK)`,
-  )
   if (template === 'JUALAH') {
     xml = updateParagraphContaining(
       xml,
@@ -1310,12 +1303,6 @@ export const buildAkadDocument = async (options: {
   assertTokenCount(xml, '[nomor kontrak]', 1)
 
   if (template === 'WAKALAH') {
-    xml = updateParagraphContaining(
-      xml,
-      'Wali/Orang Tua Siswa',
-      values.guardianName ? `Wali/Orang Tua: ${values.guardianName}` : 'Wali/Orang Tua Siswa',
-    )
-
     const nafaqahItems = values.nafaqahItems
     const ujrahItems = values.ujrahItems
     if (values.qardhAmount > 0) {
@@ -1390,11 +1377,6 @@ export const buildAkadDocument = async (options: {
 
     xml = fillTokens(xml, (token, index) => resolveWakalah(token, index, values, scheduleRebuilt))
   } else {
-    xml = updateParagraphContaining(
-      xml,
-      'Wali/Orang Tua',
-      values.guardianName ? `Wali/Orang Tua: ${values.guardianName}` : 'Wali/Orang Tua',
-    )
     assertTokenCount(xml, '[tanggal]', 3)
     xml = applyFullCoverCostTable(xml, values)
     xml = applyAppendixDocumentsTable(xml)

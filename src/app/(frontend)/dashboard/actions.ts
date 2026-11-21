@@ -32,6 +32,7 @@ export type DashboardApplication = {
   documentsRevision: number
   documentsTotal: number
   createdAt: number | null
+  updatedAt: number | null
   settled: boolean
 }
 
@@ -376,6 +377,7 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
         return []
       }
       const createdAt = readTimestampMillis(data.createdAt)
+      const updatedAt = readTimestampMillis(data.updatedAt) ?? createdAt
       const financialPlan =
         data.financialPlan && typeof data.financialPlan === 'object' ? data.financialPlan : {}
       const departureDetails =
@@ -426,6 +428,7 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
         ).length,
         documentsTotal: documents.length,
         createdAt,
+        updatedAt,
         settled: !blocksAdditionalProgram(data),
       }
       return [application]

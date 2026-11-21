@@ -179,7 +179,7 @@ const STAGE_BY_STATUS: Record<string, number> = {
   COST_VERIFICATION: 4,
   APPROVED: 4,
   CONTRACT_PREPARATION: 4,
-  ACTIVE: 6,
+  ACTIVE: 5,
   COMPLETED: 7,
 }
 
@@ -199,7 +199,7 @@ const progressSteps = [
 ]
 
 const quickActions = [
-  { label: 'Bayar angsuran', icon: 'receipt' as const, href: '/dashboard/angsuran' },
+  { label: 'Angsuran', icon: 'receipt' as const, href: '/dashboard/angsuran' },
   { label: 'Simulasi', icon: 'wallet' as const, href: '/dashboard/simulasi' },
   { label: 'Ajukan baru', icon: 'plus' as const, href: '/?step=1' },
   { label: 'Bantuan', icon: 'help' as const, href: '/dashboard/bantuan' },
@@ -366,6 +366,20 @@ function PointsSlide({
   )
 }
 
+function checkHasUnreadNotif(app: DashboardApplication | null, uid: string): boolean {
+  if (!app) return false
+  try {
+    const stored = localStorage.getItem(`vsv_notif_read_${uid}`)
+    if (!stored) return true
+    const readTime = new Date(stored).getTime()
+    if (Number.isNaN(readTime)) return true
+    const appTime = app.updatedAt ?? app.createdAt ?? 0
+    return appTime > readTime
+  } catch {
+    return false
+  }
+}
+
 export default function DashboardPage() {
   const [showBalance, setShowBalance] = useState(true)
   const [showSubmissionNotice, setShowSubmissionNotice] = useState(false)
@@ -373,6 +387,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [application, setApplication] = useState<DashboardApplication | null>(null)
   const [canApply, setCanApply] = useState(false)
+  const [hasUnreadNotif, setHasUnreadNotif] = useState(false)
   const [accountName, setAccountName] = useState('')
   const [accountPhotoUrl, setAccountPhotoUrl] = useState('')
   const [accountPhotoFailed, setAccountPhotoFailed] = useState(false)
@@ -404,6 +419,7 @@ export default function DashboardPage() {
         if (!user) {
           setApplication(null)
           setCanApply(false)
+          setHasUnreadNotif(false)
           setAccountName('')
           setAccountPhotoUrl('')
           setAccountPhotoFailed(false)
@@ -420,6 +436,7 @@ export default function DashboardPage() {
         if (cachedSummary) {
           setApplication(cachedSummary.application)
           setCanApply(cachedSummary.canApply)
+          setHasUnreadNotif(checkHasUnreadNotif(cachedSummary.application, user.uid))
           setError('')
           setLoading(false)
         }
@@ -440,11 +457,13 @@ export default function DashboardPage() {
             setError(result.message)
             setApplication(null)
             setCanApply(false)
+            setHasUnreadNotif(false)
           } else {
             dashboardSummaryCache.set(user.uid, result)
             setError('')
             setApplication(result.application)
             setCanApply(result.canApply)
+            setHasUnreadNotif(checkHasUnreadNotif(result.application, user.uid))
           }
         } catch {
           if (active) setError('Ringkasan tidak dapat dimuat. Silakan muat ulang halaman.')
@@ -464,7 +483,13 @@ export default function DashboardPage() {
 
   const schedule = application?.schedule ?? null
   const closed = ['REJECTED', 'CANCELLED'].includes(application?.status ?? '')
-  const currentStep = application ? (STAGE_BY_STATUS[application.status] ?? 0) : 0
+  const currentStep = application
+    ? application.status === 'ACTIVE'
+      ? schedule && schedule.paidCount > 0
+        ? 6
+        : 5
+      : (STAGE_BY_STATUS[application.status] ?? 0)
+    : 0
   const allDone = Boolean(application?.settled && !closed)
   const openProgramInfo = async () => {
     setShowProgramInfo(true)
@@ -578,8 +603,10 @@ export default function DashboardPage() {
               href="/dashboard/notifikasi"
             >
               <Icon name="bell" />
-              {application && (
-                <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-amber-300 ring-2 ring-[var(--primary)]" />
+              {hasUnreadNotif && (
+                <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-amber-300 ring-2 ring-[var(--primary)]">
+                  <span className="sr-only">Ada notifikasi baru</span>
+                </span>
               )}
             </Link>
           </div>
@@ -1208,17 +1235,27 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <aside className="flex items-start gap-3 rounded-2xl bg-blue-50 p-4" id="bantuan">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[var(--primary)]">
-              <Icon name="help" className="size-5" />
-            </span>
-            <div>
-              <h2 className="text-sm font-bold text-slate-800">Butuh bantuan?</h2>
-              <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                Tim VSV siap membantu pertanyaan pembiayaan dan angsuran Anda.
-              </p>
+          <Link
+            className="group flex items-center justify-between gap-3 rounded-2xl bg-blue-50 p-4 transition hover:bg-blue-100/70"
+            href="/dashboard/bantuan"
+            id="bantuan"
+          >
+            <div className="flex items-start gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-white text-[var(--primary)] shadow-sm">
+                <Icon name="help" className="size-5" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-slate-800">Butuh bantuan?</h2>
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                  Tim VSV siap membantu pertanyaan pembiayaan dan angsuran Anda.
+                </p>
+              </div>
             </div>
-          </aside>
+            <Icon
+              name="chevron"
+              className="size-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-slate-600"
+            />
+          </Link>
         </div>
       </section>
     </main>

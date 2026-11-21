@@ -104,3 +104,31 @@ export const promoteApplicationFolder = async (params: {
     }
   } catch {}
 }
+
+export const revertApplicationFolderToDraft = async (params: {
+  folderId: string
+  ownerUid: string
+  applicantName: string
+  lpkName: string
+}): Promise<void> => {
+  try {
+    const name = buildDraftFolderName(params.applicantName, params.lpkName)
+    if (!params.folderId || !params.ownerUid || !name) return
+    await renameDriveFile(params.folderId, name)
+    await setDriveFolderColor(params.folderId, DRIVE_FOLDER_COLOR_DRAFT)
+    await getFirebaseFirestore()
+      .collection('driveFolders')
+      .doc(params.ownerUid)
+      .set(
+        {
+          ownerUid: params.ownerUid,
+          folderId: params.folderId,
+          folderName: name,
+          stage: 'submitted',
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      )
+      .catch(() => {})
+  } catch {}
+}

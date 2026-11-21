@@ -14,7 +14,11 @@ import {
   type FinancingCostLine,
 } from '@/lib/departure-financing'
 import { deleteDriveFile, uploadDriveFile } from '@/lib/gdrive'
-import { ensureApplicationDriveFolder, promoteApplicationFolder } from '@/lib/drive-folders'
+import {
+  ensureApplicationDriveFolder,
+  promoteApplicationFolder,
+  revertApplicationFolderToDraft,
+} from '@/lib/drive-folders'
 import { buildDocumentFileName } from '@/lib/documents'
 import { buildAkadDocument } from '@/lib/akad-document'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
@@ -1591,5 +1595,143 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
     return { ok: true, documentNumber: built.documentNumber, studentNumber }
   } catch {
     return { ok: false, message: 'Dokumen akad belum dapat diterbitkan. Coba lagi.' }
+  }
+}
+
+export async function cancelAkadDocumentIssuance(documentId: string): Promise<ActionResult> {
+  const { staff, error } = await assertStaffDocumentId(documentId)
+  if (error) return error
+  try {
+    const db = getFirebaseFirestore()
+    const applicationRef = db.collection('applications').doc(documentId)
+    const result = await db.runTransaction(async (transaction) => {
+      const applicationSnapshot = await transaction.get(applicationRef)
+      if (!applicationSnapshot.exists) return { outcome: 'missing' as const }
+      const application = applicationSnapshot.data() ?? {}
+      const plan = (application.financialPlan ?? {}) as Record<string, unknown>
+      const akadDocument = plan.akadDocument
+      if (application.status !== 'ACTIVE' || !akadDocument || typeof akadDocument !== 'object') {
+        return { outcome: 'not-issued' as const }
+      }
+
+      const [payments, pendingProofs] = await Promise.all([
+        transaction.get(db.collection('payments').where('applicationDocId', '==', documentId)),
+        transaction.get(db.collection('paymentProofs').where('applicationDocId', '==', documentId)),
+      ])
+      if (application.agreementPdf) return { outcome: 'signed-document' as const }
+      if (
+        (Array.isArray(application.paidInstallments) && application.paidInstallments.length > 0) ||
+        payments.docs.some((payment) => payment.data().status === 'PAID')
+      ) {
+        return { outcome: 'payments-exist' as const }
+      }
+      if (pendingProofs.docs.some((proof) => proof.data().status === 'PENDING_REVIEW')) {
+        return { outcome: 'pending-proof' as const }
+      }
+
+      const ownerUid =
+        typeof application.ownerFirebaseUid === 'string' ? application.ownerFirebaseUid : ''
+      const studentNumber = String((akadDocument as Record<string, unknown>).studentNumber ?? '')
+      const studentProfileRef = ownerUid ? db.collection('studentProfiles').doc(ownerUid) : null
+      const studentProfile = studentProfileRef ? await transaction.get(studentProfileRef) : null
+      const storedStudentNumber = studentProfile?.data()?.studentNumber
+      if (storedStudentNumber && storedStudentNumber !== studentNumber) {
+        return { outcome: 'student-number-mismatch' as const }
+      }
+
+      const nextPlan = { ...plan }
+      delete nextPlan.akadDocument
+      delete nextPlan.finalAgreementReference
+      transaction.update(applicationRef, {
+        status: 'CONTRACT_PREPARATION',
+        financialPlan: nextPlan,
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: staff?.email ?? staff?.uid,
+      })
+      if (studentProfileRef && storedStudentNumber === studentNumber) {
+        transaction.update(studentProfileRef, {
+          studentNumber: FieldValue.delete(),
+          issuedAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+      return {
+        outcome: 'cancelled' as const,
+        ownerUid,
+        studentNumber,
+        akadDocument: akadDocument as Record<string, unknown>,
+        finalAgreementReference: plan.finalAgreementReference,
+        fileId: String((akadDocument as Record<string, unknown>).driveFileId ?? ''),
+        applicantName:
+          typeof application.applicantName === 'string' ? application.applicantName : '',
+        lpkName: typeof application.lpkName === 'string' ? application.lpkName : '',
+        folderId: typeof application.driveFolderId === 'string' ? application.driveFolderId : '',
+      }
+    })
+
+    if (result.outcome !== 'cancelled') {
+      const messages = {
+        missing: 'Pengajuan tidak ditemukan.',
+        'not-issued': 'Akad tidak sedang terbit atau status siswa bukan Aktif.',
+        'signed-document':
+          'Pembatalan ditolak karena PDF akad bertanda tangan basah sudah diunggah.',
+        'payments-exist': 'Pembatalan ditolak karena sudah ada pembayaran angsuran tercatat.',
+        'pending-proof':
+          'Selesaikan pemeriksaan bukti pembayaran yang masih menunggu terlebih dahulu.',
+        'student-number-mismatch':
+          'NIS pada dokumen berbeda dari NIS profil siswa. Pembatalan dihentikan.',
+      }
+      return { ok: false, message: messages[result.outcome] }
+    }
+
+    if (!result.fileId || !(await deleteDriveFile(result.fileId))) {
+      await db
+        .runTransaction(async (transaction) => {
+          const latest = await transaction.get(applicationRef)
+          if (!latest.exists) return
+          const latestPlan = (latest.data()?.financialPlan ?? {}) as Record<string, unknown>
+          if (latest.data()?.status !== 'CONTRACT_PREPARATION' || latestPlan.akadDocument) return
+          const restoredPlan: Record<string, unknown> = {
+            ...latestPlan,
+            akadDocument: result.akadDocument,
+          }
+          if (result.finalAgreementReference) {
+            restoredPlan.finalAgreementReference = result.finalAgreementReference
+          }
+          transaction.update(applicationRef, {
+            status: 'ACTIVE',
+            financialPlan: restoredPlan,
+            updatedAt: FieldValue.serverTimestamp(),
+            updatedBy: staff?.email ?? staff?.uid,
+          })
+          if (result.ownerUid && result.studentNumber) {
+            transaction.set(
+              db.collection('studentProfiles').doc(result.ownerUid),
+              {
+                ownerFirebaseUid: result.ownerUid,
+                studentNumber: result.studentNumber,
+                issuedAt: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            )
+          }
+        })
+        .catch(() => {})
+      return {
+        ok: false,
+        message:
+          'File akad di Google Drive belum berhasil dihapus. Status dan NIS telah dipulihkan.',
+      }
+    }
+
+    await revertApplicationFolderToDraft({
+      folderId: result.folderId,
+      ownerUid: result.ownerUid,
+      applicantName: result.applicantName,
+      lpkName: result.lpkName,
+    })
+    return { ok: true }
+  } catch {
+    return { ok: false, message: 'Penerbitan akad belum dapat dibatalkan. Coba lagi.' }
   }
 }

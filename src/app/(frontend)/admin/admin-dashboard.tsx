@@ -17,6 +17,7 @@ import {
 import {
   approveApplicationDocument,
   approveApplicationPricing,
+  cancelAkadDocumentIssuance,
   deleteApplicationDocument,
   deleteApplicationAkadPhoto,
   issueAkadDocument,
@@ -4349,6 +4350,8 @@ export function AdminDashboard({
   const [deleteApplicationError, setDeleteApplicationError] = useState('')
   const [revertTarget, setRevertTarget] = useState<FinancingApplicationRecord | null>(null)
   const [revertError, setRevertError] = useState('')
+  const [cancelAkadTarget, setCancelAkadTarget] = useState<FinancingApplicationRecord | null>(null)
+  const [cancelAkadError, setCancelAkadError] = useState('')
   const [pending, startTransition] = useTransition()
   const [approvalSavingId, setApprovalSavingId] = useState<string | null>(null)
 
@@ -4453,6 +4456,22 @@ export function AdminDashboard({
         setRevertTarget(null)
         router.refresh()
       }
+    })
+  }
+
+  const handleCancelAkadIssuance = (target: FinancingApplicationRecord) => {
+    setCancelAkadError('')
+    startTransition(async () => {
+      const result = await cancelAkadDocumentIssuance(target.id)
+      if (!result.ok) {
+        setCancelAkadError(result.message)
+        return
+      }
+      setCancelAkadTarget(null)
+      setSavedNotice(
+        `Penerbitan akad ${formatDisplayApplicationId(target.applicationId)} dibatalkan. Status siswa kembali ke Persiapan Akad.`,
+      )
+      router.refresh()
     })
   }
 
@@ -6467,12 +6486,42 @@ export function AdminDashboard({
                                 )}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-right">
-                                <DrawerAction
-                                  ariaLabel={`Kelola arsip ${app.applicationId}`}
-                                  label="Kelola Arsip"
-                                  onClick={() => openApplicationDrawer(app.id, 'contract')}
-                                  variant="primary"
-                                />
+                                <div className="inline-flex items-center gap-2">
+                                  <DrawerAction
+                                    ariaLabel={`Kelola arsip ${app.applicationId}`}
+                                    label="Kelola Arsip"
+                                    onClick={() => openApplicationDrawer(app.id, 'contract')}
+                                    variant="primary"
+                                  />
+                                  <button
+                                    aria-label={`Batalkan penerbitan akad ${app.applicantName}`}
+                                    className="inline-flex size-9 items-center justify-center rounded-lg border border-red-200 bg-white text-red-600 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                    disabled={!hasDocx || app.status !== 'ACTIVE'}
+                                    onClick={() => {
+                                      setCancelAkadTarget(app)
+                                      setCancelAkadError('')
+                                    }}
+                                    title={
+                                      hasDocx && app.status === 'ACTIVE'
+                                        ? 'Batalkan penerbitan akad'
+                                        : 'Tersedia untuk akad yang sudah terbit dan berstatus Aktif'
+                                    }
+                                    type="button"
+                                  >
+                                    <svg
+                                      aria-hidden="true"
+                                      className="size-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={1.8}
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path d="M3 6h18M8 6V4h8v2m3 0-.9 14H5.9L5 6m4 4v6m6-6v6" />
+                                    </svg>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )
@@ -8123,6 +8172,93 @@ export function AdminDashboard({
                 type="button"
               >
                 {pending ? 'Mengembalikan…' : 'Kembalikan ke Pengajuan'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {cancelAkadTarget && (
+        <div
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !pending) {
+              setCancelAkadTarget(null)
+              setCancelAkadError('')
+            }
+          }}
+        >
+          <section
+            aria-labelledby="cancel-akad-title"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+            role="alertdialog"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <svg
+                  aria-hidden="true"
+                  className="size-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M3 6h18M8 6V4h8v2m3 0-.9 14H5.9L5 6m4 4v6m6-6v6" />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-sm font-bold text-slate-900" id="cancel-akad-title">
+                  Batalkan Penerbitan Akad?
+                </h2>
+                <p className="mt-1 text-xs leading-5 text-slate-600">
+                  <span className="font-semibold text-[#0b57d0]">
+                    {formatDisplayApplicationId(cancelAkadTarget.applicationId)}
+                  </span>{' '}
+                  · {cancelAkadTarget.applicantName}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs leading-5 text-amber-950">
+              <p className="font-semibold">Status siswa akan kembali ke Persiapan Akad.</p>
+              <p className="mt-1.5">
+                File DOCX akad di Google Drive dan NIS pada profil siswa akan dihapus. Nomor urut
+                NIS yang dicabut tidak digunakan ulang; penghapusan ini tidak dapat dipulihkan.
+                Pembatalan tidak dapat dilakukan jika PDF bertanda tangan sudah diunggah, pembayaran
+                sudah tercatat, atau bukti pembayaran masih menunggu pemeriksaan.
+              </p>
+            </div>
+            {cancelAkadError && (
+              <p
+                className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-800"
+                role="alert"
+              >
+                {cancelAkadError}
+              </p>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                autoFocus
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                onClick={() => {
+                  setCancelAkadTarget(null)
+                  setCancelAkadError('')
+                }}
+                type="button"
+              >
+                Batal
+              </button>
+              <button
+                className="rounded-lg bg-red-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={pending}
+                onClick={() => handleCancelAkadIssuance(cancelAkadTarget)}
+                type="button"
+              >
+                {pending ? 'Membatalkan…' : 'Batalkan Penerbitan'}
               </button>
             </div>
           </section>

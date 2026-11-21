@@ -135,6 +135,7 @@ function ApplicationTerms({
   const [scheduleFlowReserve, setScheduleFlowReserve] = useState(0)
   const [scheduleStickyTop, setScheduleStickyTop] = useState(128)
   const scheduleStickyTopRef = useRef(128)
+  const articleRef = useRef<HTMLElement | null>(null)
   const programButtonRef = useRef<HTMLButtonElement | null>(null)
   const scheduleSentinelRef = useRef<HTMLDivElement | null>(null)
   const schedulePanelRef = useRef<HTMLElement | null>(null)
@@ -328,8 +329,10 @@ function ApplicationTerms({
   useEffect(() => {
     let frame = 0
     const measureStickyTop = () => {
-      const programButtonBottom = programButtonRef.current?.getBoundingClientRect().bottom
-      const stickyTop = Math.max(0, Math.ceil((programButtonBottom ?? 120) + 8))
+      const articleTop = articleRef.current?.getBoundingClientRect().top ?? 0
+      const programButtonBottom = programButtonRef.current?.getBoundingClientRect().bottom ?? 120
+      const relativeBottom = Math.max(0, programButtonBottom - articleTop)
+      const stickyTop = Math.max(0, Math.ceil(relativeBottom + 8))
       scheduleStickyTopRef.current = stickyTop
       setScheduleStickyTop((current) => (current === stickyTop ? current : stickyTop))
     }
@@ -397,7 +400,7 @@ function ApplicationTerms({
 
   return (
     <>
-      <article className="sticky top-0 z-0 -mx-5 -mt-5">
+      <article className="sticky top-0 z-0 -mx-5 -mt-5" ref={articleRef}>
         <section className="relative overflow-hidden rounded-none bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-5 pb-14 text-white sm:px-6 sm:pt-6 sm:pb-16">
           <div
             aria-hidden="true"
@@ -558,7 +561,7 @@ function ApplicationTerms({
             </div>
           )}
           <div
-            className={`dashboard-schedule-scroll space-y-3 transition-[max-height] duration-300 ease-out [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
+            className={`dashboard-schedule-scroll space-y-3 [overflow-anchor:none] ${schedulePinned ? 'overflow-y-auto overscroll-y-auto' : ''}`}
             ref={scheduleScrollRef}
             style={
               schedulePinned
@@ -723,7 +726,7 @@ function ApplicationTerms({
         </section>
         <div
           aria-hidden="true"
-          className="pointer-events-none transition-[height] duration-200 ease-out"
+          className="pointer-events-none"
           style={{ height: scheduleFlowReserve }}
         />
       </div>

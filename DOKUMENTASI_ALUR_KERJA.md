@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **21 November 2026** (Halaman /dashboard/angsuran diperbarui: rekening operasional Bank BRI disentralisasi ke src/lib/company-accounts.ts, ditambahkan banner edukasi pra-akad bagi pengajuan yang belum berstatus aktif, tombol Segarkan Status interaktif pada riwayat pembayaran, serta perbaikan sinkronisasi posisi sticky scroll card jadwal angsuran saat scroll cepat. Kriteria menu Siswa Aktif diperketat: hanya pengajuan berstatus ACTIVE dengan akad terbit atau Legacy dengan sisa kewajiban yang masuk ke Siswa Aktif; data yang dikembalikan otomatis keluar dari daftar.)
+Terakhir diperbarui: **21 November 2026** (Halaman /dashboard/angsuran diperbarui: perbaikan patokan sticky card jadwal angsuran berbasis offset relatif banner agar tidak menutupi tombol program saat discroll, penghapusan transisi tinggi dinamis yang memicu mental scroll, sentralisasi rekening operasional Bank BRI, banner edukasi pra-akad, dan tombol Segarkan Status interaktif. Kriteria menu Siswa Aktif diperketat: hanya pengajuan berstatus ACTIVE dengan akad terbit atau Legacy dengan sisa kewajiban yang masuk ke Siswa Aktif; data yang dikembalikan otomatis keluar dari daftar.)
 
 ---
 

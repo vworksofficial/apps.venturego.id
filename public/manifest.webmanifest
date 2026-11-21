@@ -6,6 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
+  "lang": "id",
   "background_color": "#0b57d0",
   "theme_color": "#0b57d0",
   "categories": ["education", "finance"],
@@ -25,6 +27,29 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Jadwal Angsuran",
+      "short_name": "Angsuran",
+      "description": "Pantau jadwal dan riwayat pembayaran angsuran",
+      "url": "/dashboard/angsuran",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Unggah Berkas",
+      "short_name": "Unggah",
+      "description": "Unggah dokumen persyaratan pembiayaan",
+      "url": "/dashboard/unggah-berkas",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pusat Bantuan",
+      "short_name": "Bantuan",
+      "description": "Konsultasi dan bantuan seputar pembiayaan VSV",
+      "url": "/dashboard/bantuan",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

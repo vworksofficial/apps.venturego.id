@@ -14,6 +14,7 @@ import {
   SkeletonBlock,
   type DashboardIconName,
 } from '../_components/dashboard-ui'
+import { InstallAppButton } from '../../_components/install-app-button'
 
 const PROFILE_MENU: { href: string; label: string; detail: string; icon: DashboardIconName }[] = [
   {
@@ -248,6 +249,12 @@ export default function ProfilePage() {
           </div>
         </div>
       </DashboardCard>
+
+      <InstallAppButton
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-white to-indigo-50/70 px-4 py-3.5 text-xs font-bold text-[var(--primary)] shadow-sm transition hover:bg-blue-100/60"
+        compact
+        hideWhenInstalled
+      />
 
       <section>
         <h2 className="mb-3 text-sm font-bold text-slate-900">Menu profil</h2>

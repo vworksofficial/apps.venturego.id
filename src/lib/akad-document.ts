@@ -632,7 +632,10 @@ const applyFullCoverCostTable = (xml: string, values: ResolvedValues): string =>
   const rows = splitRows(table)
   const findRow = (marker: string) => rows.find((row) => rowText(row).includes(marker)) ?? null
   const header = findRow('Komponen')
-  const itemTemplate = findRow('Pendaftaran dan MCU')
+  const itemTemplate =
+    rows.find(
+      (row) => rowText(row).includes('Medical Check Up') || rowText(row).includes('Pendaftaran'),
+    ) ?? null
   const nafaqahSubtotal = findRow('Subtotal Nafaqah al-Wakalah')
   const ujrahTemplate = findRow('Jasa perwakilan')
   const ujrahSubtotal = findRow('Subtotal Ujrah')
@@ -1389,8 +1392,8 @@ export const buildAkadDocument = async (options: {
   } else {
     xml = updateParagraphContaining(
       xml,
-      'Wali ',
-      values.guardianName ? `Wali: ${values.guardianName}` : null,
+      'Wali/Orang Tua',
+      values.guardianName ? `Wali/Orang Tua: ${values.guardianName}` : 'Wali/Orang Tua',
     )
     assertTokenCount(xml, '[tanggal]', 3)
     xml = applyFullCoverCostTable(xml, values)

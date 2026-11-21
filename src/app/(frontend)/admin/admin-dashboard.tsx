@@ -138,7 +138,7 @@ const STUDENT_DIRECTORY_FILTERS: {
   { id: 'ALL', label: 'Semua Siswa' },
   { id: 'IN_PROGRESS', label: 'Dalam Proses' },
   { id: 'ACTIVE', label: 'Siswa Aktif' },
-  { id: 'ALUMNI', label: 'Alumnus' },
+  { id: 'ALUMNI', label: 'Alumni' },
 ]
 
 const RELIGION_LABELS: Record<string, string> = {
@@ -243,7 +243,7 @@ const SIDEBAR_GROUPS: {
       },
       {
         id: 'alumni',
-        label: 'Alumnus',
+        label: 'Alumni',
         subtitle:
           'Siswa alumni yang telah menyelesaikan seluruh kewajiban angsuran secara lunas tuntas',
         defaultTab: 'installment-history',
@@ -2263,6 +2263,36 @@ function ApplicationDrawerForm({
                 >
                   Preview Dokumen
                 </button>
+                <a
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-semibold text-[#0b57d0] shadow-2xs transition hover:border-blue-300 hover:bg-blue-100/70 hover:text-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                  href={`/api/admin/applications/${application.id}/gdocs`}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                  title="Buka naskah akad di Google Docs (tab baru)"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="size-4 shrink-0 text-[#0b57d0]"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM6 20V4h7v5h5v11H6z" />
+                    <path d="M8 12h8v2H8zm0 4h8v2H8z" />
+                  </svg>
+                  <span>Preview Gdocx</span>
+                  <svg
+                    aria-hidden="true"
+                    className="size-3 shrink-0 text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                  </svg>
+                </a>
                 {akadIssued ? (
                   <a
                     className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
@@ -5738,13 +5768,13 @@ export function AdminDashboard({
                   type="button"
                 >
                   <span className="text-xs font-medium text-slate-500">
-                    Pembayaran tercatat · Alumnus
+                    Pembayaran tercatat · Alumni
                   </span>
                   <strong className="mt-1 block text-lg font-extrabold text-slate-900">
                     {formatRupiah(dashboardAnalytics.paidVolume)}
                   </strong>
                   <span className="mt-1 block text-[11px] text-amber-700">
-                    {dashboardAnalytics.alumniCount} alumnus
+                    {dashboardAnalytics.alumniCount} alumni
                   </span>
                 </button>
               </div>
@@ -6629,7 +6659,7 @@ export function AdminDashboard({
                         tone: 'text-emerald-700',
                       },
                       {
-                        label: 'Alumnus',
+                        label: 'Alumni',
                         value: studentDirectoryCounts.ALUMNI,
                         tone: 'text-amber-700',
                       },
@@ -7169,7 +7199,7 @@ export function AdminDashboard({
                     </div>
                     <div>
                       <h1 className="text-lg font-extrabold text-slate-900">
-                        Direktori Alumnus &amp; Pelunasan Tuntas
+                        Direktori Alumni &amp; Pelunasan Tuntas
                       </h1>
                       <p className="mt-0.5 text-xs text-slate-500">
                         Daftar pembiayaan siswa yang telah diselesaikan 100% secara amanah, tuntas,
@@ -7206,12 +7236,12 @@ export function AdminDashboard({
               <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
                 <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-slate-100 bg-slate-50/70 px-4 py-2">
                   <h2 className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                    Daftar Alumnus ({visibleAlumni.length})
+                    Daftar Alumni ({visibleAlumni.length})
                   </h2>
                   <div className="flex flex-wrap gap-1">
                     {(
                       [
-                        ['ALL', 'Semua Alumnus'],
+                        ['ALL', 'Semua Alumni'],
                         ['ON_TIME', 'Lunas Tepat Waktu'],
                         ['EARLY', 'Pelunasan Dipercepat'],
                       ] as const
@@ -7231,7 +7261,7 @@ export function AdminDashboard({
 
                 {visibleAlumni.length === 0 ? (
                   <div className="px-4 py-12 text-center text-sm text-slate-500">
-                    Belum ada alumnus yang cocok dengan filter ini.
+                    Belum ada alumni yang cocok dengan filter ini.
                   </div>
                 ) : (
                   <>
@@ -7239,7 +7269,7 @@ export function AdminDashboard({
                       <table className="w-full text-left text-xs">
                         <thead className="bg-white text-[10px] uppercase tracking-wider text-slate-500">
                           <tr>
-                            <th className="px-4 py-2">Alumnus</th>
+                            <th className="px-4 py-2">Alumni</th>
                             <th className="px-4 py-2">Program &amp; LPK</th>
                             <th className="px-4 py-2">Negara &amp; Keberangkatan</th>
                             <th className="px-4 py-2">Total Realisasi Lunas</th>

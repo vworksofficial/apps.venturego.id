@@ -111,11 +111,21 @@ export type UserPaymentItem = {
   createdAt: string | null
 }
 
+export type UserPaymentProofItem = {
+  id: string
+  applicationDocId: string
+  installmentNumber: number
+  amount: number
+  status: 'PENDING_REVIEW' | 'VERIFIED' | 'REJECTED'
+  submittedAt: string | null
+}
+
 export type UserActivityFeedResult =
   | {
       ok: true
       applications: UserApplicationDetail[]
       payments: UserPaymentItem[]
+      paymentProofs: UserPaymentProofItem[]
     }
   | { ok: false; message: string }
 
@@ -490,9 +500,10 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
     if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
 
     const db = getFirebaseFirestore()
-    const [appSnapshot, paymentSnapshot] = await Promise.all([
+    const [appSnapshot, paymentSnapshot, proofSnapshot] = await Promise.all([
       db.collection('applications').where('ownerFirebaseUid', '==', identity.uid).get(),
       db.collection('payments').where('ownerFirebaseUid', '==', identity.uid).limit(50).get(),
+      db.collection('paymentProofs').where('ownerFirebaseUid', '==', identity.uid).limit(50).get(),
     ])
 
     const applications: UserApplicationDetail[] = appSnapshot.docs
@@ -654,7 +665,29 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
       })
       .sort((a, b) => (b.paidAt ?? b.createdAt ?? '').localeCompare(a.paidAt ?? a.createdAt ?? ''))
 
-    return { ok: true, applications, payments }
+    const paymentProofs: UserPaymentProofItem[] = proofSnapshot.docs.flatMap((document) => {
+      const data = document.data()
+      if (
+        typeof data.applicationDocId !== 'string' ||
+        !Number.isInteger(data.installmentNumber) ||
+        !Number.isSafeInteger(data.amount) ||
+        !['PENDING_REVIEW', 'VERIFIED', 'REJECTED'].includes(String(data.status))
+      ) {
+        return []
+      }
+      return [
+        {
+          id: document.id,
+          applicationDocId: data.applicationDocId,
+          installmentNumber: Number(data.installmentNumber),
+          amount: Number(data.amount),
+          status: data.status as UserPaymentProofItem['status'],
+          submittedAt: typeof data.submittedAt === 'string' ? data.submittedAt : null,
+        },
+      ]
+    })
+
+    return { ok: true, applications, payments, paymentProofs }
   } catch {
     return { ok: false, message: 'Data aktivitas belum dapat dimuat. Silakan coba lagi.' }
   }

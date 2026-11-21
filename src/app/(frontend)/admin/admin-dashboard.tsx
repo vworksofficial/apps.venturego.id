@@ -678,19 +678,34 @@ const summarizeInstallments = (
   }
 }
 
-const isAlumnus = (app: FinancingApplicationRecord, summary: InstallmentSummary) =>
-  app.status === 'COMPLETED' ||
-  (summary.obligation !== null &&
+const isAlumnus = (app: FinancingApplicationRecord, summary: InstallmentSummary) => {
+  if (app.status === 'COMPLETED') return true
+  if (app.status === 'REJECTED' || app.status === 'CANCELLED') return false
+  if (!isLegacyApplication(app) && app.status !== 'ACTIVE') return false
+  return (
+    summary.obligation !== null &&
     summary.obligation > 0 &&
     summary.remaining === 0 &&
-    summary.paidCount >= summary.schedule.length)
+    summary.paidCount >= summary.schedule.length
+  )
+}
 
 const isLegacyApplication = (app: FinancingApplicationRecord) =>
   Boolean(app.legacy) ||
   (typeof app.contractScheme === 'string' && app.contractScheme.startsWith('LEGACY_'))
 
-const hasActiveInstallment = (app: FinancingApplicationRecord, summary: InstallmentSummary) =>
-  !isAlumnus(app, summary) && summary.remaining > 0
+const hasActiveInstallment = (app: FinancingApplicationRecord, summary: InstallmentSummary) => {
+  if (isAlumnus(app, summary)) return false
+  if (app.status === 'REJECTED' || app.status === 'CANCELLED') return false
+  if (summary.remaining <= 0) return false
+
+  // Record legacy dianggap aktif selama masih ada sisa kewajiban
+  if (isLegacyApplication(app)) return true
+
+  // Siswa aktif harus berstatus ACTIVE dan dokumen akad telah diterbitkan
+  // Data yang dikembalikan ke persiapan akad atau pengajuan otomatis keluar dari halaman siswa aktif
+  return app.status === 'ACTIVE' && Boolean(app.financialPlan?.akadDocument)
+}
 
 const getStudentDirectoryCategory = (
   app: FinancingApplicationRecord,

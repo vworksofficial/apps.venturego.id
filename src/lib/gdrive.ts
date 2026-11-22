@@ -397,6 +397,59 @@ export const downloadDriveFile = async (fileId: string): Promise<Uint8Array> => 
   return new Uint8Array(await response.arrayBuffer())
 }
 
+/**
+ * Upload sebuah file DOCX ke Google Drive dan langsung konversi ke format Google Docs,
+ * sehingga bisa diekspor sebagai PDF via Drive Export API.
+ * Gunakan ini sebagai pengganti uploadDriveFile jika tujuannya hanya untuk diekspor.
+ */
+export const uploadDocxAsGoogleDoc = async (options: {
+  parentFolderId: string
+  fileName: string
+  bytes: Uint8Array
+}): Promise<{ fileId: string }> => {
+  if (
+    !FILE_ID_PATTERN.test(options.parentFolderId) ||
+    !options.fileName ||
+    !options.bytes.byteLength
+  ) {
+    throw new GDriveError('Data berkas tidak valid.', 'INVALID')
+  }
+
+  const boundary = `venturego_${randomBytes(18).toString('hex')}`
+  // Metadata: mimeType Google Docs agar Drive otomatis konversi dari DOCX
+  const metadata = JSON.stringify({
+    name: options.fileName,
+    parents: [options.parentFolderId],
+    mimeType: 'application/vnd.google-apps.document',
+  })
+  const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  const multipartBody = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${docxMime}\r\n\r\n`,
+      'utf8',
+    ),
+    Buffer.from(options.bytes),
+    Buffer.from(`\r\n--${boundary}--`, 'utf8'),
+  ])
+
+  const response = await driveFetch('/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body: multipartBody,
+  })
+  if (!response.ok) {
+    if (response.status === 403)
+      throw new GDriveError('Akses penyimpanan berkas ditolak.', 'FORBIDDEN')
+    throw new GDriveError('Server gagal mengonversi berkas akad ke Google Docs.', 'UPSTREAM')
+  }
+
+  const data = (await response.json().catch(() => null)) as { id?: string } | null
+  if (!data?.id || !FILE_ID_PATTERN.test(data.id)) {
+    throw new GDriveError('Server tidak mengembalikan identitas berkas.', 'UPSTREAM')
+  }
+  return { fileId: data.id }
+}
+
 export const exportDriveFileAsPdf = async (fileId: string): Promise<Uint8Array> => {
   if (!FILE_ID_PATTERN.test(fileId)) {
     throw new GDriveError('Identitas berkas tidak valid.', 'INVALID')

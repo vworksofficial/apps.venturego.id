@@ -8,7 +8,7 @@ import {
   deleteDriveFile,
   downloadDriveFile,
   exportDriveFileAsPdf,
-  uploadDriveFile,
+  uploadDocxAsGoogleDoc,
 } from '@/lib/gdrive'
 import {
   getExistingStudentNumber,
@@ -67,8 +67,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         typeof akadDocument.driveFileId === 'string' &&
         akadDocument.driveFileId
       ) {
-        // Dokumen sudah diterbitkan — ekspor langsung dari file Drive yang ada
-        pdfBytes = await exportDriveFileAsPdf(akadDocument.driveFileId)
+        // Dokumen sudah diterbitkan — download DOCX dari Drive, convert ke Google Docs, export PDF
+        const docxBytes = await downloadDriveFile(akadDocument.driveFileId)
+        const existingFolderId =
+          typeof applicationData.driveFolderId === 'string' ? applicationData.driveFolderId : ''
+        const folderId = existingFolderId || (await ensureApplicationDriveFolder(applicationData))
+        const tempFileName = `[PREVIEW PDF] Akad VSV - ${applicantName.trim() || id}`
+        const uploaded = await uploadDocxAsGoogleDoc({
+          parentFolderId: folderId,
+          fileName: tempFileName,
+          bytes: docxBytes,
+        })
+        try {
+          pdfBytes = await exportDriveFileAsPdf(uploaded.fileId)
+        } finally {
+          void deleteDriveFile(uploaded.fileId).catch(() => {})
+        }
       } else {
         // Draft — build DOCX, upload sementara ke Drive, ekspor sebagai PDF, lalu hapus
         const ownerUid =
@@ -89,11 +103,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           typeof applicationData.driveFolderId === 'string' ? applicationData.driveFolderId : ''
         const folderId = existingFolderId || (await ensureApplicationDriveFolder(applicationData))
 
-        const tempFileName = `[PREVIEW PDF] Akad VSV - ${applicantName.trim() || id}.docx`
-        const uploaded = await uploadDriveFile({
+        const tempFileName = `[PREVIEW PDF] Akad VSV - ${applicantName.trim() || id}`
+        // Upload dan konversi ke Google Docs format agar bisa di-export sebagai PDF
+        const uploaded = await uploadDocxAsGoogleDoc({
           parentFolderId: folderId,
           fileName: tempFileName,
-          mimeType: DOCX_MIME,
           bytes: built.bytes,
         })
 

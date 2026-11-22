@@ -678,35 +678,6 @@ export default function UploadDocumentsPage() {
         </>
       )}
 
-      {!loading && !loadingError && selectedApplication && (
-        <section aria-label="Formulir pendaftaran digital" className="mt-2">
-          <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 via-white to-emerald-50 p-4 sm:p-5 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-              <div className="flex items-start gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-600 text-white shadow-sm">
-                  <DashboardIcon className="size-5" name="document" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900">
-                    Formulir Pendaftaran Siswa
-                  </h4>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
-                    Lengkapi data pemohon dan kontak darurat secara digital. Berkas PDF resmi akan
-                    diterbitkan otomatis tanpa perlu dicetak manual.
-                  </p>
-                </div>
-              </div>
-              <Link
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 px-4 py-2.5 text-center text-xs font-bold text-white shadow-sm transition hover:from-teal-700 hover:to-emerald-700"
-                href={`/dashboard/pendaftaran?id=${selectedApplication.id}`}
-              >
-                <span>Lengkapi Form</span>
-                <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
 
       {uploadError && (
         <p className="rounded-xl bg-red-50 p-3 text-xs text-red-700" role="alert">

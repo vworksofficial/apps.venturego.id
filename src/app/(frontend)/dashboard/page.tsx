@@ -720,14 +720,14 @@ export default function DashboardPage() {
                                   )}
                                 </div>
                                 <span
-                                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                                  className={`shrink-0 text-[10px] font-bold ${
                                     application.status === 'ACTIVE'
-                                      ? 'bg-emerald-100 text-emerald-800'
+                                      ? 'text-emerald-700'
                                       : application.status === 'COMPLETED'
-                                        ? 'bg-slate-100 text-slate-700'
+                                        ? 'text-slate-500'
                                         : closed
-                                          ? 'bg-red-100 text-red-700'
-                                          : 'bg-blue-100 text-[var(--primary)]'
+                                          ? 'text-red-600'
+                                          : 'text-[var(--primary)]'
                                   }`}
                                 >
                                   {statusLabel}

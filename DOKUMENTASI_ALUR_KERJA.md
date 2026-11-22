@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (fix(dashboard): optimasi tombol unduh template surat resmi pada tampilan mobile menjadi 1 baris teks rapat (whitespace-nowrap) dengan penyesuaian ukuran font dan pemanfaatan lebar kartu.)
+Terakhir diperbarui: **22 November 2026** (fix(dashboard): perbaikan skeleton loading halaman angsuran — penyelarasan geometri hero, SVG gauge arc, margin overlap (-mt-10), dan susunan kartu jadwal & riwayat untuk mengeliminasi layout shift (CLS).)
 
 ---
 

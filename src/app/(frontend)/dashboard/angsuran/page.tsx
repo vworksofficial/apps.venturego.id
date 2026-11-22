@@ -1114,60 +1114,97 @@ export default function InstallmentsPage() {
       {loading && (
         <div aria-label="Memuat jadwal angsuran" className="-mx-5 -mt-5" role="status">
           <span className="sr-only">Memuat jadwal angsuran…</span>
-          <section className="relative bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-5 pb-16 text-white">
-            <div className="flex flex-col items-center gap-5">
+          <section className="relative overflow-hidden bg-gradient-to-br from-[#0b57d0] via-[#1768de] to-[#3985ed] px-5 pt-5 pb-14 text-white sm:px-6 sm:pb-16">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-12 -top-20 size-64 rounded-full border border-white/10"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-2 -top-10 size-44 rounded-full border border-white/10"
+            />
+            <div className="flex flex-col items-center gap-5 text-center">
               <div className="flex flex-col items-center gap-2">
-                <SkeletonBlock className="h-5 w-36 bg-white/25" />
-                <SkeletonBlock className="h-3 w-28 bg-white/20" />
-                <SkeletonBlock className="mt-2 h-9 w-56 rounded-full bg-white/25" />
-                <SkeletonBlock className="mt-1 h-2.5 w-48 bg-white/20" />
-              </div>
-              <div className="grid size-52 place-items-center rounded-full border-[10px] border-b-transparent border-white/25 bg-white/[0.06] sm:size-60">
-                <div className="flex flex-col items-center gap-2">
-                  <SkeletonBlock className="h-10 w-20 bg-white/25" />
-                  <SkeletonBlock className="h-3 w-12 bg-white/20" />
-                  <SkeletonBlock className="h-2.5 w-16 bg-white/20" />
+                <SkeletonBlock className="h-6 w-44 bg-white/25 sm:h-7 sm:w-52" />
+                <SkeletonBlock className="h-3.5 w-32 bg-white/20" />
+                <div className="mt-2 flex h-9 w-52 items-center justify-center rounded-full bg-white/30 shadow-xs backdrop-blur-xs">
+                  <div className="h-4 w-32 animate-pulse rounded bg-white/40" />
                 </div>
+                <SkeletonBlock className="mt-1 h-3 w-64 max-w-xs bg-white/20" />
               </div>
-              <div className="-mt-1 flex flex-col items-center gap-2">
-                <SkeletonBlock className="h-3 w-36 bg-white/25" />
-                <SkeletonBlock className="h-3 w-32 bg-white/20" />
+
+              <div className="flex flex-col items-center">
+                <div className="relative grid size-52 shrink-0 place-items-center sm:size-60">
+                  <svg
+                    aria-hidden="true"
+                    className="absolute inset-0 size-full animate-pulse"
+                    viewBox="0 0 120 120"
+                  >
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="35"
+                      fill="currentColor"
+                      className="text-white/[0.06]"
+                    />
+                    <path
+                      d="M43.93 109.46 A52 52 0 1 1 76.07 109.46"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeLinecap="butt"
+                      strokeWidth="7"
+                      className="text-white/25"
+                    />
+                  </svg>
+                  <div className="-translate-y-1 flex flex-col items-center gap-2 text-center">
+                    <div className="h-10 w-24 animate-pulse rounded-lg bg-white/25 sm:h-12 sm:w-28" />
+                    <div className="h-3 w-16 animate-pulse rounded bg-white/20" />
+                    <div className="h-2.5 w-12 animate-pulse rounded bg-white/20" />
+                  </div>
+                </div>
+                <SkeletonBlock className="-mt-1 h-3.5 w-44 bg-white/25" />
+                <SkeletonBlock className="mt-2 h-4 w-28 rounded-full bg-white/20" />
               </div>
             </div>
           </section>
-          <section className="-mt-16 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-4 ring-1 ring-slate-200/70">
+
+          <section className="relative z-10 -mt-10 rounded-t-[1.5rem] bg-[#f8f9fd] px-5 pt-5 pb-8 shadow-sm ring-1 ring-slate-200/70">
             <div className="flex items-end justify-between gap-3 pb-3">
               <div className="flex-1 space-y-2">
                 <SkeletonBlock className="h-4 w-32" />
-                <SkeletonBlock className="h-2.5 w-4/5" />
-                <SkeletonBlock className="h-2.5 w-2/5" />
+                <SkeletonBlock className="h-3 w-4/5 max-w-sm" />
+                <SkeletonBlock className="h-3 w-2/5 max-w-[200px]" />
               </div>
-              <SkeletonBlock className="h-3 w-12 shrink-0" />
+              <SkeletonBlock className="h-3 w-14 shrink-0" />
             </div>
+
             <div className="divide-y divide-slate-200 border-y border-slate-200">
               {Array.from({ length: 5 }, (_, index) => (
                 <div className="flex items-center justify-between gap-3 py-3" key={index}>
                   <div className="space-y-2">
-                    <SkeletonBlock className="h-3 w-20" />
-                    <SkeletonBlock className="h-2.5 w-24" />
+                    <SkeletonBlock className="h-3.5 w-24" />
+                    <SkeletonBlock className="h-2.5 w-20" />
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <SkeletonBlock className="h-3 w-20" />
-                    <SkeletonBlock className="h-7 w-14 rounded-full" />
+                    <SkeletonBlock className="h-3.5 w-24" />
+                    <SkeletonBlock className="h-7 w-16 rounded-full" />
                   </div>
                 </div>
               ))}
             </div>
+
             <div className="space-y-3 border-t border-slate-200 pt-4">
-              <SkeletonBlock className="h-3 w-32" />
-              <div className="flex items-center justify-between gap-3 py-2">
-                <div className="space-y-2">
-                  <SkeletonBlock className="h-3 w-36" />
-                  <SkeletonBlock className="h-2.5 w-24" />
-                </div>
-                <div className="space-y-2">
-                  <SkeletonBlock className="h-3 w-20" />
-                  <SkeletonBlock className="h-2.5 w-14" />
+              <div className="flex items-center justify-between">
+                <SkeletonBlock className="h-3.5 w-36" />
+                <SkeletonBlock className="h-6 w-24 rounded-full" />
+              </div>
+              <div className="divide-y divide-slate-200 border-y border-slate-200">
+                <div className="flex items-center justify-between py-3">
+                  <div className="space-y-1.5">
+                    <SkeletonBlock className="h-3 w-24" />
+                    <SkeletonBlock className="h-2.5 w-28" />
+                  </div>
+                  <SkeletonBlock className="h-3.5 w-20" />
                 </div>
               </div>
             </div>

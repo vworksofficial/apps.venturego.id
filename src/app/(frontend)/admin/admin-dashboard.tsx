@@ -927,7 +927,7 @@ function ApplicationDrawerForm({
   const [akadIssuing, setAkadIssuing] = useState(false)
   const [akadIssueError, setAkadIssueError] = useState('')
   const [akadPreviewOpen, setAkadPreviewOpen] = useState(false)
-  const [akadPreviewHtml, setAkadPreviewHtml] = useState<string | null>(null)
+  const [akadPreviewPdfUrl, setAkadPreviewPdfUrl] = useState<string | null>(null)
   const [akadPreviewLoading, setAkadPreviewLoading] = useState(false)
   const [akadPreviewError, setAkadPreviewError] = useState('')
   const [akadPdfSaving, setAkadPdfSaving] = useState(false)
@@ -1043,7 +1043,7 @@ function ApplicationDrawerForm({
   )
 
   const downloadAkadPreviewPdf = async () => {
-    if (!akadPreviewHtml || akadPdfSaving) return
+    if (!akadPreviewPdfUrl || akadPdfSaving) return
 
     setAkadPdfSaving(true)
     setAkadPdfError('')
@@ -1087,20 +1087,27 @@ function ApplicationDrawerForm({
   const akadGateOpen = pricingStatus === 'VERIFIED' || pricingStatus === 'AGREED' || akadIssued
 
   const openAkadPreview = async () => {
+    // Revoke any existing blob URL to free memory
+    if (akadPreviewPdfUrl) {
+      URL.revokeObjectURL(akadPreviewPdfUrl)
+      setAkadPreviewPdfUrl(null)
+    }
     setAkadPreviewOpen(true)
     setAkadPreviewError('')
     setAkadPreviewLoading(true)
-    setAkadPreviewHtml(null)
     try {
-      const response = await fetch(`/api/admin/applications/${application.id}/akad`)
+      const response = await fetch(`/api/admin/applications/${application.id}/akad?mode=pdf`, {
+        cache: 'no-store',
+      })
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { message?: string } | null
-        throw new Error(body?.message || 'Pratinjau dokumen akad belum dapat dimuat.')
+        throw new Error(body?.message || 'Pratinjau PDF akad belum dapat dimuat.')
       }
-      setAkadPreviewHtml(await response.text())
+      const blob = await response.blob()
+      setAkadPreviewPdfUrl(URL.createObjectURL(blob))
     } catch (err) {
       setAkadPreviewError(
-        err instanceof Error ? err.message : 'Pratinjau dokumen akad belum dapat dimuat.',
+        err instanceof Error ? err.message : 'Pratinjau PDF akad belum dapat dimuat.',
       )
     } finally {
       setAkadPreviewLoading(false)
@@ -1125,7 +1132,10 @@ function ApplicationDrawerForm({
           return
         }
         setAkadPreviewOpen(false)
-        setAkadPreviewHtml(null)
+        if (akadPreviewPdfUrl) {
+          URL.revokeObjectURL(akadPreviewPdfUrl)
+          setAkadPreviewPdfUrl(null)
+        }
         router.refresh()
       } catch (err) {
         setAkadIssueError(
@@ -2261,7 +2271,7 @@ function ApplicationDrawerForm({
                   onClick={openAkadPreview}
                   type="button"
                 >
-                  Preview Dokumen
+                  Preview PDF
                 </button>
                 <a
                   className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/70 px-4 py-2.5 text-xs font-semibold text-[#0b57d0] shadow-2xs transition hover:border-blue-300 hover:bg-blue-100/70 hover:text-[#0842a0] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
@@ -3941,7 +3951,13 @@ function ApplicationDrawerForm({
         <div
           className="fixed inset-0 z-[60] flex justify-end overflow-hidden bg-slate-950/55"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setAkadPreviewOpen(false)
+            if (event.target === event.currentTarget) {
+              setAkadPreviewOpen(false)
+              if (akadPreviewPdfUrl) {
+                URL.revokeObjectURL(akadPreviewPdfUrl)
+                setAkadPreviewPdfUrl(null)
+              }
+            }
           }}
         >
           <aside
@@ -3973,7 +3989,7 @@ function ApplicationDrawerForm({
                 <div className="relative flex shrink-0 flex-wrap items-center gap-2">
                   <button
                     className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!akadPreviewHtml || akadPreviewLoading || akadPdfSaving}
+                    disabled={!akadPreviewPdfUrl || akadPreviewLoading || akadPdfSaving}
                     onClick={downloadAkadPreviewPdf}
                     type="button"
                   >
@@ -3992,7 +4008,13 @@ function ApplicationDrawerForm({
                   <button
                     aria-label="Tutup pratinjau dokumen akad"
                     className="rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
-                    onClick={() => setAkadPreviewOpen(false)}
+                    onClick={() => {
+                      setAkadPreviewOpen(false)
+                      if (akadPreviewPdfUrl) {
+                        URL.revokeObjectURL(akadPreviewPdfUrl)
+                        setAkadPreviewPdfUrl(null)
+                      }
+                    }}
                     type="button"
                   >
                     ✕
@@ -4019,10 +4041,10 @@ function ApplicationDrawerForm({
                     <span className="size-4 animate-spin rounded-full border-2 border-blue-100 border-t-[#0b57d0]" />
                     <div>
                       <p className="text-xs font-semibold text-slate-800">
-                        Menyiapkan pratinjau akad
+                        Menyiapkan pratinjau PDF
                       </p>
                       <p className="mt-0.5 text-[11px] text-slate-500">
-                        Menata halaman dan lampiran dokumen…
+                        Mengonversi dokumen akad ke PDF…
                       </p>
                     </div>
                   </div>
@@ -4046,7 +4068,9 @@ function ApplicationDrawerForm({
                   className="mx-auto mt-10 max-w-lg rounded-2xl border border-red-200 bg-white p-6 text-center shadow-sm"
                   role="alert"
                 >
-                  <h4 className="text-sm font-bold text-slate-900">Pratinjau belum dapat dimuat</h4>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Pratinjau PDF belum dapat dimuat
+                  </h4>
                   <p className="mt-2 text-xs leading-5 text-slate-600">{akadPreviewError}</p>
                   <button
                     className="mt-4 rounded-lg bg-[#0b57d0] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#0842a0]"
@@ -4057,12 +4081,12 @@ function ApplicationDrawerForm({
                   </button>
                 </div>
               )}
-              {akadPreviewHtml && !akadPreviewLoading && (
+              {akadPreviewPdfUrl && !akadPreviewLoading && (
                 <iframe
                   className="mx-auto h-full min-h-[75vh] w-full max-w-4xl rounded-xl border border-slate-200 bg-white shadow-md"
                   ref={akadPreviewFrameRef}
-                  srcDoc={akadPreviewHtml}
-                  title="Pratinjau dokumen akad"
+                  src={akadPreviewPdfUrl}
+                  title="Preview PDF dokumen akad"
                 />
               )}
             </div>

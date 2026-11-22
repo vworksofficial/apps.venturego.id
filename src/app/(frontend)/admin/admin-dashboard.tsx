@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
-import { DOCUMENT_DEFINITIONS, getKtpDocumentIndex } from '@/lib/documents'
+import { DOCUMENT_DEFINITIONS, getKtpDocumentIndex, isFormPendaftaranLabel } from '@/lib/documents'
 import { FINANCING_OPTIONS } from '@/lib/financing-plan'
 import {
   APPLICATION_STATUSES,
@@ -2089,15 +2089,24 @@ function ApplicationDrawerForm({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {application.documents.map((document, index) => {
-                  const def = definitions[index]
+                {definitions.map((def, index) => {
+                  const document = application.documents.find(
+                    (doc) =>
+                      doc.documentType === def.label ||
+                      (isFormPendaftaranLabel(def.label) &&
+                        isFormPendaftaranLabel(doc.documentType ?? '')),
+                  ) ??
+                    application.documents[index] ?? {
+                      documentType: def.label,
+                      status: 'NOT_UPLOADED',
+                    }
                   const currentStatus = document.status
                   return (
-                    <tr className="hover:bg-slate-50" key={`${document.documentType}-${index}`}>
+                    <tr className="hover:bg-slate-50" key={`${def.label}-${index}`}>
                       <td className="px-3.5 py-2.5 text-slate-400">{index + 1}</td>
                       <td className="px-3.5 py-2.5">
                         <span className="font-medium text-slate-900">
-                          {document.documentType}
+                          {def.label}
                           {def?.required && <span className="ml-1 text-red-500">*</span>}
                         </span>
                         {document.fileId && (
@@ -2111,7 +2120,7 @@ function ApplicationDrawerForm({
                         {def?.section === 'dokumen-susulan'
                           ? 'Susulan'
                           : def?.section === 'dokumen-pendukung'
-                            ? 'Pendukung'
+                            ? 'Persyaratan'
                             : 'Utama'}
                       </td>
                       <td className="px-3.5 py-2.5">

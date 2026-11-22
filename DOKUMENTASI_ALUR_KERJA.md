@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (Integrasi Formulir Pendaftaran Digital: penambahan halaman `/dashboard/pendaftaran` untuk pengisian digital data pemohon & kontak emergency tanpa perlu tulis tangan; sistem mengonversi input menjadi PDF resmi identik formulir asli via Puppeteer dan otomatis mengunggahnya ke slot `Form Pendaftaran` [indeks 9/14] di Google Drive siswa; tombol pada kartu `Form Pendaftaran` di `/dashboard/unggah-berkas` menjadi 'Lengkapi Form' beraksen gradien teal/emerald jika belum diisi, dan berubah menjadi tombol 'Unduh' jika sudah terisi; penambahan banner ajakan di bagian bawah halaman unggah berkas; serta integrasi kartu 'Formulir Pendaftaran Siswa (Digital)' pada Tab Profil di drawer admin untuk meninjau data terstruktur dan tautan ke berkas PDF-nya. Sebelumnya: tombol Preview PDF di tab Draft Akad panel staf.)
+Terakhir diperbarui: **22 November 2026** (Penyesuaian tata letak dokumen unggahan: seksi "Dokumen Pendukung" diubah namanya menjadi "Dokumen Persyaratan", serta posisi dokumen "Form Pendaftaran" dipindahkan ke urutan paling atas di atas "Scan Surat Rekomendasi LPK" pada kedua produk; sistem dokumen dinormalisasi berbasis label sehingga berkas lama tetap cocok dan aman.)
 
 ---
 
@@ -191,11 +191,11 @@ Halaman **Angsuran**, **Riwayat**, **Unggah Berkas**, dan **Profil** tidak menam
 
 **Daftar dokumen per produk** (`src/lib/documents.ts`):
 
-- **Dana Keberangkatan — 17 slot** (wajib ditandai `*`: Pas Foto, Scan KTP, Scan KK, Ijazah SD, SMP, SMA): Pas Foto · Scan KTP · Scan Akta Kelahiran · Scan KK · Ijazah SD/MI · Ijazah SMP/MTs/SLTP · Ijazah SMA/SMK/MA/SLTA · Scan Passport · _pendukung:_ Scan Surat Rekomendasi LPK · Scan Form Pendaftaran · Scan Surat Kesediaan Mengangsur · Scan Surat Mengetahui Orang Tua · Scan SKCK · Scan COE · Scan Kontrak Kerja · Scan KTP Orang Tua/Wali · Scan Surat Nikah Orang Tua.
+- **Dana Keberangkatan — 17 slot** (wajib ditandai `*`: Pas Foto, Scan KTP, Scan KK, Ijazah SD, SMP, SMA): Pas Foto · Scan KTP · Scan Akta Kelahiran · Scan KK · Ijazah SD/MI · Ijazah SMP/MTs/SLTP · Ijazah SMA/SMK/MA/SLTA · Scan Passport · _persyaratan:_ Form Pendaftaran · Scan Surat Rekomendasi LPK · Scan Surat Kesediaan Mengangsur · Scan Surat Mengetahui Orang Tua · Scan SKCK · Scan COE · Scan Kontrak Kerja · Scan KTP Orang Tua/Wali · Scan Surat Nikah Orang Tua.
 - **Full Cover — 17 slot dalam 3 grup** (tanda `*` hanya penanda tampilan; **submit tetap hanya mewajibkan Scan KTP**):
   - **Dokumen Wajib** (`*`: Pas Foto · Scan KTP · Scan Akta Kelahiran · Scan KK (Kartu Keluarga) · Ijazah SD/MI · Ijazah SMP/MTs/SLTP · Ijazah SMA/SMK/MA/SLTA · Scan KTP Orang Tua / Wali · Scan Surat Nikah Orang Tua / Wali; tanpa `*`: Scan SKCK (Jika ada)).
   - **Dokumen Susulan (setelah pelatihan selesai)**: Scan Passport · Scan Kontrak Kerja · Scan Visa Kerja atau COE.
-  - **Dokumen Pendukung**: Scan Surat Rekomendasi LPK · Scan Form Pendaftaran · Scan Surat Kesediaan Mengangsur · Scan Surat Mengetahui Orang Tua.
+  - **Dokumen Persyaratan**: Form Pendaftaran · Scan Surat Rekomendasi LPK · Scan Surat Kesediaan Mengangsur · Scan Surat Mengetahui Orang Tua.
   - `Scan KTP` tetap berada di indeks 1 sehingga `getKtpDocumentIndex`, validasi submit, dan langkah wizard tidak berubah. 2 pengajuan Full Cover lama (9 slot) sudah dimigrasi oleh `scripts/migrate-full-cover-documents-v2.mjs` — entri `KTP siswa` (berkas + status `UPLOADED`) dipindah ke slot `Scan KTP`, sisanya `NOT_UPLOADED`; skrip idempoten (lewati bila sudah 17 slot, mode dry-run bila tanpa `--write`, abort bila ada berkas terunggah tanpa padanan label baru).
 
 #### Angsuran `/dashboard/angsuran`

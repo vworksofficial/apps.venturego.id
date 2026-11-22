@@ -108,11 +108,11 @@ export default function UploadDocumentsPage() {
       ? {
           'dokumen-wajib': 'Dokumen Wajib',
           'dokumen-susulan': 'Dokumen Susulan (setelah pelatihan selesai)',
-          'dokumen-pendukung': 'Dokumen Pendukung',
+          'dokumen-pendukung': 'Dokumen Persyaratan',
         }
       : {
           default: 'Dokumen utama',
-          'dokumen-pendukung': 'Dokumen pendukung',
+          'dokumen-pendukung': 'Dokumen Persyaratan',
         }
   const documentGroups = Object.entries(
     definitions.reduce<Record<string, { document: (typeof definitions)[number]; index: number }[]>>(
@@ -375,7 +375,13 @@ export default function UploadDocumentsPage() {
               </h3>
               <DashboardCard>
                 {group.documents.map(({ document, index }, groupIndex) => {
-                  const uploadedDocument = selectedApplication?.documents[index]
+                  const uploadedDocument =
+                    selectedApplication?.documents.find(
+                      (doc) =>
+                        doc.documentType === document.label ||
+                        (isFormPendaftaranLabel(document.label) &&
+                          isFormPendaftaranLabel(doc.documentType ?? '')),
+                    ) ?? selectedApplication?.documents[index]
                   const status = uploadedDocument?.status ?? 'NOT_UPLOADED'
                   const isUploaded = status !== 'NOT_UPLOADED'
                   const isVerified = status === 'VERIFIED'

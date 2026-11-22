@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { FieldValue } from 'firebase-admin/firestore'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
-import { DOCUMENT_DEFINITIONS, getFormPendaftaranIndex } from '@/lib/documents'
+import {
+  DOCUMENT_DEFINITIONS,
+  getFormPendaftaranIndex,
+  isFormPendaftaranLabel,
+} from '@/lib/documents'
 import { ensureApplicationDriveFolder } from '@/lib/drive-folders'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { deleteDriveFile, uploadDriveFile } from '@/lib/gdrive'
@@ -150,15 +154,22 @@ export async function POST(request: Request) {
       ? (applicationData.documents as Record<string, unknown>[])
       : []
 
+    const prevFormDoc =
+      currentDocuments.find((item) => isFormPendaftaranLabel(String(item.documentType ?? ''))) ??
+      currentDocuments[formIndex]
     const previousFileId =
-      typeof currentDocuments[formIndex]?.fileId === 'string'
-        ? (currentDocuments[formIndex]?.fileId as string)
-        : null
+      typeof prevFormDoc?.fileId === 'string' ? (prevFormDoc.fileId as string) : null
 
     const definitions = DOCUMENT_DEFINITIONS[product]
     const nextDocuments = definitions.map((definition, index) => {
       if (index !== formIndex) {
         return (
+          currentDocuments.find(
+            (item) =>
+              item.documentType === definition.label ||
+              (isFormPendaftaranLabel(definition.label) &&
+                isFormPendaftaranLabel(String(item.documentType ?? ''))),
+          ) ??
           currentDocuments[index] ?? {
             documentType: definition.label,
             status: 'NOT_UPLOADED',

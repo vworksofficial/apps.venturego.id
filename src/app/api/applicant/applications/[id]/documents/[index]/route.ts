@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
+import { DOCUMENT_DEFINITIONS, isFormPendaftaranLabel } from '@/lib/documents'
 import { downloadDriveFile } from '@/lib/gdrive'
 
 const APPLICATION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
@@ -39,7 +40,25 @@ export async function GET(
       return errorResponse('Berkas tidak ditemukan pada akun ini.')
     }
 
-    const file = Array.isArray(data.documents) ? data.documents[index] : null
+    const product = data?.product as keyof typeof DOCUMENT_DEFINITIONS
+    const definitions = DOCUMENT_DEFINITIONS[product]
+    const def = definitions?.[index]
+    const rawDocuments = Array.isArray(data.documents)
+      ? (data.documents as Array<{
+          documentType?: string
+          status?: string
+          fileId?: string
+          fileName?: string
+          mimeType?: string
+        }>)
+      : []
+    const file = def
+      ? (rawDocuments.find(
+          (item) =>
+            item.documentType === def.label ||
+            (isFormPendaftaranLabel(def.label) && isFormPendaftaranLabel(item.documentType ?? '')),
+        ) ?? rawDocuments[index])
+      : rawDocuments[index]
     if (
       !file ||
       (file.status !== 'VERIFIED' && file.status !== 'UPLOADED') ||
@@ -51,8 +70,9 @@ export async function GET(
 
     const bytes = await downloadDriveFile(file.fileId)
     const fileName = safeFileName(String(file.fileName ?? 'dokumen-terverifikasi'))
-    const mimeType = ['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimeType)
-      ? file.mimeType
+    const fileMime = typeof file.mimeType === 'string' ? file.mimeType : ''
+    const mimeType = ['application/pdf', 'image/jpeg', 'image/png'].includes(fileMime)
+      ? fileMime
       : 'application/octet-stream'
     return new Response(bytes as unknown as BodyInit, {
       headers: {

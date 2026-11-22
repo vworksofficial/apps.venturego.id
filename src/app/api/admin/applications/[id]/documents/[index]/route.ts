@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
 import { getStaffSession } from '@/lib/firebase-session'
+import { DOCUMENT_DEFINITIONS, isFormPendaftaranLabel } from '@/lib/documents'
 import { downloadDriveFile } from '@/lib/gdrive'
 
 export async function GET(
@@ -18,8 +19,26 @@ export async function GET(
 
   try {
     const application = await getFirebaseFirestore().collection('applications').doc(id).get()
-    const documents = application.data()?.documents
-    const document = Array.isArray(documents) ? documents[index] : null
+    const appData = application.data()
+    const product = appData?.product as keyof typeof DOCUMENT_DEFINITIONS
+    const definitions = DOCUMENT_DEFINITIONS[product]
+    const def = definitions?.[index]
+    const documents = Array.isArray(appData?.documents)
+      ? (appData.documents as Array<{
+          documentType?: string
+          status?: string
+          fileId?: string
+          fileName?: string
+          mimeType?: string
+        }>)
+      : []
+    const document = def
+      ? (documents.find(
+          (item) =>
+            item.documentType === def.label ||
+            (isFormPendaftaranLabel(def.label) && isFormPendaftaranLabel(item.documentType ?? '')),
+        ) ?? documents[index])
+      : documents[index]
     const fileId = document?.fileId
     if (typeof fileId !== 'string') {
       return NextResponse.json({ message: 'Berkas tidak ditemukan.' }, { status: 404 })

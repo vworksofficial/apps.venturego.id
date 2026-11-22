@@ -5,12 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
-import {
-  DashboardCard,
-  DashboardIcon,
-  DashboardScaffold,
-  SkeletonBlock,
-} from '../_components/dashboard-ui'
+import { DashboardIcon, DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
 import { getOwnedApplications, type OwnedApplication } from '../unggah-berkas/actions'
 import {
   EMPTY_REGISTRATION_FORM_DATA,
@@ -167,25 +162,21 @@ function RegistrationFormContent() {
         subtitle="Memuat formulir pendaftaran..."
         title="Form Pendaftaran"
       >
-        <DashboardCard>
-          <div className="space-y-4 p-5">
-            <SkeletonBlock className="h-6 w-44" />
-            <SkeletonBlock className="h-4 w-full" />
-            <SkeletonBlock className="h-10 w-full" />
-            <SkeletonBlock className="h-10 w-full" />
-          </div>
-        </DashboardCard>
+        <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5">
+          <SkeletonBlock className="h-6 w-44" />
+          <SkeletonBlock className="h-4 w-full" />
+          <SkeletonBlock className="h-10 w-full" />
+          <SkeletonBlock className="h-10 w-full" />
+        </div>
       </DashboardScaffold>
     )
   }
-
-  const activeApp = applications.find((app) => app.id === selectedAppId)
 
   return (
     <DashboardScaffold
       active="berkas"
       backHref="/dashboard/unggah-berkas"
-      subtitle="Data Pemohon & Kontak Emergency"
+      subtitle="Data Pemohon, Kontak Darurat, & Pekerjaan"
       title="Form Pendaftaran"
     >
       <div className="flex items-center justify-between gap-3">
@@ -204,24 +195,22 @@ function RegistrationFormContent() {
       </div>
 
       {applications.length > 1 && (
-        <DashboardCard>
-          <div className="p-4">
-            <label className="block text-xs font-semibold text-slate-600">
-              Pilih Pengajuan
-              <select
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                onChange={(e) => setSelectedAppId(e.target.value)}
-                value={selectedAppId}
-              >
-                {applications.map((app) => (
-                  <option key={app.id} value={app.id}>
-                    {app.applicationId} · {app.applicantName}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </DashboardCard>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4">
+          <label className="block text-xs font-semibold text-slate-700">
+            Pilih Pengajuan
+            <select
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
+              onChange={(e) => setSelectedAppId(e.target.value)}
+              value={selectedAppId}
+            >
+              {applications.map((app) => (
+                <option key={app.id} value={app.id}>
+                  {app.applicationId} · {app.applicantName}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       )}
 
       {errorMessage && (
@@ -244,791 +233,801 @@ function RegistrationFormContent() {
 
       <form className="space-y-6" onSubmit={handleSubmit}>
         {/* ================= SECTION 1: DATA PEMOHON ================= */}
-        <section aria-labelledby="section-pemohon">
-          <div className="mb-3 flex items-center gap-2 px-1">
-            <div className="grid size-6 place-items-center rounded-lg bg-teal-600 text-xs font-extrabold text-white">
-              1
+        <section
+          aria-labelledby="section-pemohon"
+          className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-4"
+        >
+          <div className="border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="grid size-6 place-items-center rounded-lg bg-teal-600 text-xs font-extrabold text-white">
+                1
+              </span>
+              <h2 className="text-sm font-bold text-slate-900" id="section-pemohon">
+                Data Pemohon
+              </h2>
             </div>
-            <h2 className="text-sm font-bold text-slate-900" id="section-pemohon">
-              Data Pemohon
-            </h2>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Identitas lengkap siswa pemohon pembiayaan
+            </p>
           </div>
 
-          <DashboardCard>
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Nama Lengkap <span className="text-red-500">*</span>
-                </label>
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                  onChange={(e) => updateField('fullName', e.target.value)}
-                  placeholder="Sesuai KTP"
-                  required
-                  type="text"
-                  value={formData.fullName}
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Nama Lengkap <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('fullName', e.target.value)}
+              placeholder="Sesuai KTP"
+              required
+              type="text"
+              value={formData.fullName}
+            />
+          </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    No. KTP <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={16}
-                    onChange={(e) => updateField('idCardNumber', e.target.value.replace(/\D/g, ''))}
-                    placeholder="16 digit NIK"
-                    required
-                    type="text"
-                    value={formData.idCardNumber}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Nama Gadis Ibu Kandung <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('motherMaidenName', e.target.value)}
-                    placeholder="Nama lengkap ibu kandung"
-                    required
-                    type="text"
-                    value={formData.motherMaidenName}
-                  />
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              No. KTP <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              maxLength={16}
+              onChange={(e) => updateField('idCardNumber', e.target.value.replace(/\D/g, ''))}
+              placeholder="16 digit NIK"
+              required
+              type="text"
+              value={formData.idCardNumber}
+            />
+          </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    NPWP <span className="text-slate-400 font-normal">(opsional)</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('npwp', e.target.value)}
-                    placeholder="Nomor pokok wajib pajak"
-                    type="text"
-                    value={formData.npwp}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('email', e.target.value)}
-                    placeholder="alamat@email.com"
-                    required
-                    type="email"
-                    value={formData.email}
-                  />
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Nama Gadis Ibu Kandung <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('motherMaidenName', e.target.value)}
+              placeholder="Nama lengkap ibu kandung"
+              required
+              type="text"
+              value={formData.motherMaidenName}
+            />
+          </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Alamat Rumah Terkini <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                  onChange={(e) => updateField('address', e.target.value)}
-                  placeholder="Jalan, No. Rumah, Dusun / Lingkungan"
-                  required
-                  rows={2}
-                  value={formData.address}
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              NPWP <span className="text-slate-400 font-normal">(opsional)</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('npwp', e.target.value)}
+              placeholder="Nomor pokok wajib pajak"
+              type="text"
+              value={formData.npwp}
+            />
+          </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">RT</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={3}
-                    onChange={(e) => updateField('rt', e.target.value)}
-                    placeholder="001"
-                    type="text"
-                    value={formData.rt}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">RW</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={3}
-                    onChange={(e) => updateField('rw', e.target.value)}
-                    placeholder="002"
-                    type="text"
-                    value={formData.rw}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Kelurahan</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('kelurahan', e.target.value)}
-                    placeholder="Desa / Kelurahan"
-                    type="text"
-                    value={formData.kelurahan}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Kecamatan</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('kecamatan', e.target.value)}
-                    placeholder="Kecamatan"
-                    type="text"
-                    value={formData.kecamatan}
-                  />
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Email <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('email', e.target.value)}
+              placeholder="alamat@email.com"
+              required
+              type="email"
+              value={formData.email}
+            />
+          </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Kota / Kabupaten <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('city', e.target.value)}
-                    placeholder="Contoh: Kab. Wonosobo"
-                    required
-                    type="text"
-                    value={formData.city}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Kode Pos</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={5}
-                    onChange={(e) => updateField('postalCode', e.target.value)}
-                    placeholder="5 digit"
-                    type="text"
-                    value={formData.postalCode}
-                  />
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Alamat Rumah Terkini <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('address', e.target.value)}
+              placeholder="Jalan, No. Rumah, Dusun / Lingkungan"
+              required
+              rows={2}
+              value={formData.address}
+            />
+          </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    No. Telepon Rumah
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('homePhone', e.target.value)}
-                    placeholder="Opsional"
-                    type="tel"
-                    value={formData.homePhone}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    No. Handphone / WhatsApp <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('mobilePhone', e.target.value)}
-                    placeholder="0812xxxx"
-                    required
-                    type="tel"
-                    value={formData.mobilePhone}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Jam Hubungi (Mulai)
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('contactHourStart', e.target.value)}
-                    placeholder="08.00"
-                    type="text"
-                    value={formData.contactHourStart}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Jam Hubungi (Selesai)
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('contactHourEnd', e.target.value)}
-                    placeholder="17.00"
-                    type="text"
-                    value={formData.contactHourEnd}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Zona Waktu</label>
-                  <select
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('contactTimeZone', e.target.value)}
-                    value={formData.contactTimeZone}
-                  >
-                    <option value="WIB">WIB</option>
-                    <option value="WITA">WITA</option>
-                    <option value="WIT">WIT</option>
-                    <option value="Waktu Jepang">Waktu Jepang</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Tempat Lahir <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('birthPlace', e.target.value)}
-                    placeholder="Kota Lahir"
-                    required
-                    type="text"
-                    value={formData.birthPlace}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Jenis Kelamin <span className="text-red-500">*</span>
-                  </label>
-                  <div className="mt-1.5 flex gap-2">
-                    <button
-                      className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
-                        formData.gender === 'LAKI_LAKI'
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                      onClick={() => updateField('gender', 'LAKI_LAKI')}
-                      type="button"
-                    >
-                      Laki-laki
-                    </button>
-                    <button
-                      className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
-                        formData.gender === 'PEREMPUAN'
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                      onClick={() => updateField('gender', 'PEREMPUAN')}
-                      type="button"
-                    >
-                      Perempuan
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Agama</label>
-                  <select
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) =>
-                      updateField('religion', e.target.value as RegistrationFormData['religion'])
-                    }
-                    value={formData.religion}
-                  >
-                    <option value="ISLAM">Islam</option>
-                    <option value="PROTESTAN">Protestan</option>
-                    <option value="KATHOLIK">Katholik</option>
-                    <option value="HINDU">Hindu</option>
-                    <option value="BUDHA">Budha</option>
-                    <option value="KONG_HU_CHU">Kong Hu Chu</option>
-                    <option value="LAINNYA">Lainnya</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Jumlah Tanggungan
-                  </label>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <input
-                      className="w-24 rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      min={0}
-                      onChange={(e) => updateField('dependentsCount', Number(e.target.value) || 0)}
-                      type="number"
-                      value={formData.dependentsCount}
-                    />
-                    <span className="text-xs text-slate-600">Orang</span>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Pendidikan Terakhir
-                </label>
-                <select
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                  onChange={(e) =>
-                    updateField(
-                      'lastEducation',
-                      e.target.value as RegistrationFormData['lastEducation'],
-                    )
-                  }
-                  value={formData.lastEducation}
-                >
-                  <option value="SD">SD</option>
-                  <option value="SMP">SMP</option>
-                  <option value="SMA_SEDERAJAT">SMA / SMK / Sederajat</option>
-                  <option value="D1">D1</option>
-                  <option value="D2">D2</option>
-                  <option value="D3">D3</option>
-                  <option value="D4">D4</option>
-                  <option value="S1">S1</option>
-                  <option value="S2">S2</option>
-                  <option value="S3">S3</option>
-                </select>
-              </div>
-
-              {/* Rincian Pekerjaan di Negara Tertuju */}
-              <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4 space-y-3">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                  Pekerjaan di Negara Tertuju
-                </h3>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Negara Tertuju
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('destinationCountry', e.target.value)}
-                      placeholder="JEPANG / TURKIYE"
-                      type="text"
-                      value={formData.destinationCountry}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Nama Perusahaan
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('companyName', e.target.value)}
-                      placeholder="Nama perusahaan di negara tujuan"
-                      type="text"
-                      value={formData.companyName}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Bidang Usaha
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('companyBusiness', e.target.value)}
-                      placeholder="Contoh: Manufaktur, Pertanian, Perhotelan"
-                      type="text"
-                      value={formData.companyBusiness}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Posisi / Peran
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('companyRole', e.target.value)}
-                      placeholder="Operator, Staff, dsb."
-                      type="text"
-                      value={formData.companyRole}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Alamat Perusahaan
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('companyAddress', e.target.value)}
-                      placeholder="Alamat kantor / pabrik"
-                      type="text"
-                      value={formData.companyAddress}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Kota Perusahaan
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('companyCity', e.target.value)}
-                      placeholder="Kota di negara tujuan"
-                      type="text"
-                      value={formData.companyCity}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      No. Telp Perusahaan
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('companyPhone', e.target.value)}
-                      placeholder="Opsional"
-                      type="text"
-                      value={formData.companyPhone}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Mulai Bekerja
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('workStartDate', e.target.value)}
-                      placeholder="DD/MM/YYYY"
-                      type="text"
-                      value={formData.workStartDate}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Status Pekerjaan
-                    </label>
-                    <select
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) =>
-                        updateField(
-                          'employmentStatus',
-                          e.target.value as RegistrationFormData['employmentStatus'],
-                        )
-                      }
-                      value={formData.employmentStatus}
-                    >
-                      <option value="MAGANG">Magang</option>
-                      <option value="KONTRAK">Kontrak</option>
-                      <option value="LAINNYA">Lainnya</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {formData.employmentStatus === 'LAINNYA' && (
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600">
-                        Keterangan Status
-                      </label>
-                      <input
-                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                        onChange={(e) => updateField('employmentStatusOther', e.target.value)}
-                        placeholder="Sebutkan..."
-                        type="text"
-                        value={formData.employmentStatusOther}
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Pendapatan Bulanan (Rp)
-                    </label>
-                    <input
-                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      min={0}
-                      onChange={(e) => updateField('monthlyIncome', Number(e.target.value) || 0)}
-                      placeholder="Contoh: 15000000"
-                      type="number"
-                      value={formData.monthlyIncome || ''}
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* RT dan RW dalam 1 row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">RT</label>
+              <input
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                maxLength={3}
+                onChange={(e) => updateField('rt', e.target.value)}
+                placeholder="001"
+                type="text"
+                value={formData.rt}
+              />
             </div>
-          </DashboardCard>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">RW</label>
+              <input
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                maxLength={3}
+                onChange={(e) => updateField('rw', e.target.value)}
+                placeholder="002"
+                type="text"
+                value={formData.rw}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kelurahan / Desa</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('kelurahan', e.target.value)}
+              placeholder="Desa / Kelurahan"
+              type="text"
+              value={formData.kelurahan}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kecamatan</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('kecamatan', e.target.value)}
+              placeholder="Kecamatan"
+              type="text"
+              value={formData.kecamatan}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Kota / Kabupaten <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('city', e.target.value)}
+              placeholder="Contoh: Kab. Wonosobo"
+              required
+              type="text"
+              value={formData.city}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kode Pos</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              maxLength={5}
+              onChange={(e) => updateField('postalCode', e.target.value)}
+              placeholder="5 digit"
+              type="text"
+              value={formData.postalCode}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">No. Telepon Rumah</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('homePhone', e.target.value)}
+              placeholder="Opsional"
+              type="tel"
+              value={formData.homePhone}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              No. Handphone / WhatsApp <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('mobilePhone', e.target.value)}
+              placeholder="0812xxxx"
+              required
+              type="tel"
+              value={formData.mobilePhone}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Dapat Dihubungi Pada Jam
+            </label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('contactHourStart', e.target.value)}
+                placeholder="08.00"
+                type="text"
+                value={formData.contactHourStart}
+              />
+              <span className="text-xs text-slate-400">-</span>
+              <input
+                className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('contactHourEnd', e.target.value)}
+                placeholder="17.00"
+                type="text"
+                value={formData.contactHourEnd}
+              />
+              <select
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('contactTimeZone', e.target.value)}
+                value={formData.contactTimeZone}
+              >
+                <option value="WIB">WIB</option>
+                <option value="WITA">WITA</option>
+                <option value="WIT">WIT</option>
+                <option value="Waktu Jepang">Waktu Jepang</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Tempat Lahir <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('birthPlace', e.target.value)}
+              placeholder="Kota Lahir"
+              required
+              type="text"
+              value={formData.birthPlace}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Tanggal Lahir</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('birthDate', e.target.value)}
+              placeholder="DD/MM/YYYY"
+              type="text"
+              value={formData.birthDate}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Jenis Kelamin <span className="text-red-500">*</span>
+            </label>
+            <div className="mt-1.5 flex gap-2">
+              <button
+                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+                  formData.gender === 'LAKI_LAKI'
+                    ? 'border-teal-600 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                onClick={() => updateField('gender', 'LAKI_LAKI')}
+                type="button"
+              >
+                Laki-laki
+              </button>
+              <button
+                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+                  formData.gender === 'PEREMPUAN'
+                    ? 'border-teal-600 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                onClick={() => updateField('gender', 'PEREMPUAN')}
+                type="button"
+              >
+                Perempuan
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Agama</label>
+            <select
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) =>
+                updateField('religion', e.target.value as RegistrationFormData['religion'])
+              }
+              value={formData.religion}
+            >
+              <option value="ISLAM">Islam</option>
+              <option value="PROTESTAN">Protestan</option>
+              <option value="KATHOLIK">Katholik</option>
+              <option value="HINDU">Hindu</option>
+              <option value="BUDHA">Budha</option>
+              <option value="KONG_HU_CHU">Kong Hu Chu</option>
+              <option value="LAINNYA">Lainnya</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Jumlah Tanggungan</label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                className="w-28 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                min={0}
+                onChange={(e) => updateField('dependentsCount', Number(e.target.value) || 0)}
+                type="number"
+                value={formData.dependentsCount}
+              />
+              <span className="text-xs text-slate-600">Orang</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Pendidikan Terakhir
+            </label>
+            <select
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) =>
+                updateField(
+                  'lastEducation',
+                  e.target.value as RegistrationFormData['lastEducation'],
+                )
+              }
+              value={formData.lastEducation}
+            >
+              <option value="SD">SD</option>
+              <option value="SMP">SMP</option>
+              <option value="SMA_SEDERAJAT">SMA / SMK / Sederajat</option>
+              <option value="D1">D1</option>
+              <option value="D2">D2</option>
+              <option value="D3">D3</option>
+              <option value="D4">D4</option>
+              <option value="S1">S1</option>
+              <option value="S2">S2</option>
+              <option value="S3">S3</option>
+            </select>
+          </div>
         </section>
 
         {/* ================= SECTION 2: KONTAK EMERGENCY ================= */}
-        <section aria-labelledby="section-emergency">
-          <div className="mb-3 flex items-center gap-2 px-1">
-            <div className="grid size-6 place-items-center rounded-lg bg-teal-600 text-xs font-extrabold text-white">
-              2
+        <section
+          aria-labelledby="section-emergency"
+          className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-4"
+        >
+          <div className="border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="grid size-6 place-items-center rounded-lg bg-teal-600 text-xs font-extrabold text-white">
+                2
+              </span>
+              <h2 className="text-sm font-bold text-slate-900" id="section-emergency">
+                Kontak Emergency (Darurat)
+              </h2>
             </div>
-            <h2 className="text-sm font-bold text-slate-900" id="section-emergency">
-              Kontak Emergency (Darurat)
-            </h2>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Keluarga atau kerabat yang dapat dihubungi dalam keadaan darurat
+            </p>
           </div>
 
-          <DashboardCard>
-            <div className="space-y-4 p-5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Nama Lengkap Kontak Darurat <span className="text-red-500">*</span>
-                </label>
-                <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                  onChange={(e) => updateField('emergencyName', e.target.value)}
-                  placeholder="Nama lengkap wali / kerabat"
-                  required
-                  type="text"
-                  value={formData.emergencyName}
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Nama Lengkap Kontak Darurat <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyName', e.target.value)}
+              placeholder="Nama lengkap wali / kerabat"
+              required
+              type="text"
+              value={formData.emergencyName}
+            />
+          </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Hubungan</label>
-                  <select
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) =>
-                      updateField(
-                        'emergencyRelation',
-                        e.target.value as RegistrationFormData['emergencyRelation'],
-                      )
-                    }
-                    value={formData.emergencyRelation}
-                  >
-                    <option value="ORANG_TUA">Orang Tua</option>
-                    <option value="ANAK">Anak</option>
-                    <option value="SAUDARA_KANDUNG">Saudara Kandung</option>
-                    <option value="SAUDARA_KANDUNG_ORANG_TUA">
-                      Saudara Kandung Orang Tua (Paman/Bibi)
-                    </option>
-                    <option value="LAINNYA">Lainnya</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Jenis Kelamin
-                  </label>
-                  <div className="mt-1.5 flex gap-2">
-                    <button
-                      className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
-                        formData.emergencyGender === 'LAKI_LAKI'
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                      onClick={() => updateField('emergencyGender', 'LAKI_LAKI')}
-                      type="button"
-                    >
-                      Laki-laki
-                    </button>
-                    <button
-                      className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
-                        formData.emergencyGender === 'PEREMPUAN'
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                      onClick={() => updateField('emergencyGender', 'PEREMPUAN')}
-                      type="button"
-                    >
-                      Perempuan
-                    </button>
-                  </div>
-                </div>
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Hubungan</label>
+            <select
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) =>
+                updateField(
+                  'emergencyRelation',
+                  e.target.value as RegistrationFormData['emergencyRelation'],
+                )
+              }
+              value={formData.emergencyRelation}
+            >
+              <option value="ORANG_TUA">Orang Tua</option>
+              <option value="ANAK">Anak</option>
+              <option value="SAUDARA_KANDUNG">Saudara Kandung</option>
+              <option value="SAUDARA_KANDUNG_ORANG_TUA">
+                Saudara Kandung Orang Tua (Paman/Bibi)
+              </option>
+              <option value="LAINNYA">Lainnya</option>
+            </select>
+          </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    No. Telepon Rumah
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('emergencyPhone', e.target.value)}
-                    placeholder="Opsional"
-                    type="tel"
-                    value={formData.emergencyPhone}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    No. Handphone / WhatsApp <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('emergencyMobile', e.target.value)}
-                    placeholder="08xxxxxxxx"
-                    required
-                    type="tel"
-                    value={formData.emergencyMobile}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700">
-                  Alamat Tempat Tinggal <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                  onChange={(e) => updateField('emergencyAddress', e.target.value)}
-                  placeholder="Alamat tempat tinggal kontak darurat"
-                  required
-                  rows={2}
-                  value={formData.emergencyAddress}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">RT</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={3}
-                    onChange={(e) => updateField('emergencyRt', e.target.value)}
-                    placeholder="001"
-                    type="text"
-                    value={formData.emergencyRt}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">RW</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={3}
-                    onChange={(e) => updateField('emergencyRw', e.target.value)}
-                    placeholder="002"
-                    type="text"
-                    value={formData.emergencyRw}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Kelurahan</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('emergencyKelurahan', e.target.value)}
-                    placeholder="Desa"
-                    type="text"
-                    value={formData.emergencyKelurahan}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Kecamatan</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('emergencyKecamatan', e.target.value)}
-                    placeholder="Kecamatan"
-                    type="text"
-                    value={formData.emergencyKecamatan}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Kota / Kabupaten
-                  </label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    onChange={(e) => updateField('emergencyCity', e.target.value)}
-                    placeholder="Kota domisili"
-                    type="text"
-                    value={formData.emergencyCity}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">Kode Pos</label>
-                  <input
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                    maxLength={5}
-                    onChange={(e) => updateField('emergencyPostalCode', e.target.value)}
-                    placeholder="5 digit"
-                    type="text"
-                    value={formData.emergencyPostalCode}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Status Tempat Tinggal
-                  </label>
-                  <div className="mt-1.5 flex gap-2">
-                    <button
-                      className={`flex-1 rounded-xl border py-2.5 text-[11px] font-semibold transition ${
-                        formData.emergencyCohabitation === 'TINGGAL_SERUMAH'
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                      onClick={() => updateField('emergencyCohabitation', 'TINGGAL_SERUMAH')}
-                      type="button"
-                    >
-                      Tinggal Serumah
-                    </button>
-                    <button
-                      className={`flex-1 rounded-xl border py-2.5 text-[11px] font-semibold transition ${
-                        formData.emergencyCohabitation === 'TIDAK_TINGGAL_SERUMAH'
-                          ? 'border-teal-600 bg-teal-50 text-teal-800'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                      onClick={() => updateField('emergencyCohabitation', 'TIDAK_TINGGAL_SERUMAH')}
-                      type="button"
-                    >
-                      Tidak Serumah
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Dapat Dihubungi Pada Jam
-                  </label>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <input
-                      className="w-20 rounded-xl border border-slate-200 px-2 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('emergencyContactHourStart', e.target.value)}
-                      placeholder="08.00"
-                      type="text"
-                      value={formData.emergencyContactHourStart}
-                    />
-                    <span className="text-xs text-slate-400">-</span>
-                    <input
-                      className="w-20 rounded-xl border border-slate-200 px-2 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none"
-                      onChange={(e) => updateField('emergencyContactHourEnd', e.target.value)}
-                      placeholder="17.00"
-                      type="text"
-                      value={formData.emergencyContactHourEnd}
-                    />
-                    <span className="text-xs text-slate-600">WIB</span>
-                  </div>
-                </div>
-              </div>
+          {formData.emergencyRelation === 'LAINNYA' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Keterangan Hubungan
+              </label>
+              <input
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('emergencyRelationOther', e.target.value)}
+                placeholder="Contoh: Mertua, Sepupu"
+                type="text"
+                value={formData.emergencyRelationOther}
+              />
             </div>
-          </DashboardCard>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Jenis Kelamin</label>
+            <div className="mt-1.5 flex gap-2">
+              <button
+                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+                  formData.emergencyGender === 'LAKI_LAKI'
+                    ? 'border-teal-600 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                onClick={() => updateField('emergencyGender', 'LAKI_LAKI')}
+                type="button"
+              >
+                Laki-laki
+              </button>
+              <button
+                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+                  formData.emergencyGender === 'PEREMPUAN'
+                    ? 'border-teal-600 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                onClick={() => updateField('emergencyGender', 'PEREMPUAN')}
+                type="button"
+              >
+                Perempuan
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">No. Telepon Rumah</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyPhone', e.target.value)}
+              placeholder="Opsional"
+              type="tel"
+              value={formData.emergencyPhone}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              No. Handphone / WhatsApp <span className="text-red-500">*</span>
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyMobile', e.target.value)}
+              placeholder="08xxxxxxxx"
+              required
+              type="tel"
+              value={formData.emergencyMobile}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Alamat Tempat Tinggal <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyAddress', e.target.value)}
+              placeholder="Alamat tempat tinggal kontak darurat"
+              required
+              rows={2}
+              value={formData.emergencyAddress}
+            />
+          </div>
+
+          {/* RT dan RW kontak darurat dalam 1 row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">RT</label>
+              <input
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                maxLength={3}
+                onChange={(e) => updateField('emergencyRt', e.target.value)}
+                placeholder="001"
+                type="text"
+                value={formData.emergencyRt}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">RW</label>
+              <input
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                maxLength={3}
+                onChange={(e) => updateField('emergencyRw', e.target.value)}
+                placeholder="002"
+                type="text"
+                value={formData.emergencyRw}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kelurahan / Desa</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyKelurahan', e.target.value)}
+              placeholder="Desa"
+              type="text"
+              value={formData.emergencyKelurahan}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kecamatan</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyKecamatan', e.target.value)}
+              placeholder="Kecamatan"
+              type="text"
+              value={formData.emergencyKecamatan}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kota / Kabupaten</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('emergencyCity', e.target.value)}
+              placeholder="Kota domisili"
+              type="text"
+              value={formData.emergencyCity}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kode Pos</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              maxLength={5}
+              onChange={(e) => updateField('emergencyPostalCode', e.target.value)}
+              placeholder="5 digit"
+              type="text"
+              value={formData.emergencyPostalCode}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Status Tempat Tinggal
+            </label>
+            <div className="mt-1.5 flex gap-2">
+              <button
+                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+                  formData.emergencyCohabitation === 'TINGGAL_SERUMAH'
+                    ? 'border-teal-600 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                onClick={() => updateField('emergencyCohabitation', 'TINGGAL_SERUMAH')}
+                type="button"
+              >
+                Tinggal Serumah
+              </button>
+              <button
+                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+                  formData.emergencyCohabitation === 'TIDAK_TINGGAL_SERUMAH'
+                    ? 'border-teal-600 bg-teal-50 text-teal-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                onClick={() => updateField('emergencyCohabitation', 'TIDAK_TINGGAL_SERUMAH')}
+                type="button"
+              >
+                Tidak Serumah
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Dapat Dihubungi Pada Jam
+            </label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('emergencyContactHourStart', e.target.value)}
+                placeholder="08.00"
+                type="text"
+                value={formData.emergencyContactHourStart}
+              />
+              <span className="text-xs text-slate-400">-</span>
+              <input
+                className="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('emergencyContactHourEnd', e.target.value)}
+                placeholder="17.00"
+                type="text"
+                value={formData.emergencyContactHourEnd}
+              />
+              <span className="text-xs font-semibold text-slate-600">WIB</span>
+            </div>
+          </div>
         </section>
 
-        {/* Submit action */}
+        {/* ================= SECTION 3: PEKERJAAN DI NEGARA TERTUJU ================= */}
+        <section
+          aria-labelledby="section-pekerjaan"
+          className="rounded-2xl border border-slate-200/80 bg-white p-5 space-y-4"
+        >
+          <div className="border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <span className="grid size-6 place-items-center rounded-lg bg-teal-600 text-xs font-extrabold text-white">
+                3
+              </span>
+              <h2 className="text-sm font-bold text-slate-900" id="section-pekerjaan">
+                Pekerjaan di Negara Tertuju
+              </h2>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Rincian kontrak kerja dan perusahaan penempatan di negara tujuan
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Negara Tertuju</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('destinationCountry', e.target.value)}
+              placeholder="Contoh: JEPANG / TURKIYE"
+              type="text"
+              value={formData.destinationCountry}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Nama Perusahaan</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('companyName', e.target.value)}
+              placeholder="Nama perusahaan penerima di negara tujuan"
+              type="text"
+              value={formData.companyName}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Bidang Usaha</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('companyBusiness', e.target.value)}
+              placeholder="Contoh: Manufaktur, Pertanian, Perhotelan"
+              type="text"
+              value={formData.companyBusiness}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Posisi / Peran</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('companyRole', e.target.value)}
+              placeholder="Operator Pabrik, Caregiver, dsb."
+              type="text"
+              value={formData.companyRole}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Alamat Perusahaan</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('companyAddress', e.target.value)}
+              placeholder="Alamat kantor atau lokasi kerja"
+              type="text"
+              value={formData.companyAddress}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Kota Perusahaan</label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('companyCity', e.target.value)}
+              placeholder="Prefektur / Kota di negara tujuan"
+              type="text"
+              value={formData.companyCity}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              No. Telepon Perusahaan
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('companyPhone', e.target.value)}
+              placeholder="Opsional"
+              type="text"
+              value={formData.companyPhone}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Tanggal Mulai Bekerja
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) => updateField('workStartDate', e.target.value)}
+              placeholder="DD/MM/YYYY"
+              type="text"
+              value={formData.workStartDate}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">Status Pekerjaan</label>
+            <select
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              onChange={(e) =>
+                updateField(
+                  'employmentStatus',
+                  e.target.value as RegistrationFormData['employmentStatus'],
+                )
+              }
+              value={formData.employmentStatus}
+            >
+              <option value="MAGANG">Magang</option>
+              <option value="KONTRAK">Kontrak</option>
+              <option value="LAINNYA">Lainnya</option>
+            </select>
+          </div>
+
+          {formData.employmentStatus === 'LAINNYA' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Keterangan Status Pekerjaan
+              </label>
+              <input
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                onChange={(e) => updateField('employmentStatusOther', e.target.value)}
+                placeholder="Sebutkan..."
+                type="text"
+                value={formData.employmentStatusOther}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Lama Kontrak (Tahun)
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              maxLength={2}
+              onChange={(e) => updateField('contractDurationYears', e.target.value)}
+              placeholder="Contoh: 1, 3, atau 5"
+              type="text"
+              value={formData.contractDurationYears}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700">
+              Pendapatan Bulanan (Rp)
+            </label>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              min={0}
+              onChange={(e) => updateField('monthlyIncome', Number(e.target.value) || 0)}
+              placeholder="Contoh: 15000000"
+              type="number"
+              value={formData.monthlyIncome || ''}
+            />
+          </div>
+        </section>
+
+        {/* Tombol Simpan */}
         <div className="pt-2">
           <button
-            className="w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-xs font-bold text-white shadow-lg transition hover:from-teal-700 hover:to-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+            className="w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 py-3.5 text-xs font-bold text-white shadow-md transition hover:from-teal-700 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             disabled={submitting}
             type="submit"
           >
-            {submitting ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                <span>Menyusun dan Menerbitkan PDF Form...</span>
-              </span>
-            ) : (
-              'Simpan & Terbitkan Formulir PDF'
-            )}
+            {submitting ? 'Menyimpan…' : 'Simpan'}
           </button>
-          <p className="mt-2 text-center text-[11px] text-slate-400">
-            Dokumen PDF resmi akan otomatis diterbitkan dan tersimpan di slot berkas pendaftaran
-            Anda.
-          </p>
         </div>
       </form>
     </DashboardScaffold>

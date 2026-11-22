@@ -397,6 +397,22 @@ export const downloadDriveFile = async (fileId: string): Promise<Uint8Array> => 
   return new Uint8Array(await response.arrayBuffer())
 }
 
+export const exportDriveFileAsPdf = async (fileId: string): Promise<Uint8Array> => {
+  if (!FILE_ID_PATTERN.test(fileId)) {
+    throw new GDriveError('Identitas berkas tidak valid.', 'INVALID')
+  }
+  const response = await driveFetch(
+    `/drive/v3/files/${fileId}/export?mimeType=${encodeURIComponent('application/pdf')}`,
+  )
+  if (!response.ok) {
+    throw new GDriveError(
+      'Berkas tidak dapat diekspor sebagai PDF dari penyimpanan.',
+      response.status === 404 ? 'INVALID' : 'UPSTREAM',
+    )
+  }
+  return new Uint8Array(await response.arrayBuffer())
+}
+
 export const deleteDriveFile = async (fileId: string): Promise<boolean> => {
   if (!FILE_ID_PATTERN.test(fileId)) return false
   try {

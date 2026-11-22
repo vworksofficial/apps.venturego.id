@@ -18,6 +18,7 @@ import {
   approveApplicationDocument,
   approveApplicationPricing,
   cancelAkadDocumentIssuance,
+  auditAndCleanDriveOrphans,
   deleteApplicationDocument,
   deleteApplicationAkadPhoto,
   issueAkadDocument,
@@ -933,6 +934,9 @@ function ApplicationDrawerForm({
   const [akadPdfSaving, setAkadPdfSaving] = useState(false)
   const [akadPdfError, setAkadPdfError] = useState('')
   const akadPreviewFrameRef = useRef<HTMLIFrameElement>(null)
+
+  const [driveCleanupPending, setDriveCleanupPending] = useState(false)
+  const [driveCleanupResult, setDriveCleanupResult] = useState('')
 
   const router = useRouter()
 
@@ -2059,22 +2063,95 @@ function ApplicationDrawerForm({
 
         {/* TAB: DOCUMENTS */}
         <div className={activeTab === 'documents' ? 'block space-y-4' : 'hidden'}>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
-            <span>
-              Terunggah:{' '}
-              <strong>
-                {uploadedCount}/{application.documents.length}
-              </strong>
-            </span>
-            <span>
-              Menunggu tinjauan: <strong className="text-amber-700">{reviewCount}</strong>
-            </span>
-            <span>
-              Sesuai: <strong className="text-emerald-700">{verifiedCount}</strong>
-            </span>
-            <span>
-              Tidak sesuai: <strong className="text-red-700">{revisionCount}</strong>
-            </span>
+          <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <span>
+                Terunggah:{' '}
+                <strong>
+                  {uploadedCount}/{application.documents.length}
+                </strong>
+              </span>
+              <span>
+                Menunggu tinjauan: <strong className="text-amber-700">{reviewCount}</strong>
+              </span>
+              <span>
+                Sesuai: <strong className="text-emerald-700">{verifiedCount}</strong>
+              </span>
+              <span>
+                Tidak sesuai: <strong className="text-red-700">{revisionCount}</strong>
+              </span>
+            </div>
+            {application.driveFolderId && (
+              <div className="flex items-center gap-2">
+                {driveCleanupResult && (
+                  <span
+                    className={`text-[11px] font-medium ${driveCleanupResult.startsWith('✓') ? 'text-emerald-700' : 'text-red-600'}`}
+                  >
+                    {driveCleanupResult}
+                  </span>
+                )}
+                <button
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600 transition hover:border-amber-300 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={driveCleanupPending || pending}
+                  onClick={async () => {
+                    setDriveCleanupPending(true)
+                    setDriveCleanupResult('')
+                    const result = await auditAndCleanDriveOrphans(application.id)
+                    if (result.ok) {
+                      setDriveCleanupResult(
+                        result.deleted === 0
+                          ? `✓ Drive bersih (${result.total} berkas)`
+                          : `✓ ${result.deleted} orphan dihapus dari ${result.total}`,
+                      )
+                    } else {
+                      setDriveCleanupResult(`✗ ${result.message}`)
+                    }
+                    setDriveCleanupPending(false)
+                  }}
+                  title="Bandingkan berkas di Google Drive dengan data Firestore, lalu hapus yang tidak ter-referensi"
+                  type="button"
+                >
+                  {driveCleanupPending ? (
+                    <svg
+                      aria-hidden="true"
+                      className="size-3 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      aria-hidden="true"
+                      className="size-3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                  Bersihkan Drive
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="overflow-hidden rounded-xl border border-slate-200">

@@ -106,6 +106,7 @@ export type FinancingApplicationRecord = {
   acceptsDataProcessing: boolean
   internalNotes?: string
   departureDate?: string
+  driveFolderId?: string
   registrationForm?: Record<string, unknown>
 }
 

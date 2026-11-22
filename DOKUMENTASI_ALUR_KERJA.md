@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (style(pdf): header dan footer PDF Form Pendaftaran diselaraskan dengan dokumen Akad — header menampilkan identitas PT VWORKS KOLABORASI BERSAMA di kanan dan brand "Vworks Student Venture" di kiri; footer menampilkan label program dan nomor halaman, tanpa box paraf.)
+Terakhir diperbarui: **22 November 2026** (feat(admin): sinkronisasi berkas Google Drive — tombol "Bersihkan Drive" di tab Berkas admin untuk menghapus file orphan (tidak ter-referensi di Firestore); delete dokumen admin kini mencatat fileId ke `pendingDeleteFileIds` jika Drive API gagal, dan dibersihkan otomatis saat cleanup dijalankan.)
 
 ---
 

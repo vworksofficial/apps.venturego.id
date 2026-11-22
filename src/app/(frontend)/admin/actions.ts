@@ -13,7 +13,7 @@ import {
   type DepartureFinancials,
   type FinancingCostLine,
 } from '@/lib/departure-financing'
-import { deleteDriveFile, uploadDriveFile } from '@/lib/gdrive'
+import { deleteDriveFile, listDriveFilesInFolder, uploadDriveFile } from '@/lib/gdrive'
 import {
   ensureApplicationDriveFolder,
   promoteApplicationFolder,
@@ -925,11 +925,7 @@ export async function deleteApplicationDocument(
       return { ok: false, message: 'Berkas tidak ditemukan.' }
     }
     const fileId = target.fileId
-    try {
-      await deleteDriveFile(fileId)
-    } catch {
-      // Best-effort: rekaman tetap diperbarui bila Drive sedang tidak tersedia.
-    }
+    const driveDeleted = await deleteDriveFile(fileId)
     const documents = currentDocuments.map((document: Record<string, unknown>, index: number) => {
       if (index !== documentIndex) return document
       const next: Record<string, unknown> = { ...document, status: 'REVISION_REQUIRED' }
@@ -939,14 +935,82 @@ export async function deleteApplicationDocument(
       delete next.size
       return next
     })
-    await applicationRef.update({
+    // If Drive delete failed, queue the fileId for later cleanup
+    const pendingUpdates: Record<string, unknown> = {
       documents,
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: staff?.email ?? staff?.uid,
-    })
+    }
+    if (!driveDeleted) {
+      const existingPending = Array.isArray(application.data()?.pendingDeleteFileIds)
+        ? (application.data()!.pendingDeleteFileIds as string[])
+        : []
+      pendingUpdates.pendingDeleteFileIds = [...new Set([...existingPending, fileId])]
+    }
+    await applicationRef.update(pendingUpdates)
     return { ok: true }
   } catch {
     return { ok: false, message: 'Dokumen belum dapat dihapus. Coba lagi.' }
+  }
+}
+
+export async function auditAndCleanDriveOrphans(
+  documentId: string,
+): Promise<{ ok: true; deleted: number; total: number } | { ok: false; message: string }> {
+  const { error } = await assertStaffDocumentId(documentId)
+  if (error) return { ok: false, message: error.ok === false ? error.message : 'Tidak diizinkan.' }
+
+  try {
+    const applicationRef = getFirebaseFirestore().collection('applications').doc(documentId)
+    const application = await applicationRef.get()
+    if (!application.exists) return { ok: false, message: 'Pengajuan tidak ditemukan.' }
+
+    const data = application.data() ?? {}
+    const folderId = typeof data.driveFolderId === 'string' ? data.driveFolderId : ''
+    if (!folderId) return { ok: true, deleted: 0, total: 0 }
+
+    // Collect all active fileIds referenced in Firestore
+    const activeFileIds = new Set<string>()
+    const documents = Array.isArray(data.documents) ? data.documents : []
+    for (const doc of documents) {
+      if (typeof doc.fileId === 'string' && doc.fileId) activeFileIds.add(doc.fileId)
+    }
+    // Also keep akad photo, agreement pdf, akad gdoc
+    const akadPhotoFileId = data.akadPhotoFileId
+    if (typeof akadPhotoFileId === 'string' && akadPhotoFileId) activeFileIds.add(akadPhotoFileId)
+    const agreementPdfFileId = data.agreementPdf?.fileId
+    if (typeof agreementPdfFileId === 'string' && agreementPdfFileId)
+      activeFileIds.add(agreementPdfFileId)
+    const akadFileId = data.akadDocument?.fileId
+    if (typeof akadFileId === 'string' && akadFileId) activeFileIds.add(akadFileId)
+    const agreementDocxFileId = data.agreementDocxFileId
+    if (typeof agreementDocxFileId === 'string' && agreementDocxFileId)
+      activeFileIds.add(agreementDocxFileId)
+
+    // List files currently in Drive folder
+    const driveFiles = await listDriveFilesInFolder(folderId)
+    const orphans = driveFiles.filter((f) => !activeFileIds.has(f.id))
+
+    if (orphans.length === 0) {
+      // Clear any stale pendingDeleteFileIds
+      if (Array.isArray(data.pendingDeleteFileIds) && data.pendingDeleteFileIds.length > 0) {
+        await applicationRef.update({ pendingDeleteFileIds: FieldValue.delete() })
+      }
+      return { ok: true, deleted: 0, total: driveFiles.length }
+    }
+
+    // Delete orphans in parallel (best-effort)
+    await Promise.allSettled(orphans.map((f) => deleteDriveFile(f.id)))
+
+    // Clear pendingDeleteFileIds after cleanup
+    await applicationRef.update({
+      pendingDeleteFileIds: FieldValue.delete(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+
+    return { ok: true, deleted: orphans.length, total: driveFiles.length }
+  } catch {
+    return { ok: false, message: 'Pembersihan berkas Drive belum dapat dijalankan. Coba lagi.' }
   }
 }
 

@@ -487,6 +487,25 @@ export const renameDriveFile = async (fileId: string, name: string): Promise<voi
   } catch {}
 }
 
+/**
+ * List all non-folder files inside a Drive folder (non-recursive).
+ * Returns up to `maxResults` files with their id and name.
+ */
+export const listDriveFilesInFolder = async (
+  folderId: string,
+  maxResults = 200,
+): Promise<{ id: string; name: string }[]> => {
+  if (!FILE_ID_PATTERN.test(folderId)) return []
+  const query = `'${escapeQueryValue(folderId)}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false`
+  const data = await driveJson<{ files?: { id?: string; name?: string }[] }>(
+    `/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=${maxResults}`,
+  )
+  return (data.files ?? []).filter(
+    (f): f is { id: string; name: string } =>
+      typeof f.id === 'string' && typeof f.name === 'string',
+  )
+}
+
 const ticketSecret = () => {
   const config = getOAuthConfig()
   return createHash('sha256')

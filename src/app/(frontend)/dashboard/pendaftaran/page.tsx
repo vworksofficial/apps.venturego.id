@@ -2,10 +2,9 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
-import { DashboardIcon, DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
+import { DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
 import { getOwnedApplications, type OwnedApplication } from '../unggah-berkas/actions'
 import {
   EMPTY_REGISTRATION_FORM_DATA,
@@ -188,20 +187,13 @@ function RegistrationFormContent() {
       subtitle="Data Pemohon, Kontak Darurat, & Pekerjaan"
       title="Form Pendaftaran"
     >
-      <div className="flex items-center justify-between gap-3">
-        <Link
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 transition hover:text-slate-900"
-          href="/dashboard/unggah-berkas"
-        >
-          <DashboardIcon className="size-4" name="arrowLeft" />
-          <span>Kembali ke Unggah Berkas</span>
-        </Link>
-        {formData.completedAt && (
+      {formData.completedAt && (
+        <div className="flex justify-end">
           <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
             Sudah Dilengkapi
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {applications.length > 1 && (
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4">

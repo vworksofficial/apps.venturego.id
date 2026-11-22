@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (style(pdf): menambahkan logo box VentureGo di header PDF template surat & form pendaftaran, format huruf kapital di awal setiap kata/placeholder, pengosongan titik-titik lokasi sebelum tanggal pada titimangsa ttd, dan penambahan jarak vertikal lega untuk tanda tangan fisik.)
+Terakhir diperbarui: **22 November 2026** (style(pdf): data diri dan nama penandatangan orang tua/wali pada template Surat Pernyataan Orang Tua dibuat kosong [titik-titik] agar dapat diisi tulisan tangan secara mandiri saat bertanda tangan fisik.)
 
 ---
 

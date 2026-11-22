@@ -499,7 +499,7 @@ export function generateSuratOrangTuaHtml(data: TemplateSuratData): string {
         <tr>
           <td class="ident-label">Nama Lengkap Orang Tua / Wali</td>
           <td class="ident-sep">:</td>
-          <td class="ident-val">${escapeHtml(guardianName) || '................................................'}</td>
+          <td class="ident-val">................................................</td>
         </tr>
         <tr>
           <td class="ident-label">Nomor Induk KTP</td>
@@ -509,7 +509,7 @@ export function generateSuratOrangTuaHtml(data: TemplateSuratData): string {
         <tr>
           <td class="ident-label">Alamat Rumah Tinggal</td>
           <td class="ident-sep">:</td>
-          <td class="ident-val">${escapeHtml(address) || '................................................'}</td>
+          <td class="ident-val">................................................</td>
         </tr>
         <tr>
           <td class="ident-label">Nomor Telepon / HP</td>
@@ -588,7 +588,7 @@ export function generateSuratOrangTuaHtml(data: TemplateSuratData): string {
           <div>${escapeHtml(titimangsa)}</div>
           <div class="sig-title">Yang Membuat Pernyataan (Orang Tua/Wali),</div>
           <div class="meterai-box">Meterai Rp10.000</div>
-          <div class="sig-name">( ${escapeHtml(guardianName) || '........................................'} )</div>
+          <div class="sig-name">( ........................................ )</div>
         </div>
       </div>
     </div>

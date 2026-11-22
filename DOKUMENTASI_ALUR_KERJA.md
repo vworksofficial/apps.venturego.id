@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (feat(template): penyediaan template PDF resmi siap cetak untuk Surat Kesediaan Mengangsur [dengan klausul pemberian kuasa Wakalah bil Ujrah] dan Surat Pernyataan Orang Tua / Wali; judul program disesuaikan dinamis berdasarkan negara tujuan; dilengkapi card unduh template dan tombol unduh di baris dokumen halaman unggah berkas.)
+Terakhir diperbarui: **22 November 2026** (style(pdf): menambahkan logo box VentureGo di header PDF template surat & form pendaftaran, format huruf kapital di awal setiap kata/placeholder, pengosongan titik-titik lokasi sebelum tanggal pada titimangsa ttd, dan penambahan jarak vertikal lega untuk tanda tangan fisik.)
 
 ---
 

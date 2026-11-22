@@ -1,19 +1,34 @@
 import type { FinancingApplicationRecord } from './firebase-data'
 
-export type TransferBreakdown = {
+export type AdditionalRecipient = {
+  id: string
+  title: string
+  bank: string
+  accountName: string
+  accountNumber: string
+  amount: number
+  notes: string
+}
+
+export type TransferDetailsState = {
   principal: number
   adminFee: number
-  netAmount: number
-  invoiceLpk: number
-  cilAmount: number
-  pocketMoney: number
-  transportAmplop: number
+  adminVworks: number
+  adminOperasional: number
+  lpkAmount: number
   lpkBank: string
   lpkAccountName: string
   lpkAccountNumber: string
+  lpkNotes: string
+  additionalRecipients: AdditionalRecipient[]
+  pocketMoney: number
   applicantBank: string
-  applicantAccountNumber: string
   applicantAccountName: string
+  applicantAccountNumber: string
+  applicantNotes: string
+  operasionalBank: string
+  operasionalAccountNumber: string
+  operasionalRecipientName: string
 }
 
 export function formatThousandsNumber(value: number): string {
@@ -21,7 +36,11 @@ export function formatThousandsNumber(value: number): string {
   return Math.round(value).toLocaleString('id-ID')
 }
 
-export function getTransferBreakdown(app: FinancingApplicationRecord): TransferBreakdown {
+export function parseThousandsInput(value: string): number {
+  return Number(value.replace(/\D/g, '')) || 0
+}
+
+export function createInitialTransferState(app: FinancingApplicationRecord): TransferDetailsState {
   const plan = app.financialPlan ?? {}
   const personal = (app.personalDetails ?? {}) as Record<string, unknown>
   const bankAccounts = (personal.bankAccounts ?? {}) as {
@@ -40,11 +59,13 @@ export function getTransferBreakdown(app: FinancingApplicationRecord): TransferB
         : 0
 
   const adminFee = Math.round(principal * 0.05)
+  const adminVworks = Math.round(adminFee * 0.6)
+  const adminOperasional = adminFee - adminVworks
   const netAmount = Math.max(0, principal - adminFee)
 
   const savedInvoice = Number(plan.hppLpkInvoiceAmount)
   const departureInvoice = Number(departure.outstandingLPKAmount)
-  const invoiceLpk =
+  const lpkAmount =
     Number.isSafeInteger(savedInvoice) && savedInvoice >= 0
       ? savedInvoice
       : Number.isSafeInteger(departureInvoice) && departureInvoice >= 0
@@ -55,124 +76,131 @@ export function getTransferBreakdown(app: FinancingApplicationRecord): TransferB
   const pocketMoney =
     Number.isSafeInteger(savedPocketMoney) && savedPocketMoney >= 0
       ? savedPocketMoney
-      : Math.max(0, netAmount - invoiceLpk)
-
-  // 2% dari plafon untuk Transport+Amplop petugas penandatanganan akad
-  const transportAmplop = Math.round(principal * 0.02)
+      : Math.max(0, netAmount - lpkAmount)
 
   const lpkBank = String(bankAccounts.lpk?.bankName ?? '').trim()
-  const lpkAccountName = String(bankAccounts.lpk?.accountName ?? '').trim()
+  const lpkAccountName =
+    String(bankAccounts.lpk?.accountName ?? '').trim() ||
+    (app.lpkName ? `LPK ${app.lpkName}` : 'LPK Mitra')
   const lpkAccountNumber = String(bankAccounts.lpk?.accountNumber ?? '').trim()
 
   const applicantBank = String(bankAccounts.applicant?.bankName ?? '').trim()
   const applicantAccountNumber = String(bankAccounts.applicant?.accountNumber ?? '').trim()
-  const applicantAccountName = String(bankAccounts.applicant?.accountName ?? '').trim()
+  const applicantAccountName =
+    String(bankAccounts.applicant?.accountName ?? '').trim() || app.applicantName
 
   return {
     principal,
     adminFee,
-    netAmount,
-    invoiceLpk,
-    cilAmount: 0,
-    pocketMoney,
-    transportAmplop,
+    adminVworks,
+    adminOperasional,
+    lpkAmount,
     lpkBank,
     lpkAccountName,
     lpkAccountNumber,
+    lpkNotes: app.applicantName,
+    additionalRecipients: [],
+    pocketMoney,
     applicantBank,
-    applicantAccountNumber,
     applicantAccountName,
+    applicantAccountNumber,
+    applicantNotes: `Uang Saku ${app.applicantName}`,
+    operasionalBank: 'Jenius SMBC Indonesia',
+    operasionalAccountNumber: '90020422216',
+    operasionalRecipientName: 'Panut',
   }
 }
 
 /**
- * Menghasilkan format pesan teks WhatsApp untuk finance / tim transfer
- * Contoh:
+ * Menghasilkan format pesan WhatsApp resmi untuk finance / tukang transfer:
+ *
  * 29. Dimas Pranaika Putra
  *
- * Plafon
- * 33.000.000
- * Biaya Administrasi 5%
+ * *PLAFON PEMBIAYAAN*
+ * Rp33.000.000
  *
- * Jumlah cair
- * 31.350.000
+ * *Jasa Administrasi 5%*
+ * Rp1.650.000
+ * _*Alokasi*_
+ * - Rp990.000 (PT Vworks Kolaborasi Bersama)
+ * - Rp660.000 (Operasional Pencairan)
  *
- * Pembagian
- * Transfer SO
- * BRI LPK CAHAYA MANDIRI INDONESIA
+ * *Sisa Beban LPK*
+ * Rp27.500.000
+ * BRI. LPK CAHAYA MANDIRI INDONESIA
  * 033401001355306
- * Jumlah 27.500.000
  * Ket. Dimas Pranaika Putra
  *
- * Transfer CIL
- * BRI 014901002149569
- * LPK CAHAYA INDONESIA LANGGENG
- * Jumlah 0
- * Ket.
+ * *Uang Saku Siswa (Nafaqah)*
+ * Rp3.850.000
+ * BNI. Dimas Pranaika Putra
+ * 2059015299
+ * Ket. Uang Saku Dimas Pranaika Putra
  *
- * Transfer Siswa
- * 2059015299 BNI
- * Ket. Dimas Pranaika Putra
- * Jumlah Rp3.850.000
- *
- * Transfer Transport+Amplop
+ * Notes:
+ * *Operasional Pencairan*
+ * Rp660.000
  * Jenius SMBC Indonesia
  * 90020422216
- * Jumlah 660.000
  * Panut
  */
-export function buildTransferWhatsappMessage(
-  app: FinancingApplicationRecord,
-  index: number,
+export function buildDepartureTransferWhatsappMessage(
+  studentNumberOrIndex: string | number,
+  applicantName: string,
+  state: TransferDetailsState,
 ): string {
-  const breakdown = getTransferBreakdown(app)
+  const lpkBankAndName = [state.lpkBank, state.lpkAccountName].filter(Boolean).join('. ') || 'LPK'
+  const applicantBankAndName =
+    [state.applicantBank, state.applicantAccountName].filter(Boolean).join('. ') || applicantName
 
-  // Format Baris Transfer SO (LPK Mitra)
-  const lpkHeader =
-    [breakdown.lpkBank, breakdown.lpkAccountName || (app.lpkName ? `LPK ${app.lpkName}` : '')]
-      .filter(Boolean)
-      .join(' ') || (app.lpkName ? `LPK ${app.lpkName}` : 'Rekening LPK')
-  const lpkNumber = breakdown.lpkAccountNumber || '....................'
-
-  // Format Baris Transfer Siswa
-  const studentBankLine =
-    [breakdown.applicantAccountNumber, breakdown.applicantBank].filter(Boolean).join(' ') ||
-    '....................'
-
-  const lines = [
-    `${index + 1}. ${app.applicantName}`,
+  const lines: string[] = [
+    `${studentNumberOrIndex}. ${applicantName}`,
     '',
-    'Plafon',
-    formatThousandsNumber(breakdown.principal),
-    'Biaya Administrasi 5%',
+    '*PLAFON PEMBIAYAAN*',
+    `Rp${formatThousandsNumber(state.principal)}`,
     '',
-    'Jumlah cair',
-    formatThousandsNumber(breakdown.netAmount),
+    '*Jasa Administrasi 5%*',
+    `Rp${formatThousandsNumber(state.adminFee)}`,
+    '_*Alokasi*_',
+    `- Rp${formatThousandsNumber(state.adminVworks)} (PT Vworks Kolaborasi Bersama)`,
+    `- Rp${formatThousandsNumber(state.adminOperasional)} (Operasional Pencairan)`,
     '',
-    'Pembagian',
-    'Transfer SO',
-    lpkHeader,
-    lpkNumber,
-    `Jumlah ${formatThousandsNumber(breakdown.invoiceLpk)}`,
-    `Ket. ${app.applicantName}`,
-    '',
-    'Transfer CIL',
-    'BRI 014901002149569',
-    'LPK CAHAYA INDONESIA LANGGENG',
-    `Jumlah ${formatThousandsNumber(breakdown.cilAmount)}`,
-    'Ket.',
-    '',
-    'Transfer Siswa ',
-    studentBankLine,
-    `Ket. ${app.applicantName}`,
-    `Jumlah Rp${formatThousandsNumber(breakdown.pocketMoney)}`,
-    '',
-    'Transfer Transport+Amplop',
-    'Jenius SMBC Indonesia',
-    '90020422216',
-    `Jumlah ${formatThousandsNumber(breakdown.transportAmplop)}`,
-    'Panut',
+    '*Sisa Beban LPK*',
+    `Rp${formatThousandsNumber(state.lpkAmount)}`,
+    lpkBankAndName,
+    state.lpkAccountNumber || '....................',
+    `Ket. ${state.lpkNotes || applicantName}`,
   ]
+
+  // Tambahkan penerima komisi / LPK lain jika ada
+  for (const recipient of state.additionalRecipients) {
+    const bankAndName =
+      [recipient.bank, recipient.accountName].filter(Boolean).join('. ') || 'Penerima'
+    lines.push(
+      '',
+      `*${recipient.title || 'Pencairan Komisi / LPK Lain'}*`,
+      `Rp${formatThousandsNumber(recipient.amount)}`,
+      bankAndName,
+      recipient.accountNumber || '....................',
+      `Ket. ${recipient.notes || applicantName}`,
+    )
+  }
+
+  lines.push(
+    '',
+    '*Uang Saku Siswa (Nafaqah)*',
+    `Rp${formatThousandsNumber(state.pocketMoney)}`,
+    applicantBankAndName,
+    state.applicantAccountNumber || '....................',
+    `Ket. ${state.applicantNotes || `Uang Saku ${applicantName}`}`,
+    '',
+    'Notes:',
+    '*Operasional Pencairan*',
+    `Rp${formatThousandsNumber(state.adminOperasional)}`,
+    state.operasionalBank || 'Jenius SMBC Indonesia',
+    state.operasionalAccountNumber || '90020422216',
+    state.operasionalRecipientName || 'Panut',
+  )
 
   return lines.join('\n')
 }

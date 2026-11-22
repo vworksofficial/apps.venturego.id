@@ -34,7 +34,14 @@ import { FullCoverBudgetFields } from './full-cover-budget-fields'
 import { validateFullCoverBudget } from '@/lib/full-cover-budget'
 import { InstallmentMonitor } from './installment-monitor'
 import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
-import { buildTransferWhatsappMessage } from '@/lib/transfer-summary'
+import {
+  type AdditionalRecipient,
+  type TransferDetailsState,
+  buildDepartureTransferWhatsappMessage,
+  createInitialTransferState,
+  formatThousandsNumber,
+  parseThousandsInput,
+} from '@/lib/transfer-summary'
 
 const STATUS_LABELS: Record<(typeof APPLICATION_STATUSES)[number], string> = {
   SUBMITTED: 'Terkirim',
@@ -4748,14 +4755,90 @@ export function AdminDashboard({
     app: FinancingApplicationRecord
     index: number
   } | null>(null)
+  const [transferState, setTransferState] = useState<TransferDetailsState | null>(null)
   const [transferMessageText, setTransferMessageText] = useState('')
   const [transferCopied, setTransferCopied] = useState(false)
+  const [showLpkConfig, setShowLpkConfig] = useState(false)
+  const [showStudentConfig, setShowStudentConfig] = useState(false)
 
   const openTransferDetail = (app: FinancingApplicationRecord, index: number) => {
-    const text = buildTransferWhatsappMessage(app, index)
+    const initialState = createInitialTransferState(app)
+    const text = buildDepartureTransferWhatsappMessage(index + 1, app.applicantName, initialState)
     setTransferDetailTarget({ app, index })
+    setTransferState(initialState)
     setTransferMessageText(text)
     setTransferCopied(false)
+    setShowLpkConfig(false)
+    setShowStudentConfig(false)
+  }
+
+  const updateTransferState = (updater: (prev: TransferDetailsState) => TransferDetailsState) => {
+    if (!transferDetailTarget) return
+    setTransferState((prev) => {
+      if (!prev) return prev
+      const next = updater(prev)
+      const totalAdditional = next.additionalRecipients.reduce((sum, r) => sum + r.amount, 0)
+      const calculatedPocket = Math.max(
+        0,
+        next.principal - next.adminFee - next.lpkAmount - totalAdditional,
+      )
+      const finalState = { ...next, pocketMoney: calculatedPocket }
+      const text = buildDepartureTransferWhatsappMessage(
+        transferDetailTarget.index + 1,
+        transferDetailTarget.app.applicantName,
+        finalState,
+      )
+      setTransferMessageText(text)
+      return finalState
+    })
+  }
+
+  const handleResetTransferState = () => {
+    if (!transferDetailTarget) return
+    const initialState = createInitialTransferState(transferDetailTarget.app)
+    const text = buildDepartureTransferWhatsappMessage(
+      transferDetailTarget.index + 1,
+      transferDetailTarget.app.applicantName,
+      initialState,
+    )
+    setTransferState(initialState)
+    setTransferMessageText(text)
+    setShowLpkConfig(false)
+    setShowStudentConfig(false)
+  }
+
+  const addAdditionalRecipient = () => {
+    updateTransferState((prev) => ({
+      ...prev,
+      additionalRecipients: [
+        ...prev.additionalRecipients,
+        {
+          id: `rec-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          title: 'Pencairan Komisi / LPK Lain',
+          bank: '',
+          accountName: '',
+          accountNumber: '',
+          amount: 0,
+          notes: '',
+        },
+      ],
+    }))
+  }
+
+  const removeAdditionalRecipient = (id: string) => {
+    updateTransferState((prev) => ({
+      ...prev,
+      additionalRecipients: prev.additionalRecipients.filter((r) => r.id !== id),
+    }))
+  }
+
+  const updateAdditionalRecipient = (id: string, patch: Partial<AdditionalRecipient>) => {
+    updateTransferState((prev) => ({
+      ...prev,
+      additionalRecipients: prev.additionalRecipients.map((r) =>
+        r.id === id ? { ...r, ...patch } : r,
+      ),
+    }))
   }
 
   const handleCopyTransferMessage = async () => {
@@ -8697,9 +8780,9 @@ export function AdminDashboard({
       )}
 
       {/* POPUP RINCIAN BIAYA SIAP TRANSFER UNTUK FINANCE / WA */}
-      {transferDetailTarget && (
+      {transferDetailTarget && transferState && (
         <div
-          className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/50 p-3 sm:p-4 backdrop-blur-[2px]"
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setTransferDetailTarget(null)
@@ -8709,12 +8792,12 @@ export function AdminDashboard({
           <section
             aria-labelledby="transfer-detail-title"
             aria-modal="true"
-            className="flex max-h-[92vh] w-full max-w-xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            className="flex max-h-[94vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-5">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
               <div className="flex items-center gap-3">
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                   <svg
@@ -8733,13 +8816,13 @@ export function AdminDashboard({
                 </span>
                 <div>
                   <h2 className="text-sm font-bold text-slate-900" id="transfer-detail-title">
-                    Rincian Biaya Siap Transfer
+                    Rincian Biaya Siap Transfer — Dana Keberangkatan
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-500">
                     <span className="font-semibold text-[#0b57d0]">
-                      {formatDisplayApplicationId(transferDetailTarget.app.applicationId)}
+                      {transferDetailTarget.index + 1}. {transferDetailTarget.app.applicantName}
                     </span>{' '}
-                    · {transferDetailTarget.app.applicantName}
+                    · {formatDisplayApplicationId(transferDetailTarget.app.applicationId)}
                   </p>
                 </div>
               </div>
@@ -8762,63 +8845,508 @@ export function AdminDashboard({
             </div>
 
             {/* Body */}
-            <div className="flex-1 space-y-4 overflow-y-auto p-5">
-              <div className="flex items-start gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3.5 text-xs text-emerald-950">
-                <svg
-                  className="mt-0.5 size-4 shrink-0 text-emerald-700"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <div>
-                  <strong className="font-semibold text-emerald-900">
-                    Format Pesan WhatsApp Finance
-                  </strong>
-                  <p className="mt-0.5 text-emerald-800">
-                    Teks di bawah ini telah disesuaikan dengan format pesan WhatsApp untuk
-                    finance/bagian transfer. Anda dapat langsung menyalin atau menyesuaikan teks
-                    jika ada perubahan sebelum dikirimkan.
+            <div className="flex-1 space-y-4 overflow-y-auto p-5 text-xs">
+              {/* 1. KARTU PLAFON & JASA ADMINISTRASI */}
+              <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Plafon Pembiayaan
+                    </span>
+                    <p className="text-base font-extrabold text-slate-900">
+                      Rp{formatThousandsNumber(transferState.principal)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                      Jasa Administrasi 5%
+                    </span>
+                    <p className="text-base font-extrabold text-[#0b57d0]">
+                      Rp{formatThousandsNumber(transferState.adminFee)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600">
+                  <span className="font-semibold italic text-slate-700">Alokasi Jasa Admin:</span>
+                  <div className="flex flex-wrap gap-3">
+                    <span className="rounded-md bg-white px-2 py-1 shadow-2xs border border-slate-200/70">
+                      🏢 PT Vworks (60%):{' '}
+                      <strong className="text-slate-900">
+                        Rp{formatThousandsNumber(transferState.adminVworks)}
+                      </strong>
+                    </span>
+                    <span className="rounded-md bg-white px-2 py-1 shadow-2xs border border-slate-200/70">
+                      🚀 Operasional Pencairan (40%):{' '}
+                      <strong className="text-emerald-700">
+                        Rp{formatThousandsNumber(transferState.adminOperasional)}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. SISA BEBAN LPK */}
+              <div className="rounded-xl border border-amber-200/80 bg-amber-50/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-amber-500" />
+                    <h3 className="font-bold text-slate-900">Sisa Beban LPK</h3>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                      Rp{formatThousandsNumber(transferState.lpkAmount)}
+                    </span>
+                  </div>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900 shadow-2xs transition hover:bg-amber-50"
+                    onClick={() => setShowLpkConfig((prev) => !prev)}
+                    type="button"
+                  >
+                    <svg
+                      className="size-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {showLpkConfig ? 'Tutup Pengaturan' : 'Atur Ulang Norek LPK'}
+                  </button>
+                </div>
+
+                {!showLpkConfig ? (
+                  <div className="mt-2.5 rounded-lg border border-amber-200/50 bg-white/90 p-3 text-[11px] leading-relaxed text-slate-700">
+                    <p className="font-bold text-slate-900">
+                      {transferState.lpkBank
+                        ? `${transferState.lpkBank}. ${transferState.lpkAccountName}`
+                        : transferState.lpkAccountName}
+                    </p>
+                    <p className="font-mono text-xs font-semibold text-slate-800">
+                      {transferState.lpkAccountNumber || 'Rekening belum terdaftar'}
+                    </p>
+                    <p className="text-slate-500">
+                      Ket. {transferState.lpkNotes || transferDetailTarget.app.applicantName}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-2.5 rounded-lg border border-amber-200 bg-white p-3.5">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Nominal Sisa Beban LPK (Rp)
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = parseThousandsInput(e.target.value)
+                            updateTransferState((prev) => ({ ...prev, lpkAmount: val }))
+                          }}
+                          type="text"
+                          value={formatThousandsNumber(transferState.lpkAmount)}
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Nama Bank LPK
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({ ...prev, lpkBank: val }))
+                          }}
+                          placeholder="Contoh: BRI / BCA"
+                          type="text"
+                          value={transferState.lpkBank}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Atas Nama Rekening LPK
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({ ...prev, lpkAccountName: val }))
+                          }}
+                          placeholder="Nama pemilik rekening"
+                          type="text"
+                          value={transferState.lpkAccountName}
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Nomor Rekening LPK
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 font-mono text-xs font-medium text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({ ...prev, lpkAccountNumber: val }))
+                          }}
+                          placeholder="Nomor rekening transfer"
+                          type="text"
+                          value={transferState.lpkAccountNumber}
+                        />
+                      </label>
+                    </div>
+
+                    <label className="block space-y-1">
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        Keterangan Transfer (Ket.)
+                      </span>
+                      <input
+                        className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                        onChange={(e) => {
+                          const val = e.target.value
+                          updateTransferState((prev) => ({ ...prev, lpkNotes: val }))
+                        }}
+                        type="text"
+                        value={transferState.lpkNotes}
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. PENERIMA TAMBAHAN (LPK LAIN / KOMISI) */}
+              <div className="rounded-xl border border-indigo-200/80 bg-indigo-50/20 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-indigo-600" />
+                    <h3 className="font-bold text-slate-900">
+                      Penerima Tambahan (Pencairan Komisi / LPK Lain)
+                    </h3>
+                  </div>
+                  <button
+                    className="inline-flex items-center gap-1.5 rounded-md border border-indigo-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-indigo-900 shadow-2xs transition hover:bg-indigo-50"
+                    onClick={addAdditionalRecipient}
+                    type="button"
+                  >
+                    <svg
+                      className="size-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M12 4.5v15m7.5-7.5h-15"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Tambah Data Penerima
+                  </button>
+                </div>
+
+                {transferState.additionalRecipients.length === 0 ? (
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Belum ada penerima tambahan. Klik tombol di atas jika terdapat pembagian ke LPK
+                    lain atau pencairan komisi (misal LPK CIL).
+                  </p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {transferState.additionalRecipients.map((rec, idx) => (
+                      <div
+                        className="space-y-2.5 rounded-lg border border-indigo-200 bg-white p-3 shadow-2xs"
+                        key={rec.id}
+                      >
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="text-[11px] font-bold text-indigo-900">
+                            Penerima Tambahan #{idx + 1}
+                          </span>
+                          <button
+                            aria-label="Hapus penerima"
+                            className="rounded-md p-1 text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                            onClick={() => removeAdditionalRecipient(rec.id)}
+                            type="button"
+                          >
+                            <svg
+                              className="size-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className="space-y-1">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              Judul Keperluan
+                            </span>
+                            <input
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                              onChange={(e) =>
+                                updateAdditionalRecipient(rec.id, { title: e.target.value })
+                              }
+                              placeholder="Misal: Pencairan Komisi LPK CIL"
+                              type="text"
+                              value={rec.title}
+                            />
+                          </label>
+                          <label className="space-y-1">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              Nominal Komisi (Rp)
+                            </span>
+                            <input
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#0b57d0]"
+                              onChange={(e) => {
+                                const val = parseThousandsInput(e.target.value)
+                                updateAdditionalRecipient(rec.id, { amount: val })
+                              }}
+                              type="text"
+                              value={formatThousandsNumber(rec.amount)}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <label className="space-y-1">
+                            <span className="text-[10px] font-semibold text-slate-500">Bank</span>
+                            <input
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                              onChange={(e) =>
+                                updateAdditionalRecipient(rec.id, { bank: e.target.value })
+                              }
+                              placeholder="BRI"
+                              type="text"
+                              value={rec.bank}
+                            />
+                          </label>
+                          <label className="space-y-1 sm:col-span-2">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              Atas Nama Rekening
+                            </span>
+                            <input
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                              onChange={(e) =>
+                                updateAdditionalRecipient(rec.id, { accountName: e.target.value })
+                              }
+                              placeholder="LPK CAHAYA INDONESIA LANGGENG"
+                              type="text"
+                              value={rec.accountName}
+                            />
+                          </label>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <label className="space-y-1">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              Nomor Rekening
+                            </span>
+                            <input
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 font-mono text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                              onChange={(e) =>
+                                updateAdditionalRecipient(rec.id, { accountNumber: e.target.value })
+                              }
+                              placeholder="014901002149569"
+                              type="text"
+                              value={rec.accountNumber}
+                            />
+                          </label>
+                          <label className="space-y-1">
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              Keterangan
+                            </span>
+                            <input
+                              className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                              onChange={(e) =>
+                                updateAdditionalRecipient(rec.id, { notes: e.target.value })
+                              }
+                              type="text"
+                              value={rec.notes}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. UANG SAKU SISWA (NAFAQAH) */}
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-600" />
+                    <h3 className="font-bold text-slate-900">Uang Saku Siswa (Nafaqah)</h3>
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-900">
+                      Rp{formatThousandsNumber(transferState.pocketMoney)}
+                    </span>
+                  </div>
+                  <button
+                    className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-900 shadow-2xs transition hover:bg-emerald-50"
+                    onClick={() => setShowStudentConfig((prev) => !prev)}
+                    type="button"
+                  >
+                    <svg
+                      className="size-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {showStudentConfig ? 'Tutup Rekening Siswa' : 'Sesuaikan Rekening Siswa'}
+                  </button>
+                </div>
+
+                {!showStudentConfig ? (
+                  <div className="mt-2.5 rounded-lg border border-emerald-200/50 bg-white/90 p-3 text-[11px] leading-relaxed text-slate-700">
+                    <p className="font-bold text-slate-900">
+                      {transferState.applicantBank
+                        ? `${transferState.applicantBank}. ${transferState.applicantAccountName}`
+                        : transferState.applicantAccountName}
+                    </p>
+                    <p className="font-mono text-xs font-semibold text-slate-800">
+                      {transferState.applicantAccountNumber || 'Rekening belum terdaftar'}
+                    </p>
+                    <p className="text-slate-500">
+                      Ket.{' '}
+                      {transferState.applicantNotes ||
+                        `Uang Saku ${transferDetailTarget.app.applicantName}`}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-2.5 rounded-lg border border-emerald-200 bg-white p-3.5">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Nama Bank Siswa
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({ ...prev, applicantBank: val }))
+                          }}
+                          placeholder="BNI / BCA"
+                          type="text"
+                          value={transferState.applicantBank}
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Atas Nama Rekening Siswa
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({ ...prev, applicantAccountName: val }))
+                          }}
+                          type="text"
+                          value={transferState.applicantAccountName}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Nomor Rekening Siswa
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 font-mono text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({
+                              ...prev,
+                              applicantAccountNumber: val,
+                            }))
+                          }}
+                          type="text"
+                          value={transferState.applicantAccountNumber}
+                        />
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          Keterangan Transfer Siswa
+                        </span>
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:border-[#0b57d0]"
+                          onChange={(e) => {
+                            const val = e.target.value
+                            updateTransferState((prev) => ({ ...prev, applicantNotes: val }))
+                          }}
+                          type="text"
+                          value={transferState.applicantNotes}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 5. OPERASIONAL PENCAIRAN (NOTES) */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-slate-500" />
+                    <h3 className="font-bold text-slate-900">Notes: Operasional Pencairan</h3>
+                    <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[11px] font-bold text-slate-800">
+                      Rp{formatThousandsNumber(transferState.adminOperasional)}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">40% dari Biaya Administrasi</span>
+                </div>
+                <div className="mt-2.5 rounded-lg border border-slate-200 bg-white p-3 text-[11px] leading-relaxed text-slate-700">
+                  <p className="font-bold text-slate-900">
+                    {transferState.operasionalBank || 'Jenius SMBC Indonesia'}
+                  </p>
+                  <p className="font-mono text-xs font-semibold text-slate-800">
+                    {transferState.operasionalAccountNumber || '90020422216'}
+                  </p>
+                  <p className="text-slate-500">
+                    {transferState.operasionalRecipientName || 'Panut'} (Staf VentureGo)
                   </p>
                 </div>
               </div>
 
+              {/* 6. PRATINJAU TEKS WHATSAPP (SIAP SALIN) */}
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label
-                    className="text-xs font-semibold text-slate-700"
+                    className="text-xs font-bold text-slate-900"
                     htmlFor="transfer-whatsapp-textarea"
                   >
-                    Pratinjau Teks WhatsApp
+                    Pratinjau Format Pesan WhatsApp (Siap Kirim ke Finance)
                   </label>
                   <button
                     className="text-[11px] font-medium text-[#0b57d0] transition hover:underline"
-                    onClick={() => {
-                      if (transferDetailTarget) {
-                        setTransferMessageText(
-                          buildTransferWhatsappMessage(
-                            transferDetailTarget.app,
-                            transferDetailTarget.index,
-                          ),
-                        )
-                      }
-                    }}
+                    onClick={handleResetTransferState}
                     type="button"
                   >
-                    Reset ke Template Awal
+                    Reset ke Template Bawaan
                   </button>
                 </div>
                 <textarea
-                  className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 p-3.5 font-mono text-xs leading-relaxed text-slate-800 shadow-inner outline-none transition focus:border-[#0b57d0] focus:bg-white focus:ring-2 focus:ring-[#0b57d0]/15"
+                  className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 p-3.5 font-mono text-xs leading-relaxed text-slate-900 shadow-inner outline-none transition focus:border-[#0b57d0] focus:bg-white focus:ring-2 focus:ring-[#0b57d0]/15"
                   id="transfer-whatsapp-textarea"
                   onChange={(e) => setTransferMessageText(e.target.value)}
-                  rows={15}
+                  rows={16}
                   value={transferMessageText}
                 />
               </div>
@@ -8875,7 +9403,7 @@ export function AdminDashboard({
                         strokeLinejoin="round"
                       />
                     </svg>
-                    Salin Rincian Transfer
+                    Salin Rincian Transfer (WhatsApp)
                   </>
                 )}
               </button>

@@ -65,6 +65,59 @@ export type RegistrationFormData = {
   pdfFileId?: string
 }
 
+const MONTH_NAMES_ID: Record<string, string> = {
+  '01': 'Januari',
+  '02': 'Februari',
+  '03': 'Maret',
+  '04': 'April',
+  '05': 'Mei',
+  '06': 'Juni',
+  '07': 'Juli',
+  '08': 'Agustus',
+  '09': 'September',
+  '10': 'Oktober',
+  '11': 'November',
+  '12': 'Desember',
+}
+
+export function formatIndonesianDate(value: string | undefined | null): string {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+
+  // If already formatted with month name (contains letters), return as is
+  if (/[a-zA-Z]/.test(trimmed)) return trimmed
+
+  // Match YYYY-MM-DD
+  const ymdMatch = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (ymdMatch) {
+    const [, year, month, day] = ymdMatch
+    const monthKey = month.padStart(2, '0')
+    const monthName = MONTH_NAMES_ID[monthKey] ?? month
+    return `${parseInt(day, 10)} ${monthName} ${year}`
+  }
+
+  // Match DD-MM-YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/)
+  if (dmyMatch) {
+    const [, day, month, year] = dmyMatch
+    const monthKey = month.padStart(2, '0')
+    const monthName = MONTH_NAMES_ID[monthKey] ?? month
+    return `${parseInt(day, 10)} ${monthName} ${year}`
+  }
+
+  const date = new Date(trimmed)
+  if (!isNaN(date.getTime())) {
+    const d = date.getUTCDate()
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const y = date.getUTCFullYear()
+    const monthName = MONTH_NAMES_ID[m] ?? m
+    return `${d} ${monthName} ${y}`
+  }
+
+  return trimmed
+}
+
 export const EMPTY_REGISTRATION_FORM_DATA: RegistrationFormData = {
   fullName: '',
   idCardNumber: '',

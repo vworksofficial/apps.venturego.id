@@ -9,6 +9,7 @@ import { DashboardIcon, DashboardScaffold, SkeletonBlock } from '../_components/
 import { getOwnedApplications, type OwnedApplication } from '../unggah-berkas/actions'
 import {
   EMPTY_REGISTRATION_FORM_DATA,
+  formatIndonesianDate,
   type RegistrationFormData,
 } from '@/lib/registration-form-types'
 
@@ -90,11 +91,19 @@ function RegistrationFormContent() {
 
         if (active && result.ok) {
           if (result.data) {
-            setFormData(result.data)
+            const data = { ...result.data }
+            if (data.birthDate) {
+              data.birthDate = formatIndonesianDate(data.birthDate)
+            }
+            setFormData(data)
           } else if (result.prefill) {
+            const prefill = { ...result.prefill }
+            if (prefill.birthDate) {
+              prefill.birthDate = formatIndonesianDate(prefill.birthDate)
+            }
             setFormData((prev) => ({
               ...prev,
-              ...result.prefill,
+              ...prefill,
             }))
           }
         }
@@ -252,13 +261,18 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Nama Lengkap <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Nama Lengkap <span className="text-red-500">*</span>
+              </label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) => updateField('fullName', e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
               placeholder="Sesuai KTP"
+              readOnly
               required
               type="text"
               value={formData.fullName}
@@ -266,14 +280,19 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              No. KTP <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                No. KTP <span className="text-red-500">*</span>
+              </label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 font-mono text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
               maxLength={16}
-              onChange={(e) => updateField('idCardNumber', e.target.value.replace(/\D/g, ''))}
               placeholder="16 digit NIK"
+              readOnly
               required
               type="text"
               value={formData.idCardNumber}
@@ -308,13 +327,18 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Email <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Email <span className="text-red-500">*</span>
+              </label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) => updateField('email', e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
               placeholder="alamat@email.com"
+              readOnly
               required
               type="email"
               value={formData.email}
@@ -326,11 +350,11 @@ function RegistrationFormContent() {
               Alamat Rumah Terkini <span className="text-red-500">*</span>
             </label>
             <textarea
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="mt-1.5 min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs leading-relaxed text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 resize-y"
               onChange={(e) => updateField('address', e.target.value)}
               placeholder="Jalan, No. Rumah, Dusun / Lingkungan"
               required
-              rows={2}
+              rows={4}
               value={formData.address}
             />
           </div>
@@ -421,13 +445,18 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              No. Handphone / WhatsApp <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                No. Handphone / WhatsApp <span className="text-red-500">*</span>
+              </label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) => updateField('mobilePhone', e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 font-mono text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
               placeholder="0812xxxx"
+              readOnly
               required
               type="tel"
               value={formData.mobilePhone}
@@ -468,13 +497,18 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Tempat Lahir <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Tempat Lahir <span className="text-red-500">*</span>
+              </label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) => updateField('birthPlace', e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
               placeholder="Kota Lahir"
+              readOnly
               required
               type="text"
               value={formData.birthPlace}
@@ -482,63 +516,79 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Tanggal Lahir</label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">Tanggal Lahir</label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) => updateField('birthDate', e.target.value)}
-              placeholder="DD/MM/YYYY"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
+              placeholder="Contoh: 12 Februari 2000"
+              readOnly
               type="text"
-              value={formData.birthDate}
+              value={formData.birthDate ? formatIndonesianDate(formData.birthDate) : ''}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">
-              Jenis Kelamin <span className="text-red-500">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Jenis Kelamin <span className="text-red-500">*</span>
+              </label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <div className="mt-1.5 flex gap-2">
-              <button
-                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+              <div
+                className={`flex-1 rounded-xl border py-2.5 text-center text-xs font-semibold cursor-not-allowed select-none ${
                   formData.gender === 'LAKI_LAKI'
-                    ? 'border-teal-600 bg-teal-50 text-teal-800'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    ? 'border-teal-500/50 bg-teal-50/70 text-teal-800'
+                    : 'border-slate-200 bg-slate-50 text-slate-400'
                 }`}
-                onClick={() => updateField('gender', 'LAKI_LAKI')}
-                type="button"
               >
                 Laki-laki
-              </button>
-              <button
-                className={`flex-1 rounded-xl border py-2.5 text-xs font-semibold transition ${
+              </div>
+              <div
+                className={`flex-1 rounded-xl border py-2.5 text-center text-xs font-semibold cursor-not-allowed select-none ${
                   formData.gender === 'PEREMPUAN'
-                    ? 'border-teal-600 bg-teal-50 text-teal-800'
-                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    ? 'border-teal-500/50 bg-teal-50/70 text-teal-800'
+                    : 'border-slate-200 bg-slate-50 text-slate-400'
                 }`}
-                onClick={() => updateField('gender', 'PEREMPUAN')}
-                type="button"
               >
                 Perempuan
-              </button>
+              </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Agama</label>
-            <select
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) =>
-                updateField('religion', e.target.value as RegistrationFormData['religion'])
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">Agama</label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
+            <input
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 text-xs text-slate-700 cursor-not-allowed select-none focus:outline-none"
+              readOnly
+              type="text"
+              value={
+                formData.religion === 'ISLAM'
+                  ? 'Islam'
+                  : formData.religion === 'PROTESTAN'
+                    ? 'Protestan'
+                    : formData.religion === 'KATHOLIK'
+                      ? 'Katholik'
+                      : formData.religion === 'HINDU'
+                        ? 'Hindu'
+                        : formData.religion === 'BUDHA'
+                          ? 'Budha'
+                          : formData.religion === 'KONG_HU_CHU'
+                            ? 'Kong Hu Chu'
+                            : 'Lainnya'
               }
-              value={formData.religion}
-            >
-              <option value="ISLAM">Islam</option>
-              <option value="PROTESTAN">Protestan</option>
-              <option value="KATHOLIK">Katholik</option>
-              <option value="HINDU">Hindu</option>
-              <option value="BUDHA">Budha</option>
-              <option value="KONG_HU_CHU">Kong Hu Chu</option>
-              <option value="LAINNYA">Lainnya</option>
-            </select>
+            />
           </div>
 
           <div>
@@ -866,11 +916,16 @@ function RegistrationFormContent() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700">Negara Tertuju</label>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">Negara Tertuju</label>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                Tersinkron
+              </span>
+            </div>
             <input
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
-              onChange={(e) => updateField('destinationCountry', e.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 px-3 py-2.5 text-xs font-semibold text-slate-700 cursor-not-allowed select-none focus:outline-none"
               placeholder="Contoh: JEPANG / TURKIYE"
+              readOnly
               type="text"
               value={formData.destinationCountry}
             />

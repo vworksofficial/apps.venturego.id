@@ -1,5 +1,5 @@
 import { renderAkadPdf } from './akad-pdf'
-import type { RegistrationFormData } from './registration-form-types'
+import { formatIndonesianDate, type RegistrationFormData } from './registration-form-types'
 
 function renderBoxes(text: string | undefined | null, count: number, extraClass = ''): string {
   const clean = (text ?? '').trim().toUpperCase()
@@ -450,6 +450,11 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
         <div class="form-row">
           <div class="form-label">Tempat Lahir</div>
           <div class="form-content">${renderBoxes(data.birthPlace, 32)}</div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">Tanggal Lahir</div>
+          <div class="form-content">${renderBoxes(formatIndonesianDate(data.birthDate), 32)}</div>
         </div>
 
         <div class="form-row">

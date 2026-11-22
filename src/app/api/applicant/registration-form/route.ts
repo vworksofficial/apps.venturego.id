@@ -6,7 +6,7 @@ import { ensureApplicationDriveFolder } from '@/lib/drive-folders'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { deleteDriveFile, uploadDriveFile } from '@/lib/gdrive'
 import { renderRegistrationFormPdf } from '@/lib/registration-form-pdf'
-import type { RegistrationFormData } from '@/lib/registration-form-types'
+import { formatIndonesianDate, type RegistrationFormData } from '@/lib/registration-form-types'
 
 const APPLICATION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       mobilePhone: String(data.phone ?? ''),
       email: String(identity.email ?? personal.email ?? ''),
       birthPlace: String(personal.birthPlace ?? ''),
-      birthDate: String(personal.birthDate ?? ''),
+      birthDate: formatIndonesianDate(String(personal.birthDate ?? '')),
       gender: personal.gender === 'FEMALE' ? 'PEREMPUAN' : 'LAKI_LAKI',
       religion: String(personal.religion ?? 'ISLAM'),
       address: String(personal.domicileAddress ?? personal.idCardAddress ?? ''),
@@ -67,9 +67,14 @@ export async function GET(request: Request) {
       destinationCountry,
     }
 
+    const regForm = (data.registrationForm as RegistrationFormData | undefined) ?? null
+    if (regForm && regForm.birthDate) {
+      regForm.birthDate = formatIndonesianDate(regForm.birthDate)
+    }
+
     return NextResponse.json({
       ok: true,
-      data: (data.registrationForm as RegistrationFormData | undefined) ?? null,
+      data: regForm,
       prefill,
     })
   } catch {

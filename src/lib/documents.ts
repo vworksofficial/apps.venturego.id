@@ -19,7 +19,7 @@ export const DOCUMENT_DEFINITIONS: Record<DocumentProduct, DocumentDefinition[]>
     { label: 'Ijazah SMA/SMK/MA/SLTA', required: true },
     { label: 'Scan Passport', required: false },
     { label: 'Scan Surat Rekomendasi LPK', required: false, section: 'dokumen-pendukung' },
-    { label: 'Scan Form Pendaftaran', required: false, section: 'dokumen-pendukung' },
+    { label: 'Form Pendaftaran', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan Surat Kesediaan Mengangsur', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan Surat Mengetahui Orang Tua', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan SKCK', required: false },
@@ -43,7 +43,7 @@ export const DOCUMENT_DEFINITIONS: Record<DocumentProduct, DocumentDefinition[]>
     { label: 'Scan Kontrak Kerja', required: false, section: 'dokumen-susulan' },
     { label: 'Scan Visa Kerja atau COE', required: false, section: 'dokumen-susulan' },
     { label: 'Scan Surat Rekomendasi LPK', required: false, section: 'dokumen-pendukung' },
-    { label: 'Scan Form Pendaftaran', required: false, section: 'dokumen-pendukung' },
+    { label: 'Form Pendaftaran', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan Surat Kesediaan Mengangsur', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan Surat Mengetahui Orang Tua', required: false, section: 'dokumen-pendukung' },
   ],
@@ -59,6 +59,12 @@ export const isAcceptedDocumentType = (mimeType: string) =>
 export const sanitizeUploadFileName = (value: string) => value.replace(/[\\/]/g, '_').slice(0, 180)
 
 const KTP_LABEL_PATTERN = /^(scan ktp$|ktp\b)/i
+
+export const isFormPendaftaranLabel = (label: string): boolean =>
+  label === 'Form Pendaftaran' || label === 'Scan Form Pendaftaran'
+
+export const getFormPendaftaranIndex = (product: DocumentProduct): number =>
+  DOCUMENT_DEFINITIONS[product].findIndex((definition) => isFormPendaftaranLabel(definition.label))
 
 export const getKtpDocumentIndex = (product: DocumentProduct): number =>
   DOCUMENT_DEFINITIONS[product].findIndex((definition) => KTP_LABEL_PATTERN.test(definition.label))

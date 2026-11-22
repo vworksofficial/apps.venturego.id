@@ -8,6 +8,7 @@ import {
   buildDocumentFileName,
   hasValidDocumentSignature,
   isAcceptedDocumentType,
+  isFormPendaftaranLabel,
   sanitizeUploadFileName,
 } from '@/lib/documents'
 import { buildDraftFolderName, ensureApplicationDriveFolder } from '@/lib/drive-folders'
@@ -271,7 +272,10 @@ const handleChunk = async (request: Request, uid: string) => {
           if (index !== ticket.documentIndex) {
             return (
               currentDocuments.find(
-                (item: { documentType?: string }) => item.documentType === definition.label,
+                (item: { documentType?: string }) =>
+                  item.documentType === definition.label ||
+                  (isFormPendaftaranLabel(definition.label) &&
+                    isFormPendaftaranLabel(item.documentType ?? '')),
               ) ?? { documentType: definition.label, status: 'NOT_UPLOADED' }
             )
           }

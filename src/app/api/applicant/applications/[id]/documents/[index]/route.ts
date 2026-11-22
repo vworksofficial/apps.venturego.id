@@ -40,8 +40,13 @@ export async function GET(
     }
 
     const file = Array.isArray(data.documents) ? data.documents[index] : null
-    if (file?.status !== 'VERIFIED' || typeof file.fileId !== 'string' || !file.fileId) {
-      return errorResponse('Berkas yang sesuai tidak tersedia.')
+    if (
+      !file ||
+      (file.status !== 'VERIFIED' && file.status !== 'UPLOADED') ||
+      typeof file.fileId !== 'string' ||
+      !file.fileId
+    ) {
+      return errorResponse('Berkas yang sesuai belum tersedia.')
     }
 
     const bytes = await downloadDriveFile(file.fileId)

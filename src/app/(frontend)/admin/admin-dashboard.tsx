@@ -1591,6 +1591,194 @@ function ApplicationDrawerForm({
               )}
             </div>
           </section>
+
+          {/* Section: Formulir Pendaftaran Siswa (Digital) */}
+          <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Formulir Pendaftaran Siswa (Digital)
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Data formulir pendaftaran yang diisi secara online oleh siswa
+                </p>
+              </div>
+              {application.registrationForm ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-200">
+                  Sudah Dilengkapi
+                </span>
+              ) : (
+                <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
+                  Belum Diisi
+                </span>
+              )}
+            </div>
+
+            {application.registrationForm ? (
+              <div className="space-y-5 p-5 text-xs">
+                <div>
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Data Tambahan Pemohon
+                  </h4>
+                  <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <dt className="text-slate-400">Nama Gadis Ibu Kandung</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.motherMaidenName ?? '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">NPWP</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.npwp || '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Jam Hubungi</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.contactHourStart ?? '—')} -{' '}
+                        {String(application.registrationForm.contactHourEnd ?? '—')}{' '}
+                        {String(application.registrationForm.contactTimeZone ?? '')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Jumlah Tanggungan</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.dependentsCount ?? '0')} Orang
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Pendidikan Terakhir</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.lastEducation ?? '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">No. Telepon Rumah</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.homePhone || '—')}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="border-t border-slate-100 pt-4">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Pekerjaan di Negara Tertuju (
+                    {String(application.registrationForm.destinationCountry ?? '—')})
+                  </h4>
+                  <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <dt className="text-slate-400">Nama Perusahaan</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.companyName || '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Bidang Usaha</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.companyBusiness || '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Posisi / Peran</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.companyRole || '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Alamat Perusahaan</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.companyAddress || '—')},{' '}
+                        {String(application.registrationForm.companyCity || '')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Status Pekerjaan</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.employmentStatus || '—')}
+                        {application.registrationForm.employmentStatusOther
+                          ? ` (${String(application.registrationForm.employmentStatusOther)})`
+                          : ''}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Estimasi Pendapatan</dt>
+                      <dd className="mt-0.5 font-semibold text-emerald-700">
+                        Rp{' '}
+                        {Number(application.registrationForm.monthlyIncome || 0).toLocaleString(
+                          'id-ID',
+                        )}{' '}
+                        / bln
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="border-t border-slate-100 pt-4">
+                  <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Kontak Emergency (Darurat)
+                  </h4>
+                  <dl className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div>
+                      <dt className="text-slate-400">Nama Kontak</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.emergencyName || '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Hubungan</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.emergencyRelation || '—')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">No. HP / WA</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {String(application.registrationForm.emergencyMobile || '—')}
+                      </dd>
+                    </div>
+                    <div className="col-span-2">
+                      <dt className="text-slate-400">Alamat Domisili</dt>
+                      <dd className="mt-0.5 text-slate-800">
+                        {String(application.registrationForm.emergencyAddress || '—')} (RT{' '}
+                        {String(application.registrationForm.emergencyRt || '')}/RW{' '}
+                        {String(application.registrationForm.emergencyRw || '')},{' '}
+                        {String(application.registrationForm.emergencyCity || '')})
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-slate-400">Status Tempat Tinggal</dt>
+                      <dd className="mt-0.5 font-semibold text-slate-900">
+                        {application.registrationForm.emergencyCohabitation === 'TINGGAL_SERUMAH'
+                          ? 'Tinggal Serumah'
+                          : 'Tidak Serumah'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                  <span className="text-[11px] text-slate-400">
+                    Dilengkapi pada:{' '}
+                    {formatDateLong(String(application.registrationForm.completedAt || ''))}
+                  </span>
+                  <button
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#0b57d0] hover:underline"
+                    onClick={() => setActiveTab('documents')}
+                    type="button"
+                  >
+                    <span>Tinjau PDF di Tab Berkas</span>
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-slate-500">
+                Siswa belum melengkapi formulir pendaftaran digital.
+              </div>
+            )}
+          </section>
         </div>
 
         {/* TAB: NOMINAL PENGAJUAN */}

@@ -31,7 +31,10 @@ function formatIncomeNumber(val: number): string {
   return val.toLocaleString('id-ID')
 }
 
-export function generateRegistrationFormHtml(data: RegistrationFormData): string {
+export function generateRegistrationFormHtml(
+  data: RegistrationFormData,
+  financingScheme?: string,
+): string {
   const isJapan =
     data.destinationCountry.toUpperCase().includes('JEPANG') ||
     data.destinationCountry.toUpperCase() === 'JAPAN'
@@ -46,6 +49,13 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
       : `TALANG DANA KE ${escapeHtml(data.destinationCountry.toUpperCase() || 'LUAR NEGERI')}`
 
   const timeZone = data.contactTimeZone || (isJapan ? 'Waktu Jepang' : 'WIB')
+
+  // Determine program label for footer (matches akad document style)
+  const rawScheme = (financingScheme ?? '').toUpperCase()
+  const programLabel =
+    rawScheme.includes('FULL') || rawScheme.includes('COVER')
+      ? 'Program <i>Full Cover</i>'
+      : 'Program <i>Dana Keberangkatan</i>'
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -87,7 +97,7 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
       page-break-after: auto;
     }
 
-    /* HEADER */
+    /* HEADER — matches akad document header */
     .header-row {
       display: flex;
       justify-content: space-between;
@@ -99,49 +109,51 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
     .logo-container {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
     }
-    .v-logo {
-      font-size: 34pt;
-      font-weight: 900;
-      font-style: italic;
-      color: #0d8b82;
-      line-height: 0.9;
-      font-family: 'Arial Black', Arial, sans-serif;
+    .logo-img {
+      width: 38px;
+      height: auto;
     }
     .v-text-block {
       display: flex;
       flex-direction: column;
-    }
-    .v-title {
-      font-size: 11pt;
-      font-weight: 900;
-      letter-spacing: 0.8px;
-      color: #1e293b;
       line-height: 1.1;
     }
-    .v-subtitle {
-      font-size: 7.5pt;
+    .v-brand-name {
+      font-size: 13pt;
+      font-weight: 800;
+      color: #0b57d0;
+      font-family: 'Google Sans', Raleway, Arial, sans-serif;
+      line-height: 1.1;
+    }
+    .v-brand-sub {
+      font-size: 9pt;
       font-weight: 700;
-      letter-spacing: 0.5px;
-      color: #334155;
+      color: #0b57d0;
+      font-family: 'Google Sans', Raleway, Arial, sans-serif;
+      line-height: 1.1;
     }
     .header-info {
       text-align: right;
-      font-size: 6.8pt;
-      color: #334155;
-      line-height: 1.35;
-      max-width: 320px;
+      font-size: 6.5pt;
+      color: #000000;
+      line-height: 1.4;
+      max-width: 280px;
     }
-    .header-info .powered {
-      font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 1px;
-    }
-    .header-info .koperasi-title {
+    .header-info .company-name {
       font-weight: 800;
-      color: #0d8b82;
-      font-size: 7.5pt;
+      color: #0b57d0;
+      font-size: 9pt;
+      font-family: 'Google Sans', Raleway, Arial, sans-serif;
+      line-height: 1.2;
+    }
+    .header-info .company-tagline {
+      font-weight: 700;
+      color: #0b57d0;
+      font-size: 8pt;
+      font-family: 'Google Sans', Raleway, Arial, sans-serif;
+      line-height: 1.2;
     }
 
     /* TITLE */
@@ -270,59 +282,29 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
       margin-right: 3px;
     }
 
-    /* FOOTER */
+    /* FOOTER — matches akad document footer (no paraf box) */
     .footer-row {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
-      gap: 18px;
       padding-top: 5px;
       border-top: 1.5px solid #e2e8f0;
       margin-top: 6px;
     }
-    .koperasi-footer {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .footer-program {
+      font-size: 8pt;
+      color: #94a3b8;
+      font-style: normal;
     }
-    .koperasi-sun-badge {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #eab308;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 11pt;
-      font-weight: 900;
-    }
-    .koperasi-footer-text {
-      font-size: 6.5pt;
-      line-height: 1.2;
-      color: #475569;
-      font-weight: 600;
-    }
-    .v-footer {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .v-footer-mark {
-      font-size: 18pt;
-      font-weight: 900;
+    .footer-program i {
       font-style: italic;
-      color: #0d8b82;
-      line-height: 0.9;
-      font-family: 'Arial Black', Arial, sans-serif;
     }
-    .v-footer-text {
-      display: flex;
-      flex-direction: column;
-      font-size: 5.5pt;
-      line-height: 1.1;
-      font-weight: 800;
-      color: #1e293b;
+    .footer-page {
+      font-size: 8pt;
+      color: #64748b;
+    }
+    .footer-right {
+      width: 80px;
     }
   </style>
 </head>
@@ -334,17 +316,17 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
       <!-- Header -->
       <div class="header-row">
         <div class="logo-container">
-          <div class="v-logo">V</div>
           <div class="v-text-block">
-            <span class="v-title">V-WORKS</span>
-            <span class="v-subtitle">STUDENT VENTURE</span>
+            <span class="v-brand-name">Vworks</span>
+            <span class="v-brand-sub">Student Venture</span>
           </div>
         </div>
         <div class="header-info">
-          <div class="powered">Powered by :</div>
-          <div class="koperasi-title">Koperasi Konsumen Mentari Jaya Husada</div>
-          <div>Sekretariat: Jalan Kyai Wonosobo, RT/RW 08/01 Kel. Kejiwan,</div>
-          <div>Kec. Wonosobo, Kab. Wonosobo, Jawa tengah 56311</div>
+          <div class="company-name">PT VWORKS KOLABORASI BERSAMA</div>
+          <div class="company-tagline">Your Partner to Leap Together</div>
+          <div>Perum Bumi Dieng Indah 2, Blok G5 No. 2 &amp; 3, RW 4</div>
+          <div>Andongsili, Kec. Mojotengah, Kabupaten Wonosobo, Jawa Tengah 56351</div>
+          <div>082213072665</div>
         </div>
       </div>
 
@@ -570,20 +552,9 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
 
     <!-- Footer Page 1 -->
     <div class="footer-row">
-      <div class="koperasi-footer">
-        <div class="koperasi-sun-badge">&#9728;</div>
-        <div class="koperasi-footer-text">
-          <div>Koperasi Konsumen</div>
-          <div style="font-weight:800; color:#0d8b82;">Mentari Jaya Husada</div>
-        </div>
-      </div>
-      <div class="v-footer">
-        <div class="v-footer-mark">V</div>
-        <div class="v-footer-text">
-          <span>V-WORKS</span>
-          <span style="color:#0d8b82;">STUDENT VENTURE</span>
-        </div>
-      </div>
+      <div class="footer-program">${programLabel}</div>
+      <div class="footer-page">Halaman 1 dari 2</div>
+      <div class="footer-right"></div>
     </div>
   </div>
 
@@ -593,17 +564,17 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
       <!-- Header -->
       <div class="header-row">
         <div class="logo-container">
-          <div class="v-logo">V</div>
           <div class="v-text-block">
-            <span class="v-title">V-WORKS</span>
-            <span class="v-subtitle">STUDENT VENTURE</span>
+            <span class="v-brand-name">Vworks</span>
+            <span class="v-brand-sub">Student Venture</span>
           </div>
         </div>
         <div class="header-info">
-          <div class="powered">Powered by :</div>
-          <div class="koperasi-title">Koperasi Konsumen Mentari Jaya Husada</div>
-          <div>Sekretariat: Jalan Kyai Wonosobo, RT/RW 08/01 Kel. Kejiwan,</div>
-          <div>Kec. Wonosobo, Kab. Wonosobo, Jawa tengah 56311</div>
+          <div class="company-name">PT VWORKS KOLABORASI BERSAMA</div>
+          <div class="company-tagline">Your Partner to Leap Together</div>
+          <div>Perum Bumi Dieng Indah 2, Blok G5 No. 2 &amp; 3, RW 4</div>
+          <div>Andongsili, Kec. Mojotengah, Kabupaten Wonosobo, Jawa Tengah 56351</div>
+          <div>082213072665</div>
         </div>
       </div>
 
@@ -715,20 +686,9 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
 
     <!-- Footer Page 2 -->
     <div class="footer-row">
-      <div class="koperasi-footer">
-        <div class="koperasi-sun-badge">&#9728;</div>
-        <div class="koperasi-footer-text">
-          <div>Koperasi Konsumen</div>
-          <div style="font-weight:800; color:#0d8b82;">Mentari Jaya Husada</div>
-        </div>
-      </div>
-      <div class="v-footer">
-        <div class="v-footer-mark">V</div>
-        <div class="v-footer-text">
-          <span>V-WORKS</span>
-          <span style="color:#0d8b82;">STUDENT VENTURE</span>
-        </div>
-      </div>
+      <div class="footer-program">${programLabel}</div>
+      <div class="footer-page">Halaman 2 dari 2</div>
+      <div class="footer-right"></div>
     </div>
   </div>
 
@@ -736,7 +696,10 @@ export function generateRegistrationFormHtml(data: RegistrationFormData): string
 </html>`
 }
 
-export async function renderRegistrationFormPdf(data: RegistrationFormData): Promise<Uint8Array> {
-  const html = generateRegistrationFormHtml(data)
+export async function renderRegistrationFormPdf(
+  data: RegistrationFormData,
+  financingScheme?: string,
+): Promise<Uint8Array> {
+  const html = generateRegistrationFormHtml(data, financingScheme)
   return renderAkadPdf(html)
 }

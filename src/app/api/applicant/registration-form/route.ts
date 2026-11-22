@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     }
 
     // 1. Generate PDF
-    const pdfBytes = await renderRegistrationFormPdf(formData)
+    const pdfBytes = await renderRegistrationFormPdf(formData, String(product))
 
     // 2. Ensure Google Drive folder
     const existingFolderId =

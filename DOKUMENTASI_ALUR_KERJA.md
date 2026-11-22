@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (fix(dashboard): perbaikan skeleton loading halaman angsuran — penyelarasan geometri hero, SVG gauge arc, margin overlap (-mt-10), dan susunan kartu jadwal & riwayat untuk mengeliminasi layout shift (CLS).)
+Terakhir diperbarui: **22 November 2026** (fix(dashboard): perbaikan hero card mobile — font nominal dikecilkan ke 22px (sm:26px), badge status padding dikompakkan (px-2.5 py-1), grid "Sisa angsuran / Jatuh tempo" diubah ke flex dengan kolom kiri fixed-width dan tanggal+nominal dipisah 2 baris untuk menghindari text-wrap dan kepadatan visual di layar mobile.)
 
 ---
 

@@ -690,7 +690,7 @@ export default function DashboardPage() {
                                   </p>
                                   {primaryAmount !== null ? (
                                     <div className="mt-1.5 flex items-center gap-1">
-                                      <strong className="text-[26px] font-extrabold leading-tight tracking-[-0.04em] text-slate-950">
+                                      <strong className="text-[22px] font-extrabold leading-tight tracking-[-0.04em] text-slate-950 sm:text-[26px]">
                                         {showBalance ? formatRupiah(primaryAmount) : 'Rp••••••••'}
                                       </strong>
                                       <button
@@ -720,7 +720,7 @@ export default function DashboardPage() {
                                   )}
                                 </div>
                                 <span
-                                  className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-bold ${
+                                  className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${
                                     application.status === 'ACTIVE'
                                       ? 'bg-emerald-100 text-emerald-800'
                                       : application.status === 'COMPLETED'
@@ -761,30 +761,34 @@ export default function DashboardPage() {
                                     : `${PRODUCT_LABELS[application.product]}`}
                                 </span>
                               </div>
-                              <div
-                                className="mt-5 grid gap-3 border-t border-slate-100 pt-4"
-                                style={{ gridTemplateColumns: '1fr 3fr' }}
-                              >
-                                <div>
-                                  <span className="text-[11px] text-slate-400">Sisa angsuran</span>
-                                  <strong className="mt-1 block text-sm text-slate-800">
+                              <div className="mt-5 flex gap-0 border-t border-slate-100 pt-4">
+                                <div className="w-[5.5rem] shrink-0 pr-3">
+                                  <span className="text-[10px] text-slate-400">Sisa angsuran</span>
+                                  <strong className="mt-1 block text-sm font-bold text-slate-800">
                                     {schedule.total - schedule.paidCount} kali
                                   </strong>
                                 </div>
-                                <div className="border-l border-slate-100 pl-4">
-                                  <span className="text-[11px] text-slate-400">
+                                <div className="min-w-0 flex-1 border-l border-slate-100 pl-3">
+                                  <span className="text-[10px] text-slate-400">
                                     Jatuh tempo berikutnya
                                   </span>
                                   <div className="mt-1">
-                                    <strong className="text-sm text-slate-800">
-                                      {schedule.nextDueDate
-                                        ? `${formatDate(schedule.nextDueDate)}${
-                                            schedule.nextDueAmount !== null
-                                              ? ` · ${formatRupiah(schedule.nextDueAmount)}`
-                                              : ''
-                                          }`
-                                        : 'Seluruh angsuran telah lunas'}
-                                    </strong>
+                                    {schedule.nextDueDate ? (
+                                      <>
+                                        <strong className="block text-xs font-semibold text-slate-800">
+                                          {formatDate(schedule.nextDueDate)}
+                                        </strong>
+                                        {schedule.nextDueAmount !== null && (
+                                          <span className="text-[11px] font-bold text-[var(--primary)]">
+                                            {formatRupiah(schedule.nextDueAmount)}
+                                          </span>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <strong className="text-xs font-semibold text-slate-800">
+                                        Seluruh angsuran telah lunas
+                                      </strong>
+                                    )}
                                   </div>
                                 </div>
                               </div>

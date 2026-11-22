@@ -4,7 +4,9 @@ import { isAllowedSignInProvider } from '@/lib/auth-shared'
 import {
   DOCUMENT_DEFINITIONS,
   getFormPendaftaranIndex,
+  getJobDetailsFormIndex,
   isFormPendaftaranLabel,
+  isJobDetailsFormLabel,
 } from '@/lib/documents'
 import { ensureApplicationDriveFolder } from '@/lib/drive-folders'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
@@ -80,6 +82,7 @@ export async function GET(request: Request) {
       ok: true,
       data: regForm,
       prefill,
+      product: String(data.product ?? ''),
     })
   } catch {
     return errorResponse('Data formulir belum dapat dimuat.', 500)
@@ -161,34 +164,56 @@ export async function POST(request: Request) {
       typeof prevFormDoc?.fileId === 'string' ? (prevFormDoc.fileId as string) : null
 
     const definitions = DOCUMENT_DEFINITIONS[product]
+    const jobDetailsIndex = getJobDetailsFormIndex(product)
+    const hasJobDetails = Boolean(formData.companyName?.trim())
+
     const nextDocuments = definitions.map((definition, index) => {
-      if (index !== formIndex) {
-        return (
-          currentDocuments.find(
-            (item) =>
-              item.documentType === definition.label ||
-              (isFormPendaftaranLabel(definition.label) &&
-                isFormPendaftaranLabel(String(item.documentType ?? ''))),
-          ) ??
-          currentDocuments[index] ?? {
+      if (index === formIndex) {
+        return {
+          documentType: 'Form Pendaftaran',
+          status: 'UPLOADED',
+          fileId: uploaded.fileId,
+          fileName,
+          mimeType: 'application/pdf',
+          size: uploaded.size,
+        }
+      }
+      if (jobDetailsIndex >= 0 && index === jobDetailsIndex) {
+        if (hasJobDetails) {
+          return {
             documentType: definition.label,
-            status: 'NOT_UPLOADED',
+            status: 'UPLOADED',
+            fileId: uploaded.fileId,
+            fileName,
+            mimeType: 'application/pdf',
+            size: uploaded.size,
           }
-        )
+        }
+        return {
+          documentType: definition.label,
+          status: 'NOT_UPLOADED',
+        }
       }
-      return {
-        documentType: 'Form Pendaftaran',
-        status: 'UPLOADED',
-        fileId: uploaded.fileId,
-        fileName,
-        mimeType: 'application/pdf',
-        size: uploaded.size,
-      }
+      return (
+        currentDocuments.find(
+          (item) =>
+            item.documentType === definition.label ||
+            (isFormPendaftaranLabel(definition.label) &&
+              isFormPendaftaranLabel(String(item.documentType ?? ''))),
+        ) ??
+        currentDocuments[index] ?? {
+          documentType: definition.label,
+          status: 'NOT_UPLOADED',
+        }
+      )
     })
 
     const updatedFormData: RegistrationFormData = {
       ...formData,
-      completedAt: new Date().toISOString(),
+      completedAt: formData.completedAt || new Date().toISOString(),
+      jobDetailsCompletedAt: hasJobDetails
+        ? formData.jobDetailsCompletedAt || new Date().toISOString()
+        : formData.jobDetailsCompletedAt,
       pdfFileId: uploaded.fileId,
     }
 

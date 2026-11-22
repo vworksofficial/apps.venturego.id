@@ -20,6 +20,11 @@ export type OwnedApplication = {
   applicantName: string
   status: string
   documents: DocumentEntry[]
+  registrationForm?: {
+    completedAt?: string
+    companyName?: string
+    jobDetailsCompletedAt?: string
+  } | null
 }
 
 export type OwnedApplicationsResult =
@@ -59,6 +64,7 @@ export async function getOwnedApplications(uploadToken: string): Promise<OwnedAp
           applicantName: data.applicantName,
           status: typeof data.status === 'string' ? data.status : '',
           documents: Array.isArray(data.documents) ? (data.documents as DocumentEntry[]) : [],
+          registrationForm: (data.registrationForm as OwnedApplication['registrationForm']) ?? null,
         },
       ]
     })

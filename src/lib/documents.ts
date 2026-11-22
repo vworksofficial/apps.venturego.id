@@ -42,6 +42,7 @@ export const DOCUMENT_DEFINITIONS: Record<DocumentProduct, DocumentDefinition[]>
     { label: 'Scan Passport', required: false, section: 'dokumen-susulan' },
     { label: 'Scan Kontrak Kerja', required: false, section: 'dokumen-susulan' },
     { label: 'Scan Visa Kerja atau COE', required: false, section: 'dokumen-susulan' },
+    { label: 'Form Pekerjaan Negara Tertuju', required: false, section: 'dokumen-susulan' },
     { label: 'Form Pendaftaran', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan Surat Rekomendasi LPK', required: false, section: 'dokumen-pendukung' },
     { label: 'Scan Surat Kesediaan Mengangsur', required: false, section: 'dokumen-pendukung' },
@@ -62,6 +63,14 @@ const KTP_LABEL_PATTERN = /^(scan ktp$|ktp\b)/i
 
 export const isFormPendaftaranLabel = (label: string): boolean =>
   label === 'Form Pendaftaran' || label === 'Scan Form Pendaftaran'
+
+export const isJobDetailsFormLabel = (label: string): boolean =>
+  label === 'Form Pekerjaan Negara Tertuju' ||
+  label === 'Form Info Pekerjaan' ||
+  label === 'Scan Form Pekerjaan Negara Tertuju'
+
+export const getJobDetailsFormIndex = (product: DocumentProduct): number =>
+  DOCUMENT_DEFINITIONS[product].findIndex((definition) => isJobDetailsFormLabel(definition.label))
 
 export const getFormPendaftaranIndex = (product: DocumentProduct): number =>
   DOCUMENT_DEFINITIONS[product].findIndex((definition) => isFormPendaftaranLabel(definition.label))

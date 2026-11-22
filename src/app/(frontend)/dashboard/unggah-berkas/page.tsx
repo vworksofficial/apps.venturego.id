@@ -9,6 +9,7 @@ import {
   DOCUMENT_DEFINITIONS,
   MAX_DOCUMENT_SIZE_BYTES,
   isFormPendaftaranLabel,
+  isJobDetailsFormLabel,
 } from '@/lib/documents'
 import { uploadToDrive } from '@/lib/upload-client'
 import { getOwnedApplications, type OwnedApplication } from './actions'
@@ -453,7 +454,8 @@ export default function UploadDocumentsPage() {
                             : 'Belum diunggah'}
                         </p>
                       </div>
-                      {isFormPendaftaranLabel(document.label) ? (
+                      {isFormPendaftaranLabel(document.label) ||
+                      isJobDetailsFormLabel(document.label) ? (
                         isUploaded && selectedApplication ? (
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button
@@ -470,9 +472,13 @@ export default function UploadDocumentsPage() {
                               />
                             </button>
                             <Link
-                              aria-label="Ubah formulir pendaftaran"
+                              aria-label={`Ubah ${document.label}`}
                               className="grid size-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
-                              href={`/dashboard/pendaftaran?id=${selectedApplication.id}`}
+                              href={
+                                isJobDetailsFormLabel(document.label)
+                                  ? `/dashboard/pendaftaran?id=${selectedApplication.id}&section=pekerjaan`
+                                  : `/dashboard/pendaftaran?id=${selectedApplication.id}`
+                              }
                               title="Ubah data formulir"
                             >
                               <DashboardIcon className="size-3.5" name="edit" />
@@ -481,7 +487,11 @@ export default function UploadDocumentsPage() {
                         ) : (
                           <Link
                             className="min-w-[6.5rem] shrink-0 rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 px-3.5 py-2 text-center text-[10px] font-bold text-white shadow-sm transition hover:from-teal-700 hover:to-emerald-700"
-                            href={`/dashboard/pendaftaran?id=${selectedApplication?.id ?? ''}`}
+                            href={
+                              isJobDetailsFormLabel(document.label)
+                                ? `/dashboard/pendaftaran?id=${selectedApplication?.id ?? ''}&section=pekerjaan`
+                                : `/dashboard/pendaftaran?id=${selectedApplication?.id ?? ''}`
+                            }
                           >
                             Lengkapi Form
                           </Link>

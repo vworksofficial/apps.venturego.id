@@ -62,6 +62,7 @@ export type RegistrationFormData = {
 
   // Metadata
   completedAt?: string
+  jobDetailsCompletedAt?: string
   pdfFileId?: string
 }
 

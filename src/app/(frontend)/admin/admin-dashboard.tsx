@@ -4764,7 +4764,7 @@ export function AdminDashboard({
 
   const openTransferDetail = (app: FinancingApplicationRecord, index: number) => {
     const initialState = createInitialTransferState(app)
-    const text = buildDepartureTransferWhatsappMessage(index + 1, app.applicantName, initialState)
+    const text = buildDepartureTransferWhatsappMessage(app, initialState)
     setTransferDetailTarget({ app, index })
     setTransferState(initialState)
     setTransferMessageText(text)
@@ -4784,11 +4784,7 @@ export function AdminDashboard({
         next.principal - next.adminFee - next.lpkAmount - totalAdditional,
       )
       const finalState = { ...next, pocketMoney: calculatedPocket }
-      const text = buildDepartureTransferWhatsappMessage(
-        transferDetailTarget.index + 1,
-        transferDetailTarget.app.applicantName,
-        finalState,
-      )
+      const text = buildDepartureTransferWhatsappMessage(transferDetailTarget.app, finalState)
       setTransferMessageText(text)
       return finalState
     })
@@ -4797,11 +4793,7 @@ export function AdminDashboard({
   const handleResetTransferState = () => {
     if (!transferDetailTarget) return
     const initialState = createInitialTransferState(transferDetailTarget.app)
-    const text = buildDepartureTransferWhatsappMessage(
-      transferDetailTarget.index + 1,
-      transferDetailTarget.app.applicantName,
-      initialState,
-    )
+    const text = buildDepartureTransferWhatsappMessage(transferDetailTarget.app, initialState)
     setTransferState(initialState)
     setTransferMessageText(text)
     setShowLpkConfig(false)

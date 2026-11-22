@@ -5,6 +5,7 @@ import type { FinancingApplicationRecord } from '@/lib/firebase-data'
 import {
   type AdditionalRecipient,
   type TransferDetailsState,
+  formatDisplayApplicationId,
   formatThousandsNumber,
   parseThousandsInput,
 } from '@/lib/transfer-summary'
@@ -38,17 +39,18 @@ export function TransferBreakdownModal({
 }) {
   const [showLpkConfig, setShowLpkConfig] = useState(false)
   const [showStudentConfig, setShowStudentConfig] = useState(false)
+  const [showOperasionalConfig, setShowOperasionalConfig] = useState(false)
 
-  const formatDisplayId = (id: string) => {
-    if (!id) return ''
-    const parts = id.split('-')
-    if (parts.length >= 2) return `VSV-${parts[parts.length - 1]}`
-    return id
-  }
+  const akadDoc = target.app.financialPlan?.akadDocument
+  const studentNis =
+    akadDoc && typeof akadDoc === 'object'
+      ? String((akadDoc as Record<string, unknown>).studentNumber ?? '').trim()
+      : ''
+  const displayId = formatDisplayApplicationId(target.app.applicationId)
 
   return (
     <div
-      className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/60 p-3 sm:p-5 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/60 p-3 sm:p-6 backdrop-blur-[2px]"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose()
@@ -58,7 +60,7 @@ export function TransferBreakdownModal({
       <section
         aria-labelledby="transfer-detail-title"
         aria-modal="true"
-        className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-xl border border-slate-300 bg-white shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
       >
@@ -85,9 +87,10 @@ export function TransferBreakdownModal({
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 <span className="font-semibold text-slate-800">
-                  {target.index + 1}. {target.app.applicantName}
+                  {studentNis ? `NIS ${studentNis} · ` : `${target.index + 1}. `}
+                  {target.app.applicantName}
                 </span>{' '}
-                · ID {formatDisplayId(target.app.applicationId)}
+                · ID {displayId}
               </p>
             </div>
           </div>
@@ -115,7 +118,7 @@ export function TransferBreakdownModal({
             {/* KOLOM KIRI: LEMBAR DATA PENCAIRAN FORMAL (7 Kolom) */}
             <div className="space-y-4 lg:col-span-7">
               {/* Seksi 1: Ringkasan Plafon & Jasa Administrasi */}
-              <div className="rounded-lg border border-slate-200 bg-white">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                 <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-2.5">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
                     1. Alokasi Plafon & Biaya Administrasi
@@ -152,18 +155,11 @@ export function TransferBreakdownModal({
               </div>
 
               {/* Seksi 2: Daftar Rekening Tujuan Transfer */}
-              <div className="rounded-lg border border-slate-200 bg-white">
-                <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-2.5">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-2.5">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
                     2. Rekening Tujuan Pencairan
                   </span>
-                  <button
-                    className="text-[11px] font-semibold text-[#0b57d0] transition hover:underline"
-                    onClick={onAddRecipient}
-                    type="button"
-                  >
-                    + Tambah Komisi / LPK Lain
-                  </button>
                 </div>
 
                 <div className="divide-y divide-slate-200 text-xs">
@@ -184,24 +180,35 @@ export function TransferBreakdownModal({
                           Ket. {state.lpkNotes || target.app.applicantName}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex flex-col items-end gap-1.5 text-right">
                         <span className="text-xs font-bold text-slate-900">
                           Rp{formatThousandsNumber(state.lpkAmount)}
                         </span>
-                        <div className="mt-1">
-                          <button
-                            className="text-[11px] text-[#0b57d0] hover:underline"
-                            onClick={() => setShowLpkConfig((prev) => !prev)}
-                            type="button"
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-2xs transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                          onClick={() => setShowLpkConfig((prev) => !prev)}
+                          type="button"
+                        >
+                          <svg
+                            className="size-3 text-slate-500"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            viewBox="0 0 24 24"
                           >
-                            {showLpkConfig ? 'Selesai' : 'Ubah Norek LPK'}
-                          </button>
-                        </div>
+                            <path
+                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          <span>{showLpkConfig ? 'Selesai' : 'Edit Rekening'}</span>
+                        </button>
                       </div>
                     </div>
 
                     {showLpkConfig && (
-                      <div className="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50/70 p-3 text-xs">
+                      <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs">
                         <div className="grid gap-2 sm:grid-cols-2">
                           <label className="space-y-0.5">
                             <span className="text-[10px] text-slate-500">
@@ -281,94 +288,128 @@ export function TransferBreakdownModal({
                     )}
                   </div>
 
-                  {/* 2B. Penerima Tambahan (Komisi / LPK Lain) */}
-                  {state.additionalRecipients.map((rec, idx) => (
-                    <div className="bg-slate-50/40 p-4" key={rec.id}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <span className="font-bold text-slate-900">
-                            B.{idx + 1}. {rec.title || 'Pencairan Komisi / LPK Lain'}
-                          </span>
-                          <p className="mt-0.5 text-slate-700">
-                            {rec.bank ? `${rec.bank}. ` : ''}
-                            {rec.accountName || '—'}
-                          </p>
-                          <p className="font-mono text-xs font-semibold text-slate-800">
-                            {rec.accountNumber || '—'}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            Ket. {rec.notes || target.app.applicantName}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs font-bold text-slate-900">
-                            Rp{formatThousandsNumber(rec.amount)}
-                          </span>
-                          <div className="mt-1">
-                            <button
-                              className="text-[11px] text-red-600 hover:underline"
-                              onClick={() => onRemoveRecipient(rec.id)}
-                              type="button"
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                        </div>
+                  {/* 2B. Section B: Komisi / LPK Lain (Selalu Tampil) */}
+                  <div className="bg-slate-50/40 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-slate-900">B. Komisi / LPK Lain</span>
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          Pencairan komisi atau pembagian dana ke pihak lain (opsional, memotong
+                          uang saku siswa).
+                        </p>
                       </div>
-
-                      <div className="mt-2.5 grid gap-2 sm:grid-cols-2 text-xs">
-                        <input
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                          onChange={(e) => onUpdateRecipient(rec.id, { title: e.target.value })}
-                          placeholder="Judul Keperluan"
-                          type="text"
-                          value={rec.title}
-                        />
-                        <input
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-900"
-                          onChange={(e) => {
-                            const val = parseThousandsInput(e.target.value)
-                            onUpdateRecipient(rec.id, { amount: val })
-                          }}
-                          placeholder="Nominal (Rp)"
-                          type="text"
-                          value={formatThousandsNumber(rec.amount)}
-                        />
-                        <input
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                          onChange={(e) => onUpdateRecipient(rec.id, { bank: e.target.value })}
-                          placeholder="Bank (misal BRI)"
-                          type="text"
-                          value={rec.bank}
-                        />
-                        <input
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                          onChange={(e) =>
-                            onUpdateRecipient(rec.id, { accountName: e.target.value })
-                          }
-                          placeholder="Atas Nama Rekening"
-                          type="text"
-                          value={rec.accountName}
-                        />
-                        <input
-                          className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900"
-                          onChange={(e) =>
-                            onUpdateRecipient(rec.id, { accountNumber: e.target.value })
-                          }
-                          placeholder="No. Rekening"
-                          type="text"
-                          value={rec.accountNumber}
-                        />
-                        <input
-                          className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                          onChange={(e) => onUpdateRecipient(rec.id, { notes: e.target.value })}
-                          placeholder="Keterangan"
-                          type="text"
-                          value={rec.notes}
-                        />
-                      </div>
+                      <button
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-[#0b57d0] shadow-2xs transition hover:border-[#0b57d0] hover:bg-blue-50/50"
+                        onClick={onAddRecipient}
+                        type="button"
+                      >
+                        + Tambah Komisi / LPK Lain
+                      </button>
                     </div>
-                  ))}
+
+                    {state.additionalRecipients.length === 0 ? (
+                      <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-white/70 p-3 text-center text-xs text-slate-400">
+                        Belum ada penerima komisi / LPK lain yang ditambahkan.
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {state.additionalRecipients.map((rec, idx) => (
+                          <div
+                            className="space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs"
+                            key={rec.id}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <span className="font-semibold text-slate-800">
+                                  B.{idx + 1}. {rec.title || 'Komisi / LPK Lain'}
+                                </span>
+                                <p className="mt-0.5 text-slate-700">
+                                  {rec.bank ? `${rec.bank}. ` : ''}
+                                  {rec.accountName || '—'}
+                                </p>
+                                <p className="font-mono text-xs font-semibold text-slate-800">
+                                  {rec.accountNumber || '—'}
+                                </p>
+                                <p className="text-[11px] text-slate-500">
+                                  Ket. {rec.notes || target.app.applicantName}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 text-right">
+                                <span className="text-xs font-bold text-slate-900">
+                                  Rp{formatThousandsNumber(rec.amount)}
+                                </span>
+                                <button
+                                  className="text-[11px] font-medium text-red-600 hover:underline"
+                                  onClick={() => onRemoveRecipient(rec.id)}
+                                  type="button"
+                                >
+                                  Hapus
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="mt-2 grid gap-2 border-t border-slate-100 pt-2 text-xs sm:grid-cols-2">
+                              <input
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                                onChange={(e) =>
+                                  onUpdateRecipient(rec.id, { title: e.target.value })
+                                }
+                                placeholder="Judul Keperluan (misal Komisi)"
+                                type="text"
+                                value={rec.title}
+                              />
+                              <input
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                                onChange={(e) => {
+                                  const val = parseThousandsInput(e.target.value)
+                                  onUpdateRecipient(rec.id, { amount: val })
+                                }}
+                                placeholder="Nominal (Rp)"
+                                type="text"
+                                value={formatThousandsNumber(rec.amount)}
+                              />
+                              <input
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                                onChange={(e) =>
+                                  onUpdateRecipient(rec.id, { bank: e.target.value })
+                                }
+                                placeholder="Bank (misal BRI)"
+                                type="text"
+                                value={rec.bank}
+                              />
+                              <input
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                                onChange={(e) =>
+                                  onUpdateRecipient(rec.id, { accountName: e.target.value })
+                                }
+                                placeholder="Atas Nama Rekening"
+                                type="text"
+                                value={rec.accountName}
+                              />
+                              <input
+                                className="rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                                onChange={(e) =>
+                                  onUpdateRecipient(rec.id, { accountNumber: e.target.value })
+                                }
+                                placeholder="No. Rekening"
+                                type="text"
+                                value={rec.accountNumber}
+                              />
+                              <input
+                                className="rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                                onChange={(e) =>
+                                  onUpdateRecipient(rec.id, { notes: e.target.value })
+                                }
+                                placeholder="Keterangan Transfer"
+                                type="text"
+                                value={rec.notes}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {/* 2C. Uang Saku Siswa (Nafaqah) */}
                   <div className="p-4">
@@ -394,24 +435,35 @@ export function TransferBreakdownModal({
                           Ket. {state.applicantNotes || `Uang Saku ${target.app.applicantName}`}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex flex-col items-end gap-1.5 text-right">
                         <span className="text-xs font-bold text-slate-900">
                           Rp{formatThousandsNumber(state.pocketMoney)}
                         </span>
-                        <div className="mt-1">
-                          <button
-                            className="text-[11px] text-[#0b57d0] hover:underline"
-                            onClick={() => setShowStudentConfig((prev) => !prev)}
-                            type="button"
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-2xs transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                          onClick={() => setShowStudentConfig((prev) => !prev)}
+                          type="button"
+                        >
+                          <svg
+                            className="size-3 text-slate-500"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            viewBox="0 0 24 24"
                           >
-                            {showStudentConfig ? 'Selesai' : 'Ubah Rekening Siswa'}
-                          </button>
-                        </div>
+                            <path
+                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          <span>{showStudentConfig ? 'Selesai' : 'Edit Rekening'}</span>
+                        </button>
                       </div>
                     </div>
 
                     {showStudentConfig && (
-                      <div className="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50/70 p-3 text-xs">
+                      <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs">
                         <div className="grid gap-2 sm:grid-cols-2">
                           <label className="space-y-0.5">
                             <span className="text-[10px] text-slate-500">Bank Siswa</span>
@@ -500,13 +552,90 @@ export function TransferBreakdownModal({
                           {state.operasionalRecipientName || 'Panut'} (Staf VentureGo)
                         </p>
                       </div>
-                      <div className="text-right">
-                        <span className="text-xs font-bold text-slate-900">
-                          Rp{formatThousandsNumber(state.adminOperasional)}
-                        </span>
-                        <p className="mt-0.5 text-[10px] text-slate-500">40% Jasa Administrasi</p>
+                      <div className="flex flex-col items-end gap-1.5 text-right">
+                        <div>
+                          <span className="text-xs font-bold text-slate-900">
+                            Rp{formatThousandsNumber(state.adminOperasional)}
+                          </span>
+                          <p className="text-[10px] text-slate-500">40% Jasa Administrasi</p>
+                        </div>
+                        <button
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 shadow-2xs transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                          onClick={() => setShowOperasionalConfig((prev) => !prev)}
+                          type="button"
+                        >
+                          <svg
+                            className="size-3 text-slate-500"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          <span>{showOperasionalConfig ? 'Selesai' : 'Edit Rekening'}</span>
+                        </button>
                       </div>
                     </div>
+
+                    {showOperasionalConfig && (
+                      <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <label className="space-y-0.5">
+                            <span className="text-[10px] text-slate-500">Bank Operasional</span>
+                            <input
+                              className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                              onChange={(e) => {
+                                const val = e.target.value
+                                onUpdateState((prev) => ({
+                                  ...prev,
+                                  operasionalBank: val,
+                                }))
+                              }}
+                              placeholder="Jenius SMBC Indonesia"
+                              type="text"
+                              value={state.operasionalBank}
+                            />
+                          </label>
+                          <label className="space-y-0.5">
+                            <span className="text-[10px] text-slate-500">No. Rekening</span>
+                            <input
+                              className="w-full rounded border border-slate-300 bg-white px-2 py-1 font-mono text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                              onChange={(e) => {
+                                const val = e.target.value
+                                onUpdateState((prev) => ({
+                                  ...prev,
+                                  operasionalAccountNumber: val,
+                                }))
+                              }}
+                              placeholder="90020422216"
+                              type="text"
+                              value={state.operasionalAccountNumber}
+                            />
+                          </label>
+                          <label className="space-y-0.5">
+                            <span className="text-[10px] text-slate-500">Nama Staf / Penerima</span>
+                            <input
+                              className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-[#0b57d0] focus:outline-none"
+                              onChange={(e) => {
+                                const val = e.target.value
+                                onUpdateState((prev) => ({
+                                  ...prev,
+                                  operasionalRecipientName: val,
+                                }))
+                              }}
+                              placeholder="Panut"
+                              type="text"
+                              value={state.operasionalRecipientName}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -528,13 +657,13 @@ export function TransferBreakdownModal({
                 </button>
               </div>
 
-              <p className="mt-1.5 text-[11px] text-slate-500 leading-normal">
+              <p className="mt-1.5 text-[11px] leading-normal text-slate-500">
                 Pesan di bawah ini sinkron otomatis dengan data di sebelah kiri dan siap dikirimkan
                 ke bagian finance/tukang transfer:
               </p>
 
               <textarea
-                className="mt-2.5 flex-1 min-h-[340px] w-full resize-none rounded-lg border border-slate-300 bg-slate-50 p-3 font-mono text-[11px] leading-relaxed text-slate-900 outline-none transition focus:border-[#0b57d0] focus:bg-white focus:ring-1 focus:ring-[#0b57d0]"
+                className="mt-2.5 min-h-[340px] w-full flex-1 resize-none rounded-xl border border-slate-300 bg-slate-50 p-3 font-mono text-[11px] leading-relaxed text-slate-900 outline-none transition focus:border-[#0b57d0] focus:bg-white focus:ring-1 focus:ring-[#0b57d0]"
                 id="transfer-whatsapp-textarea"
                 onChange={(e) => onMessageTextChange(e.target.value)}
                 rows={18}
@@ -542,7 +671,7 @@ export function TransferBreakdownModal({
               />
 
               <button
-                className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold text-white shadow-xs transition ${
+                className={`mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold text-white shadow-xs transition ${
                   copied ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0b57d0] hover:bg-[#0842a0]'
                 }`}
                 onClick={onCopy}

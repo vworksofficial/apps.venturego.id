@@ -111,10 +111,55 @@ export function createInitialTransferState(app: FinancingApplicationRecord): Tra
   }
 }
 
+export function formatDisplayApplicationId(id: string): string {
+  if (!id) return ''
+  const parts = id.split('-')
+  if (parts.length >= 2) return `VSV-${parts[parts.length - 1]}`
+  return id
+}
+
+export function buildDepartureTransferHeader(
+  appOrHeader: FinancingApplicationRecord | string,
+  fallbackName = '',
+): { header: string; applicantName: string } {
+  if (typeof appOrHeader === 'string') {
+    return {
+      header: appOrHeader,
+      applicantName: fallbackName,
+    }
+  }
+
+  const app = appOrHeader
+  const akadDoc = app.financialPlan?.akadDocument
+  const nis =
+    akadDoc && typeof akadDoc === 'object'
+      ? String((akadDoc as Record<string, unknown>).studentNumber ?? '').trim()
+      : ''
+
+  if (nis) {
+    return {
+      header: `${nis}. ${app.applicantName}`,
+      applicantName: app.applicantName,
+    }
+  }
+
+  // Jika siswa belum memiliki NIS: Info kode ID pengajuannya lalu enter baru nama lengkap
+  const displayId = formatDisplayApplicationId(app.applicationId)
+  return {
+    header: `${displayId}\n${app.applicantName}`,
+    applicantName: app.applicantName,
+  }
+}
+
 /**
  * Menghasilkan format pesan WhatsApp resmi untuk finance / tukang transfer:
  *
+ * Contoh jika sudah ada NIS:
  * 29. Dimas Pranaika Putra
+ *
+ * Contoh jika belum ada NIS:
+ * VSV-D73376D5
+ * Dimas Pranaika Putra
  *
  * *PLAFON PEMBIAYAAN*
  * Rp33.000.000
@@ -145,16 +190,17 @@ export function createInitialTransferState(app: FinancingApplicationRecord): Tra
  * Panut
  */
 export function buildDepartureTransferWhatsappMessage(
-  studentNumberOrIndex: string | number,
-  applicantName: string,
+  appOrHeader: FinancingApplicationRecord | string,
   state: TransferDetailsState,
+  fallbackName = '',
 ): string {
+  const { header, applicantName } = buildDepartureTransferHeader(appOrHeader, fallbackName)
   const lpkBankAndName = [state.lpkBank, state.lpkAccountName].filter(Boolean).join('. ') || 'LPK'
   const applicantBankAndName =
     [state.applicantBank, state.applicantAccountName].filter(Boolean).join('. ') || applicantName
 
   const lines: string[] = [
-    `${studentNumberOrIndex}. ${applicantName}`,
+    header,
     '',
     '*PLAFON PEMBIAYAAN*',
     `Rp${formatThousandsNumber(state.principal)}`,

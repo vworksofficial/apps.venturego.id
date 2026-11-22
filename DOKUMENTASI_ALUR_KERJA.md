@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (refactor(admin): perapihan UI popup instruksi transfer pencairan menjadi layout dua kolom formal, simpel, dan profesional tanpa tumpukan kartu warna-warni.)
+Terakhir diperbarui: **22 November 2026** (feat(admin): penyempurnaan modal rincian transfer pencairan formal — sudut rounded melengkung rapi (rounded-2xl overflow-hidden), penambahan section B mandiri untuk komisi/LPK lain, tombol edit fleksibel pada section A, C, dan D, serta format header WhatsApp dinamis: [NIS]. [Nama] atau [ID]\n[Nama Siswa] bila belum memiliki NIS.)
 
 ---
 

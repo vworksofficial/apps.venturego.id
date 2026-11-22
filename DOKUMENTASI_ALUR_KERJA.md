@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (feat(admin): sinkronisasi berkas Google Drive — tombol "Bersihkan Drive" di tab Berkas admin untuk menghapus file orphan (tidak ter-referensi di Firestore); delete dokumen admin kini mencatat fileId ke `pendingDeleteFileIds` jika Drive API gagal, dan dibersihkan otomatis saat cleanup dijalankan.)
+Terakhir diperbarui: **22 November 2026** (feat(template): penyediaan template PDF resmi siap cetak untuk Surat Kesediaan Mengangsur [dengan klausul pemberian kuasa Wakalah bil Ujrah] dan Surat Pernyataan Orang Tua / Wali; judul program disesuaikan dinamis berdasarkan negara tujuan; dilengkapi card unduh template dan tombol unduh di baris dokumen halaman unggah berkas.)
 
 ---
 

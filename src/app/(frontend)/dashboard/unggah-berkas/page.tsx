@@ -45,6 +45,9 @@ export default function UploadDocumentsPage() {
   const [uploadError, setUploadError] = useState('')
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null)
+  const [downloadingTemplate, setDownloadingTemplate] = useState<
+    'kesediaan-mengangsur' | 'pernyataan-orang-tua' | null
+  >(null)
   const [successMessage, setSuccessMessage] = useState('')
 
   const loadApplications = useCallback(async (token: string) => {
@@ -228,6 +231,44 @@ export default function UploadDocumentsPage() {
     }
   }
 
+  const downloadTemplate = async (type: 'kesediaan-mengangsur' | 'pernyataan-orang-tua') => {
+    if (!selectedApplication || !uploadToken) return
+    setUploadError('')
+    setSuccessMessage('')
+    setDownloadingTemplate(type)
+    try {
+      const response = await fetch(
+        `/api/applicant/applications/${selectedApplication.id}/templates/${type}`,
+        { headers: { Authorization: `Bearer ${uploadToken}` } },
+      )
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as {
+          message?: string
+        }
+        throw new Error(result.message || 'Template belum dapat diunduh.')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download =
+        type === 'kesediaan-mengangsur'
+          ? `Surat-Kesediaan-Mengangsur-${selectedApplication.applicantName || 'Siswa'}.pdf`
+          : `Surat-Pernyataan-Orang-Tua-${selectedApplication.applicantName || 'Siswa'}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : 'Template belum dapat diunduh. Silakan coba lagi.',
+      )
+    } finally {
+      setDownloadingTemplate(null)
+    }
+  }
+
   return (
     <DashboardScaffold
       active="berkas"
@@ -381,6 +422,49 @@ export default function UploadDocumentsPage() {
               <h3 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
                 {group.title}
               </h3>
+              {group.key === 'dokumen-pendukung' && selectedApplication && (
+                <div className="mb-3 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50/80 via-white to-sky-50/60 p-4 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-xs">
+                      <DashboardIcon className="size-5" name="document" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-bold text-slate-900">
+                        Unduh Template Surat Resmi
+                      </h4>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
+                        Unduh template surat resmi siap cetak (sudah terisi identitas), tempel
+                        meterai Rp10.000, tanda tangani secara fisik, lalu scan atau foto untuk
+                        diunggah pada daftar berkas di bawah.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={downloadingTemplate !== null}
+                          onClick={() => void downloadTemplate('kesediaan-mengangsur')}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-[11px] font-bold text-blue-700 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          <DashboardIcon className="size-3.5" name="download" />
+                          {downloadingTemplate === 'kesediaan-mengangsur'
+                            ? 'Mengunduh…'
+                            : 'Template Surat Mengangsur (PDF)'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={downloadingTemplate !== null}
+                          onClick={() => void downloadTemplate('pernyataan-orang-tua')}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-[11px] font-bold text-blue-700 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          <DashboardIcon className="size-3.5" name="download" />
+                          {downloadingTemplate === 'pernyataan-orang-tua'
+                            ? 'Mengunduh…'
+                            : 'Template Surat Orang Tua (PDF)'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <DashboardCard>
                 {group.documents.map(({ document, index }, groupIndex) => {
                   const uploadedDocument =
@@ -397,6 +481,8 @@ export default function UploadDocumentsPage() {
                   const isUploading = uploadingIndex === index
                   const statusBadge = needsRevision ? 'Perlu perbaikan' : ''
                   const isReplacing = status === 'UPLOADED'
+                  const isKesediaanDoc = document.label === 'Scan Surat Kesediaan Mengangsur'
+                  const isOrangTuaDoc = document.label === 'Scan Surat Mengetahui Orang Tua'
                   return (
                     <div
                       className={`flex items-center gap-3 p-4 ${
@@ -511,45 +597,73 @@ export default function UploadDocumentsPage() {
                           />
                         </button>
                       ) : (
-                        <label
-                          aria-disabled={isVerified || !selectedApplication}
-                          className={`min-w-[4.5rem] shrink-0 rounded-full px-3 py-2 text-center text-[10px] font-bold transition ${
-                            !selectedApplication || isVerified
-                              ? 'cursor-not-allowed bg-slate-300 text-white'
-                              : isReplacing
-                                ? 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
-                                : needsRevision
-                                  ? 'cursor-pointer bg-amber-600 text-white'
-                                  : 'cursor-pointer bg-[var(--primary)] text-white'
-                          }`}
-                          title={
-                            isVerified
-                              ? 'Dokumen sudah diverifikasi dan tidak dapat diubah'
-                              : undefined
-                          }
-                        >
-                          {isVerified
-                            ? 'Ganti'
-                            : selectedApplication
-                              ? isUploading
-                                ? 'Mengunggah…'
-                                : needsRevision
-                                  ? 'Perbaiki'
-                                  : isUploaded
-                                    ? 'Ganti'
-                                    : 'Unggah'
-                              : 'Belum aktif'}
-                          <input
-                            accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                            className="sr-only"
-                            disabled={uploadingIndex !== null || !selectedApplication || isVerified}
-                            onChange={(event) => {
-                              void uploadDocument(index, event.target.files?.[0])
-                              event.target.value = ''
-                            }}
-                            type="file"
-                          />
-                        </label>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {(isKesediaanDoc || isOrangTuaDoc) && selectedApplication && (
+                            <button
+                              aria-label={`Unduh template ${document.label}`}
+                              className="grid size-9 shrink-0 place-items-center rounded-full border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100 disabled:cursor-wait disabled:opacity-60"
+                              disabled={downloadingTemplate !== null}
+                              onClick={() =>
+                                void downloadTemplate(
+                                  isKesediaanDoc ? 'kesediaan-mengangsur' : 'pernyataan-orang-tua',
+                                )
+                              }
+                              title="Unduh template surat resmi siap cetak (PDF)"
+                              type="button"
+                            >
+                              <DashboardIcon
+                                className="size-4"
+                                name={
+                                  downloadingTemplate ===
+                                  (isKesediaanDoc ? 'kesediaan-mengangsur' : 'pernyataan-orang-tua')
+                                    ? 'clock'
+                                    : 'download'
+                                }
+                              />
+                            </button>
+                          )}
+                          <label
+                            aria-disabled={isVerified || !selectedApplication}
+                            className={`min-w-[4.5rem] shrink-0 rounded-full px-3 py-2 text-center text-[10px] font-bold transition ${
+                              !selectedApplication || isVerified
+                                ? 'cursor-not-allowed bg-slate-300 text-white'
+                                : isReplacing
+                                  ? 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                                  : needsRevision
+                                    ? 'cursor-pointer bg-amber-600 text-white'
+                                    : 'cursor-pointer bg-[var(--primary)] text-white'
+                            }`}
+                            title={
+                              isVerified
+                                ? 'Dokumen sudah diverifikasi dan tidak dapat diubah'
+                                : undefined
+                            }
+                          >
+                            {isVerified
+                              ? 'Ganti'
+                              : selectedApplication
+                                ? isUploading
+                                  ? 'Mengunggah…'
+                                  : needsRevision
+                                    ? 'Perbaiki'
+                                    : isUploaded
+                                      ? 'Ganti'
+                                      : 'Unggah'
+                                : 'Belum aktif'}
+                            <input
+                              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                              className="sr-only"
+                              disabled={
+                                uploadingIndex !== null || !selectedApplication || isVerified
+                              }
+                              onChange={(event) => {
+                                void uploadDocument(index, event.target.files?.[0])
+                                event.target.value = ''
+                              }}
+                              type="file"
+                            />
+                          </label>
+                        </div>
                       )}
                     </div>
                   )

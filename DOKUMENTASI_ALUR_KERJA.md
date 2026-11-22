@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **22 November 2026** (Penyesuaian tata letak dokumen unggahan: seksi "Dokumen Pendukung" diubah namanya menjadi "Dokumen Persyaratan", serta posisi dokumen "Form Pendaftaran" dipindahkan ke urutan paling atas di atas "Scan Surat Rekomendasi LPK" pada kedua produk; sistem dokumen dinormalisasi berbasis label sehingga berkas lama tetap cocok dan aman.)
+Terakhir diperbarui: **22 November 2026** (Penyesuaian tata letak dokumen unggahan: seksi "Dokumen Pendukung" diubah namanya menjadi "Dokumen Persyaratan" dan diposisikan di paling atas halaman unggah berkas sebelum Dokumen Wajib/Utama; dokumen "Form Pendaftaran" diposisikan di baris teratas seksi tersebut di atas "Scan Surat Rekomendasi LPK" pada kedua produk.)
 
 ---
 

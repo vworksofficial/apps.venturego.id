@@ -114,6 +114,12 @@ export default function UploadDocumentsPage() {
           default: 'Dokumen utama',
           'dokumen-pendukung': 'Dokumen Persyaratan',
         }
+  const sectionPriority: Record<string, number> = {
+    'dokumen-pendukung': 1,
+    'dokumen-wajib': 2,
+    default: 3,
+    'dokumen-susulan': 4,
+  }
   const documentGroups = Object.entries(
     definitions.reduce<Record<string, { document: (typeof definitions)[number]; index: number }[]>>(
       (groups, document, index) => {
@@ -124,8 +130,9 @@ export default function UploadDocumentsPage() {
       {},
     ),
   )
-    .map(([key, documents]) => ({ title: groupTitles[key] ?? key, documents }))
+    .map(([key, documents]) => ({ key, title: groupTitles[key] ?? key, documents }))
     .filter((group) => group.documents.length > 0)
+    .sort((a, b) => (sectionPriority[a.key] ?? 99) - (sectionPriority[b.key] ?? 99))
   const uploadedBytes = useMemo(
     () =>
       selectedApplication?.documents.reduce(
@@ -249,7 +256,7 @@ export default function UploadDocumentsPage() {
             <SkeletonBlock className="size-5 shrink-0 rounded-md" />
             <SkeletonBlock className="h-8 flex-1" />
           </div>
-          {[3, 3, 2].map((count, groupIndex) => (
+          {[4, 3, 2].map((count, groupIndex) => (
             <section className="mt-4" key={groupIndex}>
               <SkeletonBlock className="mb-2 ml-1 h-3 w-28" />
               <DashboardCard>

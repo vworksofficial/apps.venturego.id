@@ -104,6 +104,14 @@ function Icon({ name }: { name: 'program' | 'close' }) {
   )
 }
 
+function WhatsAppMark({ className }: { className: string }) {
+  return (
+    <svg aria-hidden="true" className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.1-.472-.15-.67.15-.198.297-.768.967-.94 1.165-.173.198-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.52.149-.174.198-.298.297-.496.1-.198.05-.372-.025-.52-.074-.149-.669-1.612-.916-2.206-.242-.579-.487-.5-.67-.51-.173-.009-.372-.011-.57-.011-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479s1.065 2.875 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.71.307 1.263.49 1.695.627.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.999-3.648-.235-.374a9.86 9.86 0 0 1-1.511-5.26c.001-5.45 4.437-9.884 9.893-9.884 2.645.001 5.131 1.031 6.999 2.901a9.825 9.825 0 0 1 2.9 6.997c-.003 5.45-4.44 9.885-9.908 9.885M20.52 3.48A11.815 11.815 0 0 0 12.087 0C5.52 0 .174 5.345.171 11.912c0 2.096.547 4.142 1.588 5.946L0 24l6.335-1.662a11.93 11.93 0 0 0 5.741 1.462h.005c6.566 0 11.913-5.345 11.916-11.913a11.86 11.86 0 0 0-3.477-8.407z" />
+    </svg>
+  )
+}
+
 function ApplicationTerms({
   application,
   payments,
@@ -129,6 +137,10 @@ function ApplicationTerms({
   const [paymentPreviewUrl, setPaymentPreviewUrl] = useState('')
   const [paymentError, setPaymentError] = useState('')
   const [paymentSubmitting, setPaymentSubmitting] = useState(false)
+  const [paymentSubmitted, setPaymentSubmitted] = useState<{
+    installmentNumber: number
+    amount: number
+  } | null>(null)
   const [copiedItem, setCopiedItem] = useState('')
   const programButtonRef = useRef<HTMLButtonElement | null>(null)
   const plan = application.financialPlan
@@ -186,6 +198,23 @@ function ApplicationTerms({
   const departureDateLabel = /^\d{4}-\d{2}-\d{2}$/.test(departureDate)
     ? formatDate(departureDate)
     : 'Belum ditentukan'
+  const whatsappReportUrl = paymentSubmitted
+    ? `https://wa.me/6281292271274?text=${encodeURIComponent(
+        [
+          'Assalamu’alaikum Admin VentureGo,',
+          `saya ingin melaporkan pembayaran *Angsuran ke-${paymentSubmitted.installmentNumber}*.`,
+          '',
+          `Nama: ${application.applicantName}`,
+          programName,
+          `Negara tujuan: ${application.destination === 'TURKEY' ? '🇹🇷 Turki' : '🇯🇵 Jepang'}`,
+          `Nominal transfer: *${formatRupiah(paymentSubmitted.amount)}*`,
+          '',
+          'Bukti transaksi sudah saya unggah melalui aplikasi dan menunggu verifikasi.',
+          'Mohon bantu periksa yaa.',
+          'Terimakasih',
+        ].join('\n'),
+      )}`
+    : ''
 
   const totalObligation = isFullCover ? fullCoverObligation : departureTotal
   const paidAmountFromSchedule = schedule
@@ -245,6 +274,7 @@ function ApplicationTerms({
     setPaymentAmount(String(amount))
     setPaymentFile(null)
     setPaymentError('')
+    setPaymentSubmitted(null)
     setPopup('payment')
   }
 
@@ -265,6 +295,7 @@ function ApplicationTerms({
       setPaymentError('Pilih bukti transfer terlebih dahulu.')
       return
     }
+    const installmentNumber = selectedInstallment
     const amount = Number(paymentAmount)
     if (!Number.isSafeInteger(amount) || amount < 1) {
       setPaymentError('Masukkan nominal transfer yang valid.')
@@ -296,19 +327,20 @@ function ApplicationTerms({
         setPaymentError(result.message || 'Bukti pembayaran belum dapat dikirim.')
         return
       }
+      const submittedAt = result.submittedAt ?? new Date().toISOString()
       setPaymentProofs((previous) => [
         ...previous,
         {
           id: `local-${Date.now()}`,
           applicationDocId: application.id,
-          installmentNumber: selectedInstallment,
+          installmentNumber,
           amount,
           status: 'PENDING_REVIEW',
-          submittedAt: result.submittedAt ?? new Date().toISOString(),
+          submittedAt,
         },
       ])
-      setPopup(null)
-      setSelectedInstallment(null)
+      setPaymentSubmitted({ installmentNumber, amount })
+      setPaymentFile(null)
     } catch {
       setPaymentError('Bukti pembayaran belum dapat dikirim. Periksa koneksi lalu coba lagi.')
     } finally {
@@ -635,7 +667,7 @@ function ApplicationTerms({
         <div
           className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setPopup(null)
+            if (event.target === event.currentTarget && !paymentSubmitted) setPopup(null)
           }}
         >
           <section
@@ -657,7 +689,9 @@ function ApplicationTerms({
                     ? 'Rincian pembiayaan'
                     : popup === 'program'
                       ? 'Tentang program ini'
-                      : `Pembayaran angsuran ${selectedInstallment ?? ''}`}
+                      : paymentSubmitted
+                        ? 'Bukti angsuran berhasil dikirim'
+                        : `Pembayaran angsuran ${selectedInstallment ?? ''}`}
                 </h3>
               </div>
               <button
@@ -801,7 +835,27 @@ function ApplicationTerms({
                 </>
               )}
 
-              {popup === 'payment' && (
+              {popup === 'payment' && paymentSubmitted && (
+                <div className="flex min-h-64 flex-col items-center justify-center px-2 py-8 text-center">
+                  <div className="mb-5 grid size-20 place-items-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+                    <WhatsAppMark className="size-11" />
+                  </div>
+                  <h4 className="text-lg font-bold tracking-tight text-slate-900">
+                    Selamat, bukti angsuran berhasil dikirim!
+                  </h4>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                    Silahkan lapor ke admin melalui WhatsApp dan tunggu verifikasi, ya.
+                  </p>
+                  <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-left text-xs text-slate-600">
+                    <p className="font-semibold text-slate-800">
+                      Angsuran {paymentSubmitted.installmentNumber}
+                    </p>
+                    <p className="mt-1">{formatRupiah(paymentSubmitted.amount)}</p>
+                  </div>
+                </div>
+              )}
+
+              {popup === 'payment' && !paymentSubmitted && (
                 <form className="space-y-4" id="payment-proof-form" onSubmit={submitPaymentProof}>
                   <section className="space-y-3 rounded-2xl bg-blue-50 p-4">
                     <div>
@@ -993,7 +1047,17 @@ function ApplicationTerms({
             </div>
 
             <footer className="border-t border-slate-100 px-5 py-3 text-right sm:px-6">
-              {popup === 'payment' ? (
+              {popup === 'payment' && paymentSubmitted ? (
+                <a
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                  href={whatsappReportUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  <WhatsAppMark className="size-4" />
+                  Lapor ke Admin
+                </a>
+              ) : popup === 'payment' ? (
                 <div className="flex justify-end gap-2">
                   <button
                     className="rounded-full px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"

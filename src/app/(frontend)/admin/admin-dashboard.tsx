@@ -6792,11 +6792,11 @@ export function AdminDashboard({
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
                         <th className="whitespace-nowrap px-4 py-3">Nama Siswa</th>
-                        <th className="whitespace-nowrap px-4 py-3">Status</th>
+                        <th className="whitespace-nowrap px-4 py-3">Status Angsuran</th>
                         <th className="whitespace-nowrap px-4 py-3">Naskah Akad (.docx)</th>
+                        <th className="whitespace-nowrap px-4 py-3">Pencairan</th>
                         <th className="whitespace-nowrap px-4 py-3">Salinan PDF Basah</th>
                         <th className="whitespace-nowrap px-4 py-3">Foto Dokumentasi</th>
-                        <th className="whitespace-nowrap px-4 py-3">Kelengkapan</th>
                         <th className="whitespace-nowrap px-4 py-3">Tanggal Penerbangan</th>
                         <th className="whitespace-nowrap px-4 py-3 text-right">Aksi</th>
                       </tr>
@@ -6811,7 +6811,7 @@ export function AdminDashboard({
                           </td>
                         </tr>
                       ) : (
-                        archivingApplications.map((app) => {
+                        archivingApplications.map((app, index) => {
                           const akadMeta = (app.financialPlan?.akadDocument ?? null) as {
                             documentNumber?: string
                             studentNumber?: string
@@ -6823,8 +6823,6 @@ export function AdminDashboard({
                             ? app.akadPhotos.length
                             : 0
                           const hasPhotos = photoCount > 0
-                          const hasDeparture = Boolean(app.departureDate)
-
                           const hasStartedInstallments =
                             (Array.isArray(app.paidInstallments) &&
                               app.paidInstallments.length > 0) ||
@@ -6834,17 +6832,6 @@ export function AdminDashboard({
                                   (!p.applicationDocId && p.applicationId === app.applicationId)) &&
                                 p.status === 'PAID',
                             )
-
-                          let completenessLabel = 'Menunggu'
-                          let completenessBadge = 'bg-slate-100 text-slate-600'
-                          if (hasDocx && hasPdf && hasPhotos && hasDeparture) {
-                            completenessLabel = 'Lengkap'
-                            completenessBadge =
-                              'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                          } else if (hasDocx || hasPdf || hasPhotos || hasDeparture) {
-                            completenessLabel = 'Sebagian'
-                            completenessBadge = 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
-                          }
 
                           return (
                             <tr className="hover:bg-slate-50/80" key={app.id}>
@@ -6866,23 +6853,35 @@ export function AdminDashboard({
                                 )}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
-                                {hasDocx ? (
-                                  <div className="space-y-0.5">
-                                    <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                                      Terbit
-                                    </span>
-                                    <p
-                                      className="font-mono text-[11px] text-slate-700"
-                                      title={akadMeta?.documentNumber}
-                                    >
-                                      {akadMeta?.documentNumber}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
-                                    Belum terbit
-                                  </span>
-                                )}
+                                <span
+                                  className="font-mono text-[11px] text-slate-700"
+                                  title={akadMeta?.documentNumber}
+                                >
+                                  {akadMeta?.documentNumber || '—'}
+                                </span>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <button
+                                  aria-label={`Lihat rincian pencairan ${app.applicantName}`}
+                                  className="inline-flex size-6 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-2xs transition hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                                  onClick={() => openTransferDetail(app, index)}
+                                  title="Lihat rincian pencairan"
+                                  type="button"
+                                >
+                                  <svg
+                                    aria-hidden="true"
+                                    className="size-3.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z" />
+                                    <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                  </svg>
+                                </button>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 {hasPdf ? (
@@ -6936,13 +6935,6 @@ export function AdminDashboard({
                                     Belum ada
                                   </span>
                                 )}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3">
-                                <span
-                                  className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${completenessBadge}`}
-                                >
-                                  {completenessLabel}
-                                </span>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3">
                                 {app.departureDate ? (

@@ -844,7 +844,7 @@ export default function DashboardPage() {
                               <p className="text-[10px] font-bold tracking-[0.02em] text-slate-500">
                                 Status pembiayaan
                               </p>
-                              <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--primary)] ring-1 ring-blue-100">
+                              <span className="text-[10px] font-bold text-[var(--primary)]">
                                 Siap memulai
                               </span>
                             </div>

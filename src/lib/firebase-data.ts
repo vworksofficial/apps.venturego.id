@@ -107,6 +107,7 @@ export type FinancingApplicationRecord = {
   internalNotes?: string
   departureDate?: string
   driveFolderId?: string
+  studentNumber?: string
   registrationForm?: Record<string, unknown>
 }
 

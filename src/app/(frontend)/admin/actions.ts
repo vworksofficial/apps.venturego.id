@@ -16,6 +16,7 @@ import {
 import { deleteDriveFile, listDriveFilesInFolder, uploadDriveFile } from '@/lib/gdrive'
 import {
   ensureApplicationDriveFolder,
+  moveApplicationDriveFolderToStatus,
   promoteApplicationFolder,
   revertApplicationFolderToDraft,
 } from '@/lib/drive-folders'
@@ -915,7 +916,16 @@ export async function updateApplicationWorkflow(
         typeof applicationData.ownerFirebaseUid === 'string' ? applicationData.ownerFirebaseUid : ''
       const applicantName =
         typeof applicationData.applicantName === 'string' ? applicationData.applicantName : ''
-      if (ownerUid && applicantName) {
+      if (applicantName) {
+        let folderId =
+          typeof applicationData.driveFolderId === 'string' ? applicationData.driveFolderId : ''
+        if (!folderId && ownerUid) {
+          const mapping = await getFirebaseFirestore()
+            .collection('driveFolders')
+            .doc(ownerUid)
+            .get()
+          folderId = typeof mapping.data()?.folderId === 'string' ? mapping.data()!.folderId : ''
+        }
         const currentDocuments = Array.isArray(applicationData.documents)
           ? applicationData.documents
           : []
@@ -934,13 +944,49 @@ export async function updateApplicationWorkflow(
             label: 'Akad Wakalah bil Ujrah',
           })
         }
-        await promoteApplicationFolder({
-          folderId:
-            typeof applicationData.driveFolderId === 'string' ? applicationData.driveFolderId : '',
-          ownerUid,
-          applicantName,
-          files: driveFiles,
-        })
+        if (folderId) {
+          await promoteApplicationFolder({
+            folderId,
+            ownerUid,
+            applicantName,
+            files: driveFiles,
+            studentNumber:
+              typeof applicationData.studentNumber === 'string'
+                ? applicationData.studentNumber
+                : undefined,
+            destination: applicationData.destination,
+          })
+        }
+      }
+    } else if (status !== applicationData.status) {
+      const ownerUid =
+        typeof applicationData.ownerFirebaseUid === 'string' ? applicationData.ownerFirebaseUid : ''
+      const applicantName =
+        typeof applicationData.applicantName === 'string' ? applicationData.applicantName : ''
+      if (applicantName) {
+        let folderId =
+          typeof applicationData.driveFolderId === 'string' ? applicationData.driveFolderId : ''
+        if (!folderId && ownerUid) {
+          const mapping = await getFirebaseFirestore()
+            .collection('driveFolders')
+            .doc(ownerUid)
+            .get()
+          folderId = typeof mapping.data()?.folderId === 'string' ? mapping.data()!.folderId : ''
+        }
+        if (folderId) {
+          await moveApplicationDriveFolderToStatus({
+            folderId,
+            ownerUid,
+            applicantName,
+            lpkName: typeof applicationData.lpkName === 'string' ? applicationData.lpkName : '',
+            status,
+            studentNumber:
+              typeof applicationData.studentNumber === 'string'
+                ? applicationData.studentNumber
+                : undefined,
+            destination: applicationData.destination,
+          })
+        }
       }
     }
     return { ok: true }
@@ -1615,7 +1661,11 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
       return { ok: false, message: 'Pengajuan belum terhubung ke akun pemohon.' }
     }
 
-    const studentNumber = await ensureStudentNumber(ownerUid)
+    const studentNumber = await ensureStudentNumber({
+      uid: ownerUid,
+      applicationDocId: documentId,
+      destination: applicationData.destination,
+    })
     if (!studentNumber) {
       return { ok: false, message: 'NIS belum dapat diterbitkan. Coba lagi.' }
     }
@@ -1733,7 +1783,9 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
         folderId,
         ownerUid,
         applicantName,
+        studentNumber,
         files: driveFiles,
+        destination: applicationData.destination,
       })
     }
 
@@ -1775,11 +1827,13 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
 
       const ownerUid =
         typeof application.ownerFirebaseUid === 'string' ? application.ownerFirebaseUid : ''
-      const studentNumber = String((akadDocument as Record<string, unknown>).studentNumber ?? '')
-      const studentProfileRef = ownerUid ? db.collection('studentProfiles').doc(ownerUid) : null
-      const studentProfile = studentProfileRef ? await transaction.get(studentProfileRef) : null
-      const storedStudentNumber = studentProfile?.data()?.studentNumber
-      if (storedStudentNumber && storedStudentNumber !== studentNumber) {
+      const studentNumber = String(
+        application.studentNumber ?? (akadDocument as Record<string, unknown>).studentNumber ?? '',
+      )
+      const issuedStudentNumber = String(
+        (akadDocument as Record<string, unknown>).studentNumber ?? '',
+      )
+      if (issuedStudentNumber && studentNumber && issuedStudentNumber !== studentNumber) {
         return { outcome: 'student-number-mismatch' as const }
       }
 
@@ -1796,13 +1850,6 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
         updatedAt: FieldValue.serverTimestamp(),
         updatedBy: staff?.email ?? staff?.uid,
       })
-      if (studentProfileRef && storedStudentNumber === studentNumber) {
-        transaction.update(studentProfileRef, {
-          studentNumber: FieldValue.delete(),
-          issuedAt: FieldValue.delete(),
-          updatedAt: FieldValue.serverTimestamp(),
-        })
-      }
       return {
         outcome: 'cancelled' as const,
         ownerUid,

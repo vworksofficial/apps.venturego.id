@@ -11,7 +11,11 @@ import {
   isFormPendaftaranLabel,
   sanitizeUploadFileName,
 } from '@/lib/documents'
-import { buildDraftFolderName, ensureApplicationDriveFolder } from '@/lib/drive-folders'
+import {
+  buildDraftFolderName,
+  ensureApplicationDriveFolder,
+  ensureDriveStageFolder,
+} from '@/lib/drive-folders'
 import {
   DRIVE_FOLDER_COLOR_DRAFT,
   GDriveError,
@@ -20,7 +24,6 @@ import {
   deleteDriveFile,
   getDriveFileInfo,
   getOrCreateChildFolder,
-  getRootFolderId,
   sanitizeDriveFolderName,
   sendResumableChunk,
   signUploadTicket,
@@ -165,8 +168,8 @@ const handleInit = async (request: Request, uid: string) => {
     } else {
       const draftFolderName = buildDraftFolderName(applicantName, lpkName)
       if (!draftFolderName) return failure('Nama pemohon belum diisi.')
-      const rootId = await getRootFolderId()
-      folderId = await getOrCreateChildFolder(rootId, draftFolderName, {
+      const stageFolderId = await ensureDriveStageFolder('processing')
+      folderId = await getOrCreateChildFolder(stageFolderId, draftFolderName, {
         colorRgb: DRIVE_FOLDER_COLOR_DRAFT,
         createOnly: true,
       })
@@ -174,7 +177,7 @@ const handleInit = async (request: Request, uid: string) => {
         ownerUid: uid,
         folderId,
         folderName: draftFolderName,
-        stage: 'draft',
+        stage: 'processing',
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       })

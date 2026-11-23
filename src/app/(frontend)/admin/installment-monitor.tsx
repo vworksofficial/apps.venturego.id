@@ -59,7 +59,7 @@ export function InstallmentMonitor({
         const studentNumber =
           akad && typeof akad === 'object' && 'studentNumber' in akad
             ? String(akad.studentNumber ?? '')
-            : ''
+            : (application.studentNumber ?? '')
         return [
           {
             proof,

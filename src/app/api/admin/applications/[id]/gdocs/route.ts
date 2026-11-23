@@ -50,8 +50,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // 2. Jika masih draft, buat berkas draft .docx terbaru dan simpan sementara di Google Drive
     const ownerUid =
       typeof applicationData.ownerFirebaseUid === 'string' ? applicationData.ownerFirebaseUid : ''
-    const existingNumber = ownerUid ? await getExistingStudentNumber(ownerUid) : null
-    const studentNumber = existingNumber ?? (await peekNextStudentNumber())
+    const existingNumber =
+      (typeof applicationData.studentNumber === 'string' ? applicationData.studentNumber : null) ??
+      (ownerUid ? await getExistingStudentNumber(ownerUid, applicationData.destination) : null)
+    const studentNumber =
+      existingNumber ??
+      (await peekNextStudentNumber(applicationData.destination, applicationData.createdAt))
     const sequence = (studentNumber ? studentNumberSequence(studentNumber) : null) ?? '0000'
 
     const built = await buildAkadDocument({

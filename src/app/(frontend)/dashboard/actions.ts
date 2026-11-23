@@ -4,7 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore'
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
 import { blocksAdditionalProgram } from '@/lib/application-lifecycle'
-import { STUDENT_NUMBER_PATTERN } from '@/lib/student-number'
+import { STUDENT_NUMBER_PATTERN, studentNumberCountryCode } from '@/lib/student-number'
 
 export type DashboardScheduleSummary = {
   total: number
@@ -234,11 +234,38 @@ export async function getStudentNumber(token: string): Promise<StudentNumberResu
     const identity = await verifyUserIdentity(token)
     if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
 
-    const snapshot = await getFirebaseFirestore()
-      .collection('studentProfiles')
-      .doc(identity.uid)
-      .get()
-    const studentNumber = snapshot.data()?.studentNumber
+    const firestore = getFirebaseFirestore()
+    const [applications, profile] = await Promise.all([
+      firestore.collection('applications').where('ownerFirebaseUid', '==', identity.uid).get(),
+      firestore.collection('studentProfiles').doc(identity.uid).get(),
+    ])
+    const orderedApplications = applications.docs.sort((left, right) => {
+      const leftActive = left.data().status === 'ACTIVE' ? 1 : 0
+      const rightActive = right.data().status === 'ACTIVE' ? 1 : 0
+      return (
+        rightActive - leftActive ||
+        (readTimestampMillis(right.data().createdAt) ?? 0) -
+          (readTimestampMillis(left.data().createdAt) ?? 0)
+      )
+    })
+    const primaryApplication = orderedApplications[0]
+    const primaryData = primaryApplication?.data()
+    const profileData = profile.data() ?? {}
+    const country = studentNumberCountryCode(primaryData?.destination)
+    const numbersByCountry =
+      profileData.studentNumbersByCountry && typeof profileData.studentNumbersByCountry === 'object'
+        ? (profileData.studentNumbersByCountry as Record<string, unknown>)
+        : {}
+    const profileNumber = country ? numbersByCountry[country] : profileData.studentNumber
+    const applicationNumber = primaryData?.studentNumber
+    const studentNumber =
+      (typeof applicationNumber === 'string' && STUDENT_NUMBER_PATTERN.test(applicationNumber)
+        ? applicationNumber
+        : null) ??
+      (typeof profileNumber === 'string' && STUDENT_NUMBER_PATTERN.test(profileNumber)
+        ? profileNumber
+        : null) ??
+      (!country && typeof profileData.studentNumber === 'string' ? profileData.studentNumber : '')
     return {
       ok: true,
       studentNumber:

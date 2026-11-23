@@ -519,7 +519,7 @@ export async function submitFinancingApplication(request: FormData): Promise<App
     if (ownedFolderId) {
       await mappingRef
         .update({
-          stage: 'submitted',
+          stage: 'processing',
           applicationId,
           updatedAt: FieldValue.serverTimestamp(),
         })

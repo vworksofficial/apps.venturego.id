@@ -5,8 +5,15 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 
 export const DRIVE_ROOT_FOLDER_NAME = 'VSV.VentureGo.id [database]'
 export const DRIVE_ROOT_FOLDER_LEGACY_NAME = 'VentureGo Berkas'
-export const DRIVE_FOLDER_COLOR_DRAFT = '#ff0000'
-export const DRIVE_FOLDER_COLOR_ACTIVE = '#00ff00'
+export const DRIVE_FOLDER_COLOR_DRAFT = '#f83a22'
+export const DRIVE_FOLDER_COLOR_ACTIVE = '#16a765'
+// Google Drive has no pure-black folder swatch; this is its darkest supported gray.
+export const DRIVE_FOLDER_COLOR_ALUMNI = '#8f8f8f'
+export const DRIVE_STAGE_FOLDER_NAMES = {
+  processing: 'Proses Pengajuan',
+  active: 'Siswa Aktif',
+  alumni: 'Alumni',
+} as const
 
 const DRIVE_API = 'https://www.googleapis.com'
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
@@ -179,6 +186,26 @@ export const getOrCreateChildFolder = async (
   })
   if (!created.id) throw new GDriveError('Folder gagal dibuat.', 'UPSTREAM')
   return created.id
+}
+
+export const moveDriveFolder = async (folderId: string, parentFolderId: string): Promise<void> => {
+  if (!FILE_ID_PATTERN.test(folderId) || !FILE_ID_PATTERN.test(parentFolderId)) {
+    throw new GDriveError('Identitas folder tidak valid.', 'INVALID')
+  }
+  const info = await getDriveFileInfo(folderId)
+  if (info.mimeType !== 'application/vnd.google-apps.folder' || info.trashed) {
+    throw new GDriveError('Folder siswa tidak ditemukan.', 'INVALID')
+  }
+  if ((info.parents ?? []).includes(parentFolderId)) return
+  const currentParents = info.parents ?? []
+  const query = new URLSearchParams({
+    addParents: parentFolderId,
+    fields: 'id,parents',
+  })
+  if (currentParents.length) query.set('removeParents', currentParents.join(','))
+  await driveJson(`/drive/v3/files/${folderId}?${query.toString()}`, {
+    method: 'PATCH',
+  })
 }
 
 const findRootFolderByName = async (name: string): Promise<string | null> => {

@@ -335,6 +335,15 @@ function formatDisplayApplicationId(id: string): string {
   return id
 }
 
+const getApplicationStudentNumber = (application: FinancingApplicationRecord) => {
+  const directNumber = application.studentNumber?.trim()
+  if (directNumber) return directNumber
+  const akadDocument = application.financialPlan?.akadDocument
+  if (!akadDocument || typeof akadDocument !== 'object') return ''
+  const akadNumber = (akadDocument as Record<string, unknown>).studentNumber
+  return typeof akadNumber === 'string' ? akadNumber.trim() : ''
+}
+
 function DestinationFlag({ destination }: { destination: string }) {
   if (destination === 'JAPAN') {
     return (
@@ -2510,7 +2519,7 @@ function ApplicationDrawerForm({
                   <div>
                     <dt className="text-[11px] font-semibold text-emerald-700">NIS Pemohon</dt>
                     <dd className="mt-0.5 text-sm font-bold text-emerald-950">
-                      {akadMeta.studentNumber || '-'}
+                      {akadMeta.studentNumber || application.studentNumber || '-'}
                     </dd>
                   </div>
                   <div>
@@ -7159,7 +7168,7 @@ export function AdminDashboard({
                                 ? String(
                                     (akadDocument as Record<string, unknown>).studentNumber ?? '',
                                   )
-                                : ''
+                                : (app.studentNumber ?? '')
                             const category = getStudentDirectoryCategory(app, summary)
                             return (
                               <tr className="transition-colors hover:bg-emerald-50/30" key={app.id}>
@@ -7284,7 +7293,7 @@ export function AdminDashboard({
                         const studentNumber =
                           akadDocument && typeof akadDocument === 'object'
                             ? String((akadDocument as Record<string, unknown>).studentNumber ?? '')
-                            : ''
+                            : (app.studentNumber ?? '')
                         const category = getStudentDirectoryCategory(app, summary)
                         return (
                           <article
@@ -7724,21 +7733,7 @@ export function AdminDashboard({
                                     {app.applicantName}
                                   </span>
                                   <span className="block text-[11px] font-bold text-emerald-700">
-                                    NIS{' '}
-                                    {String(
-                                      app.financialPlan?.akadDocument &&
-                                        typeof app.financialPlan.akadDocument === 'object'
-                                        ? ((
-                                            app.financialPlan.akadDocument as Record<
-                                              string,
-                                              unknown
-                                            >
-                                          ).studentNumber ?? '')
-                                        : '',
-                                    ) || 'belum tersedia'}
-                                  </span>
-                                  <span className="block text-[10px] font-medium text-slate-500">
-                                    {formatDisplayApplicationId(app.applicationId)}
+                                    NIS {getApplicationStudentNumber(app) || 'belum tersedia'}
                                   </span>
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-2 text-left">
@@ -7827,17 +7822,7 @@ export function AdminDashboard({
                             <div>
                               <h3 className="font-bold text-slate-900">{app.applicantName}</h3>
                               <p className="text-[11px] font-semibold text-emerald-700">
-                                NIS{' '}
-                                {String(
-                                  app.financialPlan?.akadDocument &&
-                                    typeof app.financialPlan.akadDocument === 'object'
-                                    ? ((app.financialPlan.akadDocument as Record<string, unknown>)
-                                        .studentNumber ?? '')
-                                    : '',
-                                ) || 'belum tersedia'}
-                              </p>
-                              <p className="text-[10px] font-medium text-slate-500">
-                                {formatDisplayApplicationId(app.applicationId)}
+                                NIS {getApplicationStudentNumber(app) || 'belum tersedia'}
                               </p>
                               <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                                 {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
@@ -8187,8 +8172,9 @@ export function AdminDashboard({
                                 <p className="truncate font-semibold text-slate-900">
                                   {app.applicantName}
                                 </p>
-                                <p className="mt-0.5 truncate text-[11px] text-slate-400">
-                                  {app.applicationId} · {app.lpkName}
+                                <p className="mt-0.5 truncate text-[11px] font-semibold text-emerald-700">
+                                  NIS {getApplicationStudentNumber(app) || 'belum tersedia'} ·{' '}
+                                  {app.lpkName}
                                 </p>
                                 <div className="mt-1">
                                   <span
@@ -8301,8 +8287,8 @@ export function AdminDashboard({
                                   <span className="block font-semibold text-slate-900 leading-tight">
                                     {app.applicantName}
                                   </span>
-                                  <span className="block text-[11px] font-bold text-[#0b57d0] leading-tight">
-                                    {app.applicationId}
+                                  <span className="block text-[11px] font-bold text-emerald-700 leading-tight">
+                                    NIS {getApplicationStudentNumber(app) || 'belum tersedia'}
                                   </span>
                                 </td>
                                 {/* Kolom 2: Program & LPK */}

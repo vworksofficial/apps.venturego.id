@@ -89,8 +89,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           typeof applicationData.ownerFirebaseUid === 'string'
             ? applicationData.ownerFirebaseUid
             : ''
-        const existingNumber = ownerUid ? await getExistingStudentNumber(ownerUid) : null
-        const studentNumber = existingNumber ?? (await peekNextStudentNumber())
+        const existingNumber =
+          (typeof applicationData.studentNumber === 'string'
+            ? applicationData.studentNumber
+            : null) ??
+          (ownerUid ? await getExistingStudentNumber(ownerUid, applicationData.destination) : null)
+        const studentNumber =
+          existingNumber ??
+          (await peekNextStudentNumber(applicationData.destination, applicationData.createdAt))
         const sequence = (studentNumber ? studentNumberSequence(studentNumber) : null) ?? '0000'
         const built = await buildAkadDocument({
           application: applicationData,
@@ -147,8 +153,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     } else {
       const ownerUid =
         typeof applicationData.ownerFirebaseUid === 'string' ? applicationData.ownerFirebaseUid : ''
-      const existingNumber = ownerUid ? await getExistingStudentNumber(ownerUid) : null
-      const studentNumber = existingNumber ?? (await peekNextStudentNumber())
+      const existingNumber =
+        (typeof applicationData.studentNumber === 'string'
+          ? applicationData.studentNumber
+          : null) ??
+        (ownerUid ? await getExistingStudentNumber(ownerUid, applicationData.destination) : null)
+      const studentNumber =
+        existingNumber ??
+        (await peekNextStudentNumber(applicationData.destination, applicationData.createdAt))
       const sequence = (studentNumber ? studentNumberSequence(studentNumber) : null) ?? '0000'
       const built = await buildAkadDocument({
         application: applicationData,

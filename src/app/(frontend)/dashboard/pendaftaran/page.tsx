@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
 import { DashboardIcon, DashboardScaffold, SkeletonBlock } from '../_components/dashboard-ui'
+import { FormSelect } from '../../_components/form-select'
 import { getOwnedApplications, type OwnedApplication } from '../unggah-berkas/actions'
 import {
   EMPTY_REGISTRATION_FORM_DATA,
@@ -248,17 +249,15 @@ function RegistrationFormContent() {
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4">
           <label className="block text-xs font-semibold text-slate-700">
             Pilih Pengajuan
-            <select
-              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none"
-              onChange={(e) => setSelectedAppId(e.target.value)}
+            <FormSelect
               value={selectedAppId}
-            >
-              {applications.map((app) => (
-                <option key={app.id} value={app.id}>
-                  {app.applicationId} · {app.applicantName}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedAppId}
+              options={applications.map((app) => ({
+                value: app.id,
+                label: `${app.applicationId} · ${app.applicantName}`,
+              }))}
+              placeholder="Pilih pengajuan"
+            />
           </label>
         </div>
       )}
@@ -346,7 +345,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 placeholder="Sesuai KTP"
                 readOnly
                 required
@@ -365,7 +364,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 maxLength={16}
                 placeholder="16 digit NIK"
                 readOnly
@@ -380,7 +379,7 @@ function RegistrationFormContent() {
                 Nama Gadis Ibu Kandung <span className="text-red-500">*</span>
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('motherMaidenName', e.target.value)}
                 placeholder="Nama lengkap ibu kandung"
                 required
@@ -394,7 +393,7 @@ function RegistrationFormContent() {
                 NPWP <span className="text-slate-400 font-normal">(opsional)</span>
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('npwp', e.target.value)}
                 placeholder="Nomor pokok wajib pajak"
                 type="text"
@@ -412,7 +411,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 placeholder="alamat@email.com"
                 readOnly
                 required
@@ -426,7 +425,7 @@ function RegistrationFormContent() {
                 Alamat Rumah Terkini <span className="text-red-500">*</span>
               </label>
               <textarea
-                className="mt-1.5 min-h-[110px] w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-base leading-relaxed text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100 resize-y"
+                className="mt-1.5 min-h-24 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] px-3 py-2 text-sm leading-relaxed text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 resize-y placeholder:text-slate-400"
                 onChange={(e) => updateField('address', e.target.value)}
                 placeholder="Jalan, No. Rumah, Dusun / Lingkungan"
                 required
@@ -440,7 +439,7 @@ function RegistrationFormContent() {
               <div>
                 <label className="block text-xs font-semibold text-slate-700">RT</label>
                 <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   maxLength={3}
                   onChange={(e) => updateField('rt', e.target.value)}
                   placeholder="001"
@@ -451,7 +450,7 @@ function RegistrationFormContent() {
               <div>
                 <label className="block text-xs font-semibold text-slate-700">RW</label>
                 <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   maxLength={3}
                   onChange={(e) => updateField('rw', e.target.value)}
                   placeholder="002"
@@ -464,7 +463,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kelurahan / Desa</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('kelurahan', e.target.value)}
                 placeholder="Desa / Kelurahan"
                 type="text"
@@ -475,7 +474,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kecamatan</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('kecamatan', e.target.value)}
                 placeholder="Kecamatan"
                 type="text"
@@ -488,7 +487,7 @@ function RegistrationFormContent() {
                 Kota / Kabupaten <span className="text-red-500">*</span>
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('city', e.target.value)}
                 placeholder="Contoh: Kab. Wonosobo"
                 required
@@ -500,7 +499,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kode Pos</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 maxLength={5}
                 onChange={(e) => updateField('postalCode', e.target.value)}
                 placeholder="5 digit"
@@ -514,7 +513,7 @@ function RegistrationFormContent() {
                 No. Telepon Rumah
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('homePhone', e.target.value)}
                 placeholder="Opsional"
                 type="tel"
@@ -532,7 +531,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 placeholder="0812xxxx"
                 readOnly
                 required
@@ -547,7 +546,7 @@ function RegistrationFormContent() {
               </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
-                  className="w-24 rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="w-24 rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   onChange={(e) => updateField('contactHourStart', e.target.value)}
                   placeholder="08.00"
                   type="text"
@@ -555,22 +554,25 @@ function RegistrationFormContent() {
                 />
                 <span className="text-xs text-slate-400">-</span>
                 <input
-                  className="w-24 rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="w-24 rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   onChange={(e) => updateField('contactHourEnd', e.target.value)}
                   placeholder="17.00"
                   type="text"
                   value={formData.contactHourEnd}
                 />
-                <select
-                  className="rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                  onChange={(e) => updateField('contactTimeZone', e.target.value)}
-                  value={formData.contactTimeZone}
-                >
-                  <option value="WIB">WIB</option>
-                  <option value="WITA">WITA</option>
-                  <option value="WIT">WIT</option>
-                  <option value="Waktu Jepang">Waktu Jepang</option>
-                </select>
+                <div className="w-36 shrink-0">
+                  <FormSelect
+                    onChange={(value) => updateField('contactTimeZone', value)}
+                    value={formData.contactTimeZone}
+                    options={[
+                      { value: 'WIB', label: 'WIB' },
+                      { value: 'WITA', label: 'WITA' },
+                      { value: 'WIT', label: 'WIT' },
+                      { value: 'Waktu Jepang', label: 'Waktu Jepang' },
+                    ]}
+                    placeholder="Pilih zona waktu"
+                  />
+                </div>
               </div>
             </div>
 
@@ -584,7 +586,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 placeholder="Kota Lahir"
                 readOnly
                 required
@@ -601,7 +603,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 placeholder="Contoh: 12 Februari 2000"
                 readOnly
                 type="text"
@@ -648,7 +650,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 readOnly
                 type="text"
                 value={
@@ -675,7 +677,7 @@ function RegistrationFormContent() {
               </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
-                  className="w-28 rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="w-28 rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   min={0}
                   onChange={(e) => updateField('dependentsCount', Number(e.target.value) || 0)}
                   type="number"
@@ -689,27 +691,24 @@ function RegistrationFormContent() {
               <label className="block text-xs font-semibold text-slate-700">
                 Pendidikan Terakhir
               </label>
-              <select
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                onChange={(e) =>
-                  updateField(
-                    'lastEducation',
-                    e.target.value as RegistrationFormData['lastEducation'],
-                  )
+              <FormSelect
+                onChange={(value) =>
+                  updateField('lastEducation', value as RegistrationFormData['lastEducation'])
                 }
                 value={formData.lastEducation}
-              >
-                <option value="SD">SD</option>
-                <option value="SMP">SMP</option>
-                <option value="SMA_SEDERAJAT">SMA / SMK / Sederajat</option>
-                <option value="D1">D1</option>
-                <option value="D2">D2</option>
-                <option value="D3">D3</option>
-                <option value="D4">D4</option>
-                <option value="S1">S1</option>
-                <option value="S2">S2</option>
-                <option value="S3">S3</option>
-              </select>
+                options={[
+                  { value: 'SD', label: 'SD' },
+                  { value: 'SMP', label: 'SMP' },
+                  { value: 'SMA_SEDERAJAT', label: 'SMA / SMK / Sederajat' },
+                  { value: 'D1', label: 'D1' },
+                  { value: 'D2', label: 'D2' },
+                  { value: 'D3', label: 'D3' },
+                  { value: 'D4', label: 'D4' },
+                  { value: 'S1', label: 'S1' },
+                  { value: 'S2', label: 'S2' },
+                  { value: 'S3', label: 'S3' },
+                ]}
+              />
             </div>
           </section>
         )}
@@ -736,7 +735,7 @@ function RegistrationFormContent() {
                 Nama Lengkap Kontak Darurat <span className="text-red-500">*</span>
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyName', e.target.value)}
                 placeholder="Nama lengkap wali / kerabat"
                 required
@@ -747,24 +746,25 @@ function RegistrationFormContent() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700">Hubungan</label>
-              <select
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                onChange={(e) =>
+              <FormSelect
+                onChange={(value) =>
                   updateField(
                     'emergencyRelation',
-                    e.target.value as RegistrationFormData['emergencyRelation'],
+                    value as RegistrationFormData['emergencyRelation'],
                   )
                 }
                 value={formData.emergencyRelation}
-              >
-                <option value="ORANG_TUA">Orang Tua</option>
-                <option value="ANAK">Anak</option>
-                <option value="SAUDARA_KANDUNG">Saudara Kandung</option>
-                <option value="SAUDARA_KANDUNG_ORANG_TUA">
-                  Saudara Kandung Orang Tua (Paman/Bibi)
-                </option>
-                <option value="LAINNYA">Lainnya</option>
-              </select>
+                options={[
+                  { value: 'ORANG_TUA', label: 'Orang Tua' },
+                  { value: 'ANAK', label: 'Anak' },
+                  { value: 'SAUDARA_KANDUNG', label: 'Saudara Kandung' },
+                  {
+                    value: 'SAUDARA_KANDUNG_ORANG_TUA',
+                    label: 'Saudara Kandung Orang Tua (Paman/Bibi)',
+                  },
+                  { value: 'LAINNYA', label: 'Lainnya' },
+                ]}
+              />
             </div>
 
             {formData.emergencyRelation === 'LAINNYA' && (
@@ -773,7 +773,7 @@ function RegistrationFormContent() {
                   Keterangan Hubungan
                 </label>
                 <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   onChange={(e) => updateField('emergencyRelationOther', e.target.value)}
                   placeholder="Contoh: Mertua, Sepupu"
                   type="text"
@@ -815,7 +815,7 @@ function RegistrationFormContent() {
                 No. Telepon Rumah
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyPhone', e.target.value)}
                 placeholder="Opsional"
                 type="tel"
@@ -828,7 +828,7 @@ function RegistrationFormContent() {
                 No. Handphone / WhatsApp <span className="text-red-500">*</span>
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyMobile', e.target.value)}
                 placeholder="08xxxxxxxx"
                 required
@@ -842,7 +842,7 @@ function RegistrationFormContent() {
                 Alamat Tempat Tinggal <span className="text-red-500">*</span>
               </label>
               <textarea
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[96px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-24 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyAddress', e.target.value)}
                 placeholder="Alamat tempat tinggal kontak darurat"
                 required
@@ -856,7 +856,7 @@ function RegistrationFormContent() {
               <div>
                 <label className="block text-xs font-semibold text-slate-700">RT</label>
                 <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   maxLength={3}
                   onChange={(e) => updateField('emergencyRt', e.target.value)}
                   placeholder="001"
@@ -867,7 +867,7 @@ function RegistrationFormContent() {
               <div>
                 <label className="block text-xs font-semibold text-slate-700">RW</label>
                 <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   maxLength={3}
                   onChange={(e) => updateField('emergencyRw', e.target.value)}
                   placeholder="002"
@@ -880,7 +880,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kelurahan / Desa</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyKelurahan', e.target.value)}
                 placeholder="Desa"
                 type="text"
@@ -891,7 +891,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kecamatan</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyKecamatan', e.target.value)}
                 placeholder="Kecamatan"
                 type="text"
@@ -902,7 +902,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kota / Kabupaten</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('emergencyCity', e.target.value)}
                 placeholder="Kota domisili"
                 type="text"
@@ -913,7 +913,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kode Pos</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 maxLength={5}
                 onChange={(e) => updateField('emergencyPostalCode', e.target.value)}
                 placeholder="5 digit"
@@ -958,7 +958,7 @@ function RegistrationFormContent() {
               </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
-                  className="w-24 rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="w-24 rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   onChange={(e) => updateField('emergencyContactHourStart', e.target.value)}
                   placeholder="08.00"
                   type="text"
@@ -966,7 +966,7 @@ function RegistrationFormContent() {
                 />
                 <span className="text-xs text-slate-400">-</span>
                 <input
-                  className="w-24 rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="w-24 rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   onChange={(e) => updateField('emergencyContactHourEnd', e.target.value)}
                   placeholder="17.00"
                   type="text"
@@ -1033,7 +1033,7 @@ function RegistrationFormContent() {
                 </span>
               </div>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-100/80 min-h-[52px] px-3.5 py-3 text-base font-semibold text-slate-700 cursor-not-allowed select-none focus:outline-none"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-slate-100/80 min-h-10 px-3 py-2 text-sm font-semibold text-slate-700 cursor-not-allowed select-none focus:bg-white focus:outline-none"
                 placeholder="Contoh: JEPANG / TURKIYE"
                 readOnly
                 type="text"
@@ -1044,7 +1044,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Nama Perusahaan</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('companyName', e.target.value)}
                 placeholder="Nama perusahaan penerima di negara tujuan"
                 type="text"
@@ -1055,7 +1055,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Bidang Usaha</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('companyBusiness', e.target.value)}
                 placeholder="Contoh: Manufaktur, Pertanian, Perhotelan"
                 type="text"
@@ -1066,7 +1066,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Posisi / Peran</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('companyRole', e.target.value)}
                 placeholder="Operator Pabrik, Caregiver, dsb."
                 type="text"
@@ -1079,7 +1079,7 @@ function RegistrationFormContent() {
                 Alamat Perusahaan
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('companyAddress', e.target.value)}
                 placeholder="Alamat kantor atau lokasi kerja"
                 type="text"
@@ -1090,7 +1090,7 @@ function RegistrationFormContent() {
             <div>
               <label className="block text-xs font-semibold text-slate-700">Kota Perusahaan</label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('companyCity', e.target.value)}
                 placeholder="Prefektur / Kota di negara tujuan"
                 type="text"
@@ -1103,7 +1103,7 @@ function RegistrationFormContent() {
                 No. Telepon Perusahaan
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('companyPhone', e.target.value)}
                 placeholder="Opsional"
                 type="text"
@@ -1116,7 +1116,7 @@ function RegistrationFormContent() {
                 Tanggal Mulai Bekerja
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 onChange={(e) => updateField('workStartDate', e.target.value)}
                 placeholder="DD/MM/YYYY"
                 type="text"
@@ -1126,20 +1126,17 @@ function RegistrationFormContent() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-700">Status Pekerjaan</label>
-              <select
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
-                onChange={(e) =>
-                  updateField(
-                    'employmentStatus',
-                    e.target.value as RegistrationFormData['employmentStatus'],
-                  )
+              <FormSelect
+                onChange={(value) =>
+                  updateField('employmentStatus', value as RegistrationFormData['employmentStatus'])
                 }
                 value={formData.employmentStatus}
-              >
-                <option value="MAGANG">Magang</option>
-                <option value="KONTRAK">Kontrak</option>
-                <option value="LAINNYA">Lainnya</option>
-              </select>
+                options={[
+                  { value: 'MAGANG', label: 'Magang' },
+                  { value: 'KONTRAK', label: 'Kontrak' },
+                  { value: 'LAINNYA', label: 'Lainnya' },
+                ]}
+              />
             </div>
 
             {formData.employmentStatus === 'LAINNYA' && (
@@ -1148,7 +1145,7 @@ function RegistrationFormContent() {
                   Keterangan Status Pekerjaan
                 </label>
                 <input
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                  className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                   onChange={(e) => updateField('employmentStatusOther', e.target.value)}
                   placeholder="Sebutkan..."
                   type="text"
@@ -1162,7 +1159,7 @@ function RegistrationFormContent() {
                 Lama Kontrak (Tahun)
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 maxLength={2}
                 onChange={(e) => updateField('contractDurationYears', e.target.value)}
                 placeholder="Contoh: 1, 3, atau 5"
@@ -1176,7 +1173,7 @@ function RegistrationFormContent() {
                 Pendapatan Bulanan (Rp)
               </label>
               <input
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white min-h-[52px] px-3.5 py-3 text-base text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100"
+                className="mt-1.5 w-full rounded-2xl border border-slate-200 bg-[#fbfcff] min-h-10 px-3 py-2 text-sm text-[#0b57d0] focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
                 min={0}
                 onChange={(e) => updateField('monthlyIncome', Number(e.target.value) || 0)}
                 placeholder="Contoh: 15000000"

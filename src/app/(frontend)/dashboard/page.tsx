@@ -764,28 +764,28 @@ export default function DashboardPage() {
                               <div className="mt-5 flex gap-0 border-t border-slate-100 pt-4">
                                 <div className="w-[5.5rem] shrink-0 pr-3">
                                   <span className="text-[10px] text-slate-400">Sisa angsuran</span>
-                                  <strong className="mt-1 block text-sm font-bold text-slate-800">
+                                  <strong className="mt-1 block text-xs font-semibold text-slate-800">
                                     {schedule.total - schedule.paidCount} kali
                                   </strong>
                                 </div>
                                 <div className="min-w-0 flex-1 border-l border-slate-100 pl-3">
-                                  <span className="text-[10px] text-slate-400">
+                                  <span className="block text-right text-[10px] text-slate-400">
                                     Jatuh tempo berikutnya
                                   </span>
-                                  <div className="mt-1">
+                                  <div className="mt-1 flex min-w-0 items-baseline justify-end gap-1.5 whitespace-nowrap">
                                     {schedule.nextDueDate ? (
                                       <>
-                                        <strong className="block text-xs font-semibold text-slate-800">
+                                        <strong className="text-xs font-semibold text-slate-800">
                                           {formatDate(schedule.nextDueDate)}
                                         </strong>
                                         {schedule.nextDueAmount !== null && (
-                                          <span className="text-[11px] font-bold text-[var(--primary)]">
+                                          <span className="text-xs font-semibold text-[var(--primary)]">
                                             {formatRupiah(schedule.nextDueAmount)}
                                           </span>
                                         )}
                                       </>
                                     ) : (
-                                      <strong className="text-xs font-semibold text-slate-800">
+                                      <strong className="text-right text-xs font-semibold text-slate-800">
                                         Seluruh angsuran telah lunas
                                       </strong>
                                     )}

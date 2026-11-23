@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **23 November 2026** (ui(login): layar selamat datang dikunci setinggi viewport dan tidak bisa discroll; penguncian dilepas otomatis saat wizard berpindah ke langkah berikutnya.)
+Terakhir diperbarui: **23 November 2026** (ui(login): welcome screen menempel ke sisi atas viewport tanpa padding canvas atau sudut luar yang membulat.)
 
 ---
 

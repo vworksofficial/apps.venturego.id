@@ -1811,6 +1811,19 @@ body {
 }
 
 /* Welcome screen inspired by the Vworks travel and graduation reference. */
+html:has(.welcome-step),
+body:has(.welcome-step) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.app-canvas:has(.welcome-step) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .welcome-step {
   /* Palet cerah ala Google (Material 3): biru terang → biru tua untuk kesan aman. */
   --primary: #0b57d0;

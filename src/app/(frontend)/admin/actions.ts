@@ -24,6 +24,7 @@ import { buildAkadDocument } from '@/lib/akad-document'
 import { getFirebaseFirestore } from '@/lib/firebase-admin'
 import { getStaffSession } from '@/lib/firebase-session'
 import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
+import { allocateInstallmentPayment } from '@/lib/installment-payment-allocation'
 import { ensureStudentNumber, studentNumberSequence } from '@/lib/student-number'
 import { FINANCING_OPTIONS } from '@/lib/financing-plan'
 import {
@@ -108,43 +109,83 @@ export async function approvePaymentProof(proofId: string): Promise<ActionResult
           ? application.paidInstallments.filter((value): value is number => Number.isInteger(value))
           : [],
       )
-      const priorAmount = existingPayments.docs.reduce((sum, paymentDocument) => {
-        const payment = paymentDocument.data()
-        return payment.status === 'PAID' && payment.installmentNumber === installmentNumber
-          ? sum + (Number.isSafeInteger(payment.amount) ? Number(payment.amount) : 0)
-          : sum
-      }, 0)
-      if (paidSet.has(installmentNumber) || priorAmount >= scheduleRow.amount) return 'already-paid'
-      if (amount > scheduleRow.amount - priorAmount) return 'amount-exceeds-balance'
-      const nextInstallmentAmount = priorAmount + amount
-      if (nextInstallmentAmount >= scheduleRow.amount) paidSet.add(installmentNumber)
+      const paymentRows = existingPayments.docs.map((document) => document.data())
+      if (paymentRows.some((payment) => payment.paymentProofId === proofId)) return 'processed'
+      const firstUnpaid = schedule.find((row) =>
+        allocateInstallmentPayment(schedule, paidSet, paymentRows, 1, row.installment),
+      )?.installment
+      if (firstUnpaid === undefined) return 'already-paid'
+      if (firstUnpaid !== installmentNumber) return 'not-current-installment'
+      const allocations = allocateInstallmentPayment(
+        schedule,
+        paidSet,
+        paymentRows,
+        amount,
+        installmentNumber,
+      )
+      if (!allocations) return 'amount-exceeds-balance'
       const now = new Date().toISOString()
       const applicationId = String(application.applicationId ?? '')
-      transaction.create(paymentRef, {
-        applicationDocId,
-        applicationId,
-        ownerFirebaseUid: String(proof.ownerFirebaseUid ?? application.ownerFirebaseUid ?? ''),
-        type: 'INSTALLMENT',
-        installmentNumber,
-        amount,
-        description: `Angsuran ${installmentNumber} · Bukti transfer`,
-        status: 'PAID',
-        paidAt: now,
-        paidMethod: 'BANK_TRANSFER',
-        paidChannel: 'BRI',
-        paymentProofId: proofId,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
+      const paidAfter = new Set(paidSet)
+      const paymentsToCreate = allocations.map((allocation, index) => {
+        const allocationRef =
+          index === 0
+            ? paymentRef
+            : db.collection('payments').doc(`proof-${proofId}-i${allocation.installmentNumber}`)
+        const scheduledAmount = schedule.find(
+          (row) => row.installment === allocation.installmentNumber,
+        )?.amount
+        const priorPaid = paymentRows
+          .filter(
+            (payment) =>
+              payment.status === 'PAID' &&
+              payment.installmentNumber === allocation.installmentNumber,
+          )
+          .reduce(
+            (sum, payment) =>
+              sum + (Number.isSafeInteger(payment.amount) ? Number(payment.amount) : 0),
+            0,
+          )
+        if (
+          paidSet.has(allocation.installmentNumber) ||
+          priorPaid + allocation.amount >= Number(scheduledAmount)
+        )
+          paidAfter.add(allocation.installmentNumber)
+        return { ref: allocationRef, ...allocation }
       })
+      if (
+        paymentsToCreate.some(({ ref }) => existingPayments.docs.some((doc) => doc.id === ref.id))
+      ) {
+        return 'processed'
+      }
+      for (const allocation of paymentsToCreate) {
+        transaction.create(allocation.ref, {
+          applicationDocId,
+          applicationId,
+          ownerFirebaseUid: String(proof.ownerFirebaseUid ?? application.ownerFirebaseUid ?? ''),
+          type: 'INSTALLMENT',
+          installmentNumber: allocation.installmentNumber,
+          amount: allocation.amount,
+          description: `Angsuran ${allocation.installmentNumber} · Bukti transfer`,
+          status: 'PAID',
+          paidAt: now,
+          paidMethod: 'BANK_TRANSFER',
+          paidChannel: 'BRI',
+          paymentProofId: proofId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
       transaction.update(proofRef, {
         status: 'VERIFIED',
         reviewedAt: FieldValue.serverTimestamp(),
         reviewedBy: staff?.email ?? staff?.uid,
         paymentId: paymentRef.id,
+        paymentIds: paymentsToCreate.map(({ ref }) => ref.id),
         updatedAt: FieldValue.serverTimestamp(),
       })
       transaction.update(applicationRef, {
-        paidInstallments: [...paidSet].sort((a, b) => a - b),
+        paidInstallments: [...paidAfter].sort((a, b) => a - b),
         updatedAt: FieldValue.serverTimestamp(),
       })
       return 'approved'
@@ -158,7 +199,9 @@ export async function approvePaymentProof(proofId: string): Promise<ActionResult
       inactive: 'Program siswa tidak sedang aktif.',
       'schedule-missing': 'Jadwal angsuran tidak ditemukan untuk bukti ini.',
       'already-paid': 'Angsuran ini sudah tercatat lunas.',
-      'amount-exceeds-balance': 'Nominal bukti melebihi sisa angsuran ini.',
+      'not-current-installment':
+        'Bukti pembayaran harus dimulai dari angsuran yang sedang berjalan.',
+      'amount-exceeds-balance': 'Nominal bukti melebihi seluruh sisa kewajiban angsuran.',
     }
     return { ok: false, message: messages[result] ?? 'Bukti pembayaran belum dapat disetujui.' }
   } catch {

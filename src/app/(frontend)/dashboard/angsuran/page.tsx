@@ -140,12 +140,20 @@ function ApplicationTerms({
   const applicationPayments = payments.filter(
     (payment) => payment.applicationDocId === application.id,
   )
-  const paidInstallments = new Set([
-    ...(application.paidInstallments ?? []),
-    ...applicationPayments
-      .filter((payment) => payment.status === 'PAID' && payment.installmentNumber !== null)
-      .map((payment) => payment.installmentNumber as number),
-  ])
+  const paidInstallments = new Set(application.paidInstallments ?? [])
+  const paidAmountsByInstallment = new Map<number, number>()
+  for (const payment of applicationPayments) {
+    if (payment.status !== 'PAID' || payment.installmentNumber === null) continue
+    paidAmountsByInstallment.set(
+      payment.installmentNumber,
+      (paidAmountsByInstallment.get(payment.installmentNumber) ?? 0) + payment.amount,
+    )
+  }
+  for (const entry of schedule) {
+    if ((paidAmountsByInstallment.get(entry.installment) ?? 0) >= entry.amount) {
+      paidInstallments.add(entry.installment)
+    }
+  }
   const fullCoverBudget = isFullCover ? normalizeFullCoverBudget(plan.fullCoverBudget) : null
   const fullCoverTotals = fullCoverBudget ? calculateFullCoverBudget(fullCoverBudget) : null
   const fullCoverCharges = fullCoverTotals
@@ -860,8 +868,12 @@ function ApplicationTerms({
                         {copiedItem === 'amount' ? 'Tersalin' : 'Salin nominal'}
                       </button>
                     </div>
+                    <p className="text-[10px] leading-4 text-slate-500">
+                      Transfer akan dialokasikan berurutan mulai dari angsuran {selectedInstallment}
+                      ; kelebihannya mengurangi angsuran berikutnya.
+                    </p>
                     <p className="text-[10px] text-slate-500">
-                      Angsuran {selectedInstallment}:{' '}
+                      Sisa angsuran {selectedInstallment}:{' '}
                       {formatRupiah(
                         displayedSchedule.find((entry) => entry.installment === selectedInstallment)
                           ?.amount,

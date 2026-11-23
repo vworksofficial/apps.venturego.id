@@ -422,53 +422,6 @@ export default function UploadDocumentsPage() {
               <h3 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-slate-500">
                 {group.title}
               </h3>
-              {group.key === 'dokumen-pendukung' && selectedApplication && (
-                <div className="mb-3 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50/80 via-white to-sky-50/60 p-3.5 shadow-xs sm:p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="grid size-8 shrink-0 place-items-center rounded-xl bg-blue-600 text-white shadow-xs sm:size-9">
-                      <DashboardIcon className="size-4.5 sm:size-5" name="document" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-xs font-bold text-slate-900">
-                        Unduh Template Surat Resmi
-                      </h4>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-slate-600">
-                        Unduh template surat resmi siap cetak (sudah terisi identitas), tempel
-                        meterai Rp10.000, tanda tangani secara fisik, lalu scan atau foto untuk
-                        diunggah pada daftar berkas di bawah.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5 sm:gap-2 sm:pl-11">
-                    <button
-                      type="button"
-                      disabled={downloadingTemplate !== null}
-                      onClick={() => void downloadTemplate('kesediaan-mengangsur')}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold text-blue-700 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 sm:px-3 sm:py-1.5 sm:text-[11px]"
-                    >
-                      <DashboardIcon className="size-3.5 shrink-0" name="download" />
-                      <span>
-                        {downloadingTemplate === 'kesediaan-mengangsur'
-                          ? 'Mengunduh…'
-                          : 'Template Surat Mengangsur (PDF)'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={downloadingTemplate !== null}
-                      onClick={() => void downloadTemplate('pernyataan-orang-tua')}
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold text-blue-700 shadow-2xs transition hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 sm:px-3 sm:py-1.5 sm:text-[11px]"
-                    >
-                      <DashboardIcon className="size-3.5 shrink-0" name="download" />
-                      <span>
-                        {downloadingTemplate === 'pernyataan-orang-tua'
-                          ? 'Mengunduh…'
-                          : 'Template Surat Orang Tua (PDF)'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              )}
               <DashboardCard>
                 {group.documents.map(({ document, index }, groupIndex) => {
                   const uploadedDocument =
@@ -677,7 +630,6 @@ export default function UploadDocumentsPage() {
           ))}
         </>
       )}
-
 
       {uploadError && (
         <p className="rounded-xl bg-red-50 p-3 text-xs text-red-700" role="alert">

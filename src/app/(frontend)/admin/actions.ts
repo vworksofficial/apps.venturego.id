@@ -37,6 +37,17 @@ import {
 
 type ActionResult = { ok: true } | { ok: false; message: string }
 
+const getJakartaTodayIso = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '01'
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
 const assertStaffDocumentId = async (
   documentId: string,
 ): Promise<{ staff: Awaited<ReturnType<typeof getStaffSession>>; error: ActionResult | null }> => {
@@ -846,11 +857,38 @@ export async function updateApplicationWorkflow(
   ) {
     return { ok: false, message: 'Format tanggal penerbangan tidak valid.' }
   }
+  if (departureDate !== undefined && typeof departureDate !== 'string') {
+    return { ok: false, message: 'Format tanggal penerbangan tidak valid.' }
+  }
   try {
     const applicationRef = getFirebaseFirestore().collection('applications').doc(documentId)
     const application = await applicationRef.get()
     if (!application.exists) return { ok: false, message: 'Pengajuan tidak ditemukan.' }
     const applicationData = application.data() ?? {}
+    const nextDepartureDate = departureDate?.trim() ?? ''
+    if (nextDepartureDate) {
+      const match = nextDepartureDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      if (!match) return { ok: false, message: 'Format tanggal penerbangan tidak valid.' }
+      const year = Number(match[1])
+      const month = Number(match[2]) - 1
+      const day = Number(match[3])
+      const parsedDate = new Date(Date.UTC(year, month, day))
+      if (
+        parsedDate.getUTCFullYear() !== year ||
+        parsedDate.getUTCMonth() !== month ||
+        parsedDate.getUTCDate() !== day
+      ) {
+        return { ok: false, message: 'Format tanggal penerbangan tidak valid.' }
+      }
+      const previousDepartureDate =
+        typeof applicationData.departureDate === 'string' ? applicationData.departureDate : ''
+      if (nextDepartureDate < getJakartaTodayIso() && nextDepartureDate !== previousDepartureDate) {
+        return {
+          ok: false,
+          message: 'Tanggal penerbangan harus hari ini atau tanggal setelahnya.',
+        }
+      }
+    }
     if (
       status === 'CANCELLED' &&
       String(applicationData.financialPlan?.pricingStatus ?? '') === 'AGREED' &&
@@ -869,7 +907,7 @@ export async function updateApplicationWorkflow(
       updatedBy: staff?.email ?? staff?.uid,
     }
     if (departureDate !== undefined) {
-      updatePayload.departureDate = departureDate.trim() || null
+      updatePayload.departureDate = nextDepartureDate || null
     }
     await applicationRef.update(updatePayload)
     if (status === 'ACTIVE' && applicationData.status !== 'ACTIVE') {

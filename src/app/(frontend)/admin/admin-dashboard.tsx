@@ -31,6 +31,7 @@ import {
 import { AdminVipPanel } from './vip-panel'
 import { FinanceTermsFields } from './finance-terms-fields'
 import { FullCoverBudgetFields } from './full-cover-budget-fields'
+import { BirthDatePicker } from '../_components/date-picker'
 import { validateFullCoverBudget } from '@/lib/full-cover-budget'
 import { TransferBreakdownModal } from './transfer-breakdown-modal'
 import { InstallmentMonitor } from './installment-monitor'
@@ -3170,7 +3171,7 @@ function ApplicationDrawerForm({
           </section>
 
           {/* BAGIAN 3: CATATAN INTERNAL STAF */}
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+          <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-xs">
             <div className="border-b border-slate-100 px-5 py-4">
               <h3 className="text-sm font-bold text-slate-900">Catatan Internal Staf</h3>
               <p className="mt-0.5 text-xs text-slate-500">
@@ -3181,7 +3182,7 @@ function ApplicationDrawerForm({
             <div className="p-5 space-y-4">
               {/* Field Tanggal Penerbangan Keberangkatan */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                <label className="block">
+                <div className="block">
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                       <svg
@@ -3209,15 +3210,18 @@ function ApplicationDrawerForm({
                     tanggal tiket penerbangan keberangkatan.
                   </span>
                   <div className="mt-2.5 flex items-center gap-3">
-                    <input
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 shadow-2xs focus:border-[#0b57d0] focus:ring-1 focus:ring-[#0b57d0] focus:outline-none"
-                      onChange={(event) => setFlightDepartureDate(event.target.value)}
-                      type="date"
-                      value={flightDepartureDate}
-                    />
+                    <div className="w-full max-w-xs">
+                      <BirthDatePicker
+                        futureLabel="tanggal keberangkatan"
+                        mode="future"
+                        onChange={setFlightDepartureDate}
+                        value={flightDepartureDate}
+                        valueFormat="iso"
+                      />
+                    </div>
                     {flightDepartureDate && (
                       <button
-                        className="text-[11px] font-medium text-slate-500 hover:text-red-600 transition"
+                        className="text-[11px] font-medium text-slate-500 transition hover:text-red-600"
                         onClick={() => setFlightDepartureDate('')}
                         type="button"
                       >
@@ -3225,7 +3229,7 @@ function ApplicationDrawerForm({
                       </button>
                     )}
                   </div>
-                </label>
+                </div>
               </div>
 
               <label className="space-y-1.5 text-xs font-semibold text-slate-700">

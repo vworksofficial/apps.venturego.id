@@ -2697,6 +2697,10 @@ body:has(.welcome-step) {
   width: 100%;
 }
 
+.form-select.date-picker-open {
+  z-index: 80;
+}
+
 .form-select-trigger {
   width: 100%;
   min-height: 40px;
@@ -2832,7 +2836,7 @@ body:has(.welcome-step) {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 40;
+  z-index: 90;
   width: min(100%, 320px);
   min-width: 280px;
   padding: 12px;

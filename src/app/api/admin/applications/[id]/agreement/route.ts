@@ -54,8 +54,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       typeof financialPlan.finalAgreementReference === 'string'
         ? financialPlan.finalAgreementReference.trim()
         : ''
-    if (!snapshot.exists || financialPlan.pricingStatus !== 'AGREED' || !agreementReference) {
-      return errorResponse('PDF akad final hanya dapat diunggah setelah akad disepakati.', 409)
+    const akadIssued = Boolean(
+      financialPlan.akadDocument && typeof financialPlan.akadDocument === 'object',
+    )
+    if (!snapshot.exists || !akadIssued || !agreementReference) {
+      return errorResponse('PDF akad final hanya dapat diunggah setelah dokumen akad terbit.', 409)
     }
 
     const applicantName =
@@ -79,10 +82,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       linked = await firestore.runTransaction(async (transaction) => {
         const latest = await transaction.get(applicationRef)
         const latestData = latest.data()
+        const latestPlan = latestData?.financialPlan
         if (
           !latest.exists ||
-          latestData?.financialPlan?.pricingStatus !== 'AGREED' ||
-          latestData?.financialPlan?.finalAgreementReference !== agreementReference
+          !latestPlan?.akadDocument ||
+          latestPlan.finalAgreementReference !== agreementReference
         ) {
           return false
         }
@@ -109,7 +113,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!linked) {
       await deleteDriveFile(uploaded.fileId)
       return errorResponse(
-        'Akad tidak lagi berstatus Disepakati. Segarkan data sebelum mengunggah.',
+        'Dokumen akad belum terbit atau referensinya berubah. Segarkan data sebelum mengunggah.',
         409,
       )
     }

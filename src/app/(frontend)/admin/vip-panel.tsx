@@ -462,7 +462,7 @@ export function AdminVipPanel({
                     Riwayat dana ({selectedLedger.length})
                   </h2>
                 </header>
-                <div className="max-h-[480px] overflow-auto">
+                <div className="hidden max-h-[480px] overflow-auto sm:block">
                   <table className="w-full border-collapse text-left text-xs">
                     <thead className="sticky top-0 bg-slate-50 text-[11px] text-slate-500">
                       <tr>
@@ -515,6 +515,57 @@ export function AdminVipPanel({
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="max-h-[480px] space-y-2 overflow-y-auto p-3 sm:hidden">
+                  {selectedLedger.map((row) => (
+                    <article
+                      className={`rounded-lg border border-slate-100 bg-slate-50/70 p-3 ${
+                        row.voided ? 'text-slate-400' : ''
+                      }`}
+                      key={row.id}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-slate-900">
+                            {VIP_LEDGER_LABELS[row.type]}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-slate-500">{tanggal(row.date)}</p>
+                        </div>
+                        <strong
+                          className={`shrink-0 text-xs ${
+                            row.type === 'WITHDRAWAL' ? 'text-slate-600' : 'text-emerald-700'
+                          }`}
+                        >
+                          {row.type === 'WITHDRAWAL' ? '−' : '+'}
+                          {rupiah(row.amount)}
+                        </strong>
+                      </div>
+                      {row.note && (
+                        <p className="mt-2 break-words border-t border-slate-200 pt-2 text-[11px] text-slate-600">
+                          {row.note}
+                        </p>
+                      )}
+                      {row.voided ? (
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          Dibatalkan: {row.voidReason}
+                        </p>
+                      ) : (
+                        <button
+                          className="mt-2 min-h-9 rounded-lg border border-rose-200 px-3 text-[11px] font-semibold text-rose-700 disabled:opacity-50"
+                          disabled={pending}
+                          onClick={() => voidRow(row)}
+                          type="button"
+                        >
+                          Batalkan transaksi
+                        </button>
+                      )}
+                    </article>
+                  ))}
+                  {selectedLedger.length === 0 && (
+                    <p className="py-5 text-center text-xs text-slate-400">
+                      Belum ada transaksi untuk mitra ini.
+                    </p>
+                  )}
                 </div>
               </section>
             </>

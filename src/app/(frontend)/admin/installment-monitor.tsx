@@ -162,118 +162,197 @@ export function InstallmentMonitor({
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1080px] border-collapse text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  <th className="px-4 py-3">Siswa</th>
-                  <th className="px-4 py-3">Program & LPK</th>
-                  <th className="px-4 py-3">Angsuran</th>
-                  <th className="px-4 py-3 text-right">Nominal transfer</th>
-                  <th className="px-4 py-3">Bukti dikirim</th>
-                  <th className="px-4 py-3">Berkas</th>
-                  <th className="px-4 py-3 text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {rows.map(({ proof, application, studentNumber, scheduledAmount, dueDate }) => (
-                  <tr className="align-middle hover:bg-slate-50/70" key={proof.id}>
-                    <td className="px-4 py-3">
-                      <strong className="block max-w-48 truncate text-xs text-slate-900">
-                        {application.applicantName}
-                      </strong>
-                      <span className="mt-0.5 block text-[10px] text-emerald-700">
-                        {studentNumber ? `NIS ${studentNumber}` : 'NIS belum tersedia'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <strong className="block text-[11px] text-slate-800">
-                        {application.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
-                      </strong>
-                      <span className="mt-0.5 block max-w-48 truncate text-[10px] text-slate-500">
-                        {application.lpkName || 'LPK belum tercatat'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <strong className="block text-[11px] text-slate-800">
-                        Angsuran {proof.installmentNumber}
-                      </strong>
-                      <span className="mt-0.5 block text-[10px] text-slate-500">
-                        Jadwal: {dueDate ? dateOnly(dueDate) : 'Fleksibel'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <strong className="block text-xs font-bold text-slate-900">
-                        {money(proof.amount)}
-                      </strong>
-                      <span className="mt-0.5 block text-[10px] text-slate-500">
-                        Angsuran {scheduledAmount ? money(scheduledAmount) : '—'}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-[10px] text-slate-600">
-                      {dateTime(proof.submittedAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="block max-w-36 truncate text-[10px] text-slate-600">
-                        {proof.fileName}
-                      </span>
-                      <span className="text-[9px] uppercase text-slate-400">
-                        {proof.mimeType.split('/').pop()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
-                          onClick={() => setPreviewId(proof.id)}
-                          type="button"
-                        >
-                          Pratinjau
-                        </button>
-                        <button
-                          aria-label={`Tolak dan hapus bukti ${application.applicantName}`}
-                          className="grid size-8 place-items-center rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                          disabled={busyId === proof.id}
-                          onClick={() => void review(proof.id, 'reject')}
-                          title="Tolak dan hapus"
-                          type="button"
-                        >
-                          <svg
-                            aria-hidden="true"
-                            className="size-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                          >
-                            <path
-                              d="M3 6h18m-2 0-.9 14H5.9L5 6m3 0V4h8v2m-7 4v6m4-6v6"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </button>
-                        <button
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-                          disabled={busyId === proof.id}
-                          onClick={() => void review(proof.id, 'approve')}
-                          type="button"
-                        >
-                          {busyId === proof.id ? 'Memproses…' : 'Setujui'}
-                        </button>
-                      </div>
-                    </td>
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[1080px] border-collapse text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/80 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="px-4 py-3">Siswa</th>
+                    <th className="px-4 py-3">Program & LPK</th>
+                    <th className="px-4 py-3">Angsuran</th>
+                    <th className="px-4 py-3 text-right">Nominal transfer</th>
+                    <th className="px-4 py-3">Bukti dikirim</th>
+                    <th className="px-4 py-3">Berkas</th>
+                    <th className="px-4 py-3 text-right">Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map(({ proof, application, studentNumber, scheduledAmount, dueDate }) => (
+                    <tr className="align-middle hover:bg-slate-50/70" key={proof.id}>
+                      <td className="px-4 py-3">
+                        <strong className="block max-w-48 truncate text-xs text-slate-900">
+                          {application.applicantName}
+                        </strong>
+                        <span className="mt-0.5 block text-[10px] text-emerald-700">
+                          {studentNumber ? `NIS ${studentNumber}` : 'NIS belum tersedia'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <strong className="block text-[11px] text-slate-800">
+                          {application.product === 'FULL_COVER'
+                            ? 'Full Cover'
+                            : 'Dana Keberangkatan'}
+                        </strong>
+                        <span className="mt-0.5 block max-w-48 truncate text-[10px] text-slate-500">
+                          {application.lpkName || 'LPK belum tercatat'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <strong className="block text-[11px] text-slate-800">
+                          Angsuran {proof.installmentNumber}
+                        </strong>
+                        <span className="mt-0.5 block text-[10px] text-slate-500">
+                          Jadwal: {dueDate ? dateOnly(dueDate) : 'Fleksibel'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <strong className="block text-xs font-bold text-slate-900">
+                          {money(proof.amount)}
+                        </strong>
+                        <span className="mt-0.5 block text-[10px] text-slate-500">
+                          Angsuran {scheduledAmount ? money(scheduledAmount) : '—'}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-[10px] text-slate-600">
+                        {dateTime(proof.submittedAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="block max-w-36 truncate text-[10px] text-slate-600">
+                          {proof.fileName}
+                        </span>
+                        <span className="text-[9px] uppercase text-slate-400">
+                          {proof.mimeType.split('/').pop()}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                            onClick={() => setPreviewId(proof.id)}
+                            type="button"
+                          >
+                            Pratinjau
+                          </button>
+                          <button
+                            aria-label={`Tolak dan hapus bukti ${application.applicantName}`}
+                            className="grid size-8 place-items-center rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                            disabled={busyId === proof.id}
+                            onClick={() => void review(proof.id, 'reject')}
+                            title="Tolak dan hapus"
+                            type="button"
+                          >
+                            <svg
+                              aria-hidden="true"
+                              className="size-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                            >
+                              <path
+                                d="M3 6h18m-2 0-.9 14H5.9L5 6m3 0V4h8v2m-7 4v6m4-6v6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                            disabled={busyId === proof.id}
+                            onClick={() => void review(proof.id, 'approve')}
+                            type="button"
+                          >
+                            {busyId === proof.id ? 'Memproses…' : 'Setujui'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-3 p-3 md:hidden">
+              {rows.map(({ proof, application, studentNumber, scheduledAmount, dueDate }) => (
+                <article className="rounded-xl border border-slate-200 p-3.5" key={proof.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="break-words text-sm font-bold text-slate-900">
+                        {application.applicantName}
+                      </h2>
+                      <p className="mt-0.5 break-all font-mono text-[10px] text-emerald-700">
+                        {studentNumber ? `NIS ${studentNumber}` : 'NIS belum tersedia'}
+                      </p>
+                    </div>
+                    <strong className="shrink-0 text-sm text-slate-900">
+                      {money(proof.amount)}
+                    </strong>
+                  </div>
+                  <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-3 text-[11px]">
+                    <p className="break-words text-slate-700">
+                      {application.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'} ·{' '}
+                      {application.lpkName || 'LPK belum tercatat'}
+                    </p>
+                    <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-slate-500">
+                      <span>
+                        Angsuran {proof.installmentNumber} ·{' '}
+                        {dueDate ? dateOnly(dueDate) : 'Fleksibel'}
+                      </span>
+                      <span>Dikirim {dateTime(proof.submittedAt)}</span>
+                    </div>
+                    <p className="break-all text-slate-500">
+                      Jadwal: {scheduledAmount ? money(scheduledAmount) : '—'} · {proof.fileName}
+                    </p>
+                  </div>
+                  <div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-2 border-t border-slate-100 pt-3">
+                    <button
+                      className="min-h-10 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700"
+                      onClick={() => setPreviewId(proof.id)}
+                      type="button"
+                    >
+                      Pratinjau
+                    </button>
+                    <button
+                      aria-label={`Tolak dan hapus bukti ${application.applicantName}`}
+                      className="grid size-10 place-items-center rounded-lg border border-rose-200 text-rose-700 disabled:opacity-50"
+                      disabled={busyId === proof.id}
+                      onClick={() => void review(proof.id, 'reject')}
+                      title="Tolak dan hapus"
+                      type="button"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        className="size-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path
+                          d="M3 6h18m-2 0-.9 14H5.9L5 6m3 0V4h8v2m-7 4v6m4-6v6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      className="min-h-10 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white disabled:opacity-50"
+                      disabled={busyId === proof.id}
+                      onClick={() => void review(proof.id, 'approve')}
+                      type="button"
+                    >
+                      {busyId === proof.id ? 'Memproses…' : 'Setujui'}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
       {preview && (
         <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-4"
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/70 p-0 sm:items-center sm:p-4"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPreviewId(null)
           }}
@@ -281,7 +360,7 @@ export function InstallmentMonitor({
           <section
             aria-label={`Pratinjau bukti ${preview.application.applicantName}`}
             aria-modal="true"
-            className="flex max-h-[92dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            className="flex h-[96dvh] max-h-[96dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:h-auto sm:max-h-[92dvh] sm:rounded-2xl"
             role="dialog"
           >
             <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
@@ -336,16 +415,16 @@ export function InstallmentMonitor({
                 </button>
               </div>
             </header>
-            <div className="min-h-[55dvh] flex-1 bg-slate-100">
+            <div className="min-h-0 flex-1 bg-slate-100">
               {preview.proof.mimeType.startsWith('image/') ? (
                 <img
                   alt={`Bukti pembayaran ${preview.application.applicantName}`}
-                  className="mx-auto max-h-[78dvh] w-full object-contain"
+                  className="mx-auto max-h-full w-full object-contain"
                   src={`/api/admin/payment-proofs/${preview.proof.id}`}
                 />
               ) : (
                 <iframe
-                  className="h-[78dvh] w-full"
+                  className="h-full min-h-0 w-full"
                   src={`/api/admin/payment-proofs/${preview.proof.id}`}
                   title={`Bukti pembayaran ${preview.application.applicantName}`}
                 />

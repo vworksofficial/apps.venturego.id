@@ -4729,6 +4729,7 @@ export function AdminDashboard({
   const [approvalSavingId, setApprovalSavingId] = useState<string | null>(null)
 
   const [activeMenu, setActiveMenu] = useState<MenuId>('dashboard')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dashboardRange, setDashboardRange] = useState<6 | 12>(6)
   const [drawerAppId, setDrawerAppId] = useState<string | null>(null)
   const [drawerTab, setDrawerTab] = useState<DetailTabId>('profile')
@@ -5602,9 +5603,17 @@ export function AdminDashboard({
       className="flex min-h-dvh flex-col bg-[#f8fafc] text-slate-900 lg:flex-row"
       suppressHydrationWarning
     >
+      {mobileMenuOpen && (
+        <button
+          aria-label="Tutup navigasi"
+          className="fixed inset-0 z-40 bg-slate-950/45 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+          type="button"
+        />
+      )}
       {/* FIXED 100dvh SIDEBAR */}
       <aside
-        className="flex w-full flex-col justify-between border-b border-slate-200 bg-[#0b57d0] text-white lg:sticky lg:top-0 lg:h-dvh lg:w-60 lg:shrink-0 lg:self-start lg:border-b-0 lg:border-r lg:border-[#0842a0]"
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-72 shrink-0 flex-col justify-between border-r border-[#0842a0] bg-[#0b57d0] text-white shadow-2xl transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:h-dvh lg:w-60 lg:self-start lg:translate-x-0 lg:shadow-none ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
         suppressHydrationWarning
       >
         {/* Brand Header */}
@@ -5625,14 +5634,14 @@ export function AdminDashboard({
         {/* Compact Menu Groups (Fits inside 1 screen height) */}
         <nav
           aria-label="Navigasi utama backoffice"
-          className="flex flex-1 flex-wrap gap-2 overflow-y-auto px-3 py-3 lg:flex-col lg:flex-nowrap lg:gap-4"
+          className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-3"
         >
           {SIDEBAR_GROUPS.map((group) => (
-            <div className="w-full space-y-1" key={group.group}>
-              <p className="hidden px-2.5 text-[10px] font-bold uppercase tracking-wider text-blue-300/60 lg:block">
+            <div className="w-full space-y-1.5" key={group.group}>
+              <p className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-blue-200/70">
                 {group.group}
               </p>
-              <div className="flex flex-wrap gap-1 lg:flex-col">
+              <div className="flex flex-col gap-1">
                 {group.items.map((item) => {
                   const active = activeMenu === item.id
                   const badge = getMenuBadge(item.id)
@@ -5640,7 +5649,7 @@ export function AdminDashboard({
                   return (
                     <button
                       aria-pressed={active}
-                      className={`relative flex items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs font-medium transition lg:w-full ${
+                      className={`relative flex min-h-10 w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition ${
                         workflowStep && workflowStep < 5
                           ? "lg:after:pointer-events-none lg:after:absolute lg:after:left-[18px] lg:after:top-1/2 lg:after:-bottom-5 lg:after:z-0 lg:after:w-px lg:after:bg-white/30 lg:after:content-['']"
                           : ''
@@ -5650,7 +5659,10 @@ export function AdminDashboard({
                           : 'text-blue-100/80 hover:bg-white/10 hover:text-white'
                       } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
                       key={item.id}
-                      onClick={() => setActiveMenu(item.id)}
+                      onClick={() => {
+                        setActiveMenu(item.id)
+                        setMobileMenuOpen(false)
+                      }}
                       suppressHydrationWarning
                       type="button"
                     >
@@ -5720,10 +5732,39 @@ export function AdminDashboard({
       {/* INDEPENDENTLY SCROLLABLE MAIN CONTENT */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Sticky Minimalist & Aesthetic Header */}
-        <header className="sticky top-0 z-10 border-b border-slate-200/80 bg-white/90 px-6 py-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md">
+        <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-md sm:px-6 sm:py-3.5">
+          <div className="mb-3 flex items-center justify-between gap-3 lg:hidden">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <button
+                aria-expanded={mobileMenuOpen}
+                aria-label="Buka navigasi admin"
+                className="grid size-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0b57d0]"
+                onClick={() => setMobileMenuOpen(true)}
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="size-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+                </svg>
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">{activeMenuInfo.label}</p>
+                <p className="truncate text-[10px] text-slate-500">VentureGo Admin</p>
+              </div>
+            </div>
+            <span className="max-w-32 truncate text-right text-[10px] font-medium text-slate-500">
+              {email}
+            </span>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             {/* Search with Icon & Clear Button — Full Width */}
-            <div className="relative flex-1 min-w-[180px]">
+            <div className="relative min-w-0 basis-full sm:flex-1 sm:basis-auto">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                 <svg
                   aria-hidden="true"
@@ -5739,7 +5780,7 @@ export function AdminDashboard({
               </div>
               <input
                 aria-label="Cari pengajuan atau siswa"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 py-1.5 pl-8.5 pr-7 text-[11px] font-medium text-slate-900 placeholder:text-[11px] placeholder:font-medium placeholder:text-slate-400 transition hover:bg-white focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15"
+                className="min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 py-2 pl-8.5 pr-7 text-[11px] font-medium text-slate-900 placeholder:text-[11px] placeholder:font-medium placeholder:text-slate-400 transition hover:bg-white focus:border-[#0b57d0] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15"
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari ID, nama, WA, LPK…"
                 style={{ fontSize: '11px', fontWeight: 500 }}
@@ -5773,7 +5814,7 @@ export function AdminDashboard({
                 aria-expanded={isDestinationDropdownOpen}
                 aria-haspopup="listbox"
                 aria-label="Filter negara tujuan"
-                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
+                className={`inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-2 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
                   destinationFilter !== 'ALL'
                     ? 'border-[#0b57d0] bg-blue-50/60 !text-[#0b57d0] ring-1 ring-[#0b57d0]/20'
                     : 'border-slate-200 bg-slate-50/70 hover:bg-white focus:border-[#0b57d0]'
@@ -5894,7 +5935,7 @@ export function AdminDashboard({
                 aria-expanded={isProductDropdownOpen}
                 aria-haspopup="listbox"
                 aria-label="Filter produk"
-                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
+                className={`inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-2 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
                   productFilter !== 'ALL'
                     ? 'border-[#0b57d0] bg-blue-50/60 !text-[#0b57d0] ring-1 ring-[#0b57d0]/20'
                     : 'border-slate-200 bg-slate-50/70 hover:bg-white focus:border-[#0b57d0]'
@@ -5991,7 +6032,7 @@ export function AdminDashboard({
                 aria-expanded={isStatusDropdownOpen}
                 aria-haspopup="listbox"
                 aria-label="Filter status"
-                className={`inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-1.5 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
+                className={`inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border py-2 pl-3 pr-2.5 text-[11px] font-medium text-slate-700 transition focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/15 ${
                   statusFilter !== 'ALL'
                     ? 'border-[#0b57d0] bg-blue-50/60 !text-[#0b57d0] ring-1 ring-[#0b57d0]/20'
                     : 'border-slate-200 bg-slate-50/70 hover:bg-white focus:border-[#0b57d0]'
@@ -6070,7 +6111,7 @@ export function AdminDashboard({
             {/* Reset Filter Button — always visible */}
             <button
               aria-label="Reset semua filter"
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[11px] font-medium transition ${
+              className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[11px] font-medium transition ${
                 hasActiveFilter
                   ? 'border-slate-200 bg-white text-slate-600 shadow-2xs hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:scale-95'
                   : 'border-slate-100 bg-slate-50/50 text-slate-300 cursor-default'
@@ -6100,7 +6141,7 @@ export function AdminDashboard({
         </header>
 
         {/* Main Workspace Container */}
-        <main className="flex-1 space-y-5 p-6">
+        <main className="min-w-0 flex-1 space-y-4 p-4 sm:space-y-5 sm:p-6">
           {error && (
             <div
               className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-800"
@@ -6392,7 +6433,7 @@ export function AdminDashboard({
                       Rekapitulasi per LPK Mitra
                     </h3>
                   </div>
-                  <div className="max-h-72 overflow-auto">
+                  <div className="hidden max-h-72 overflow-auto md:block">
                     <table className="w-full border-collapse text-left text-xs">
                       <thead className="sticky top-0 bg-slate-50/95 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
                         <tr>
@@ -6429,6 +6470,39 @@ export function AdminDashboard({
                         )}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="max-h-72 space-y-2 overflow-y-auto p-3 md:hidden">
+                    {lpkStats.map((row) => (
+                      <article
+                        className="rounded-lg border border-slate-100 bg-slate-50/70 p-3"
+                        key={row.lpkName}
+                      >
+                        <h4 className="break-words text-xs font-semibold text-slate-900">
+                          {row.lpkName}
+                        </h4>
+                        <dl className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+                          <div>
+                            <dt className="text-slate-500">Pengajuan</dt>
+                            <dd className="mt-0.5 font-semibold text-slate-800">{row.count}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-slate-500">Aktif / Selesai</dt>
+                            <dd className="mt-0.5 font-semibold text-emerald-700">{row.active}</dd>
+                          </div>
+                          <div className="col-span-2 border-t border-slate-200 pt-2">
+                            <dt className="text-slate-500">Kewajiban tercatat</dt>
+                            <dd className="mt-0.5 font-semibold text-slate-900">
+                              {formatRupiah(row.totalObligation)}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    ))}
+                    {lpkStats.length === 0 && (
+                      <p className="py-5 text-center text-xs text-slate-400">
+                        Belum ada data rekap LPK.
+                      </p>
+                    )}
                   </div>
                 </section>
               </div>
@@ -6490,7 +6564,7 @@ export function AdminDashboard({
                     Lihat Semua Pengajuan →
                   </button>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
@@ -6554,6 +6628,47 @@ export function AdminDashboard({
                     </tbody>
                   </table>
                 </div>
+                <div className="space-y-2.5 p-3 md:hidden">
+                  {filteredApplications.slice(0, 8).map((app) => {
+                    const uploaded = app.documents.filter((document) =>
+                      Boolean(document.fileId),
+                    ).length
+                    return (
+                      <article className="rounded-xl border border-slate-200 p-3" key={app.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <h3 className="break-words text-xs font-bold text-slate-900">
+                              {app.applicantName}
+                            </h3>
+                            <p className="mt-0.5 break-all font-mono text-[10px] text-[#0b57d0]">
+                              {formatDisplayApplicationId(app.applicationId)}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[9px] font-semibold text-slate-600">
+                            {STATUS_LABELS[app.status as keyof typeof STATUS_LABELS] ?? app.status}
+                          </span>
+                        </div>
+                        <p className="mt-2 break-words text-[10px] text-slate-500">
+                          {app.lpkName} · {app.destination === 'JAPAN' ? '🇯🇵 Jepang' : '🇹🇷 Turki'} ·{' '}
+                          {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                        </p>
+                        <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
+                          <span>
+                            {formatDateShort(app.createdAt)} · Berkas {uploaded}/
+                            {app.documents.length}
+                          </span>
+                          <button
+                            className="min-h-9 rounded-lg bg-[#0b57d0] px-3 text-[10px] font-semibold text-white"
+                            onClick={() => openApplicationDrawer(app.id, 'profile')}
+                            type="button"
+                          >
+                            Kelola
+                          </button>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
               </section>
             </div>
           )}
@@ -6602,22 +6717,22 @@ export function AdminDashboard({
                   </div>
 
                   {/* 3 Metric Cards Ringkas & Elegan */}
-                  <div className="grid grid-cols-3 gap-3 shrink-0">
-                    <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                  <div className="grid grid-cols-2 gap-2 shrink-0 sm:grid-cols-3 sm:gap-3">
+                    <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-2xs backdrop-blur-xs sm:px-4 sm:py-3">
                       <p className="text-[11px] font-medium text-slate-500">Total Masuk</p>
                       <p className="mt-1 text-lg font-extrabold text-slate-900">
                         {metrics.pendingApprovalCount}
                       </p>
                       <p className="mt-0.5 text-[10px] text-slate-400">Perlu persetujuan</p>
                     </div>
-                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                    <div className="rounded-xl border border-blue-200/80 bg-blue-50/60 px-3 py-2.5 shadow-2xs backdrop-blur-xs sm:px-4 sm:py-3">
                       <p className="text-[11px] font-medium text-[#0b57d0]">Perlu Tinjauan</p>
                       <p className="mt-1 text-lg font-extrabold text-[#0b57d0]">
                         {metrics.pendingReview}
                       </p>
                       <p className="mt-0.5 text-[10px] text-blue-600/80">Berkas & Biaya</p>
                     </div>
-                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3 shadow-2xs backdrop-blur-xs">
+                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/60 px-3 py-2.5 shadow-2xs backdrop-blur-xs sm:px-4 sm:py-3">
                       <p className="text-[11px] font-medium text-emerald-800">Akad Berjalan</p>
                       <p className="mt-1 text-lg font-extrabold text-emerald-700">
                         {metrics.activeCount}
@@ -6630,7 +6745,7 @@ export function AdminDashboard({
 
               {/* Multi-column Table */}
               <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-                <div className="overflow-x-auto">
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
@@ -6725,6 +6840,100 @@ export function AdminDashboard({
                     </tbody>
                   </table>
                 </div>
+                {pendingApprovalApplications.length === 0 ? (
+                  <div className="px-4 py-10 text-center text-xs text-slate-500 md:hidden">
+                    Tidak ada data pengajuan yang belum disetujui.
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-3 md:hidden">
+                    {pendingApprovalApplications.map((app) => {
+                      const uploaded = app.documents.filter((document) =>
+                        Boolean(document.fileId),
+                      ).length
+                      const isLegacyApplication = Boolean(app.legacy)
+                      return (
+                        <article className="rounded-xl border border-slate-200 p-3.5" key={app.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-bold text-slate-900">
+                                {app.applicantName}
+                              </p>
+                              <p className="mt-0.5 break-all font-mono text-[10px] font-semibold text-[#0b57d0]">
+                                {formatDisplayApplicationId(app.applicationId)}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0]">
+                              {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
+                            <div className="min-w-0">
+                              <dt className="text-slate-400">LPK</dt>
+                              <dd className="mt-0.5 break-words font-medium text-slate-800">
+                                {app.lpkName}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-400">Negara</dt>
+                              <dd className="mt-0.5 font-medium text-slate-800">
+                                {app.destination === 'JAPAN' ? '🇯🇵 Jepang' : '🇹🇷 Turki'}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-400">Tanggal masuk</dt>
+                              <dd className="mt-0.5 font-medium text-slate-800">
+                                {formatDateShort(app.createdAt)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-400">Berkas</dt>
+                              <dd className="mt-0.5 font-medium text-slate-800">
+                                {uploaded}/{app.documents.length}
+                              </dd>
+                            </div>
+                          </dl>
+                          <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
+                            <button
+                              aria-label={`Tolak dan hapus pengajuan ${app.applicationId}`}
+                              className="grid size-10 shrink-0 place-items-center rounded-lg border border-rose-200 text-rose-700 disabled:opacity-40"
+                              disabled={pending || isLegacyApplication}
+                              onClick={() => {
+                                setDeleteApplicationError('')
+                                setApplicationToDelete(app)
+                              }}
+                              title={
+                                isLegacyApplication
+                                  ? 'Data kontrak legacy dilindungi'
+                                  : 'Tolak dan hapus'
+                              }
+                              type="button"
+                            >
+                              <svg
+                                aria-hidden="true"
+                                className="size-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.8}
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M3 6h18M8 6V4h8v2m3 0-.9 14H5.9L5 6m4 4v6m6-6v6" />
+                              </svg>
+                            </button>
+                            <button
+                              className="min-h-10 flex-1 rounded-lg bg-[#0b57d0] px-3 text-xs font-semibold text-white"
+                              onClick={() => openApplicationDrawer(app.id, 'profile')}
+                              type="button"
+                            >
+                              Kelola pengajuan
+                            </button>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
               </section>
             </div>
           )}
@@ -6774,7 +6983,7 @@ export function AdminDashboard({
                   </div>
 
                   {/* 3 Metric Cards Ringkas & Elegan */}
-                  <div className="grid grid-cols-3 gap-3 shrink-0">
+                  <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                     <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs backdrop-blur-xs">
                       <p className="text-[11px] font-medium text-slate-500">Total Arsip</p>
                       <p className="mt-1 text-lg font-extrabold text-slate-900">
@@ -7460,7 +7669,7 @@ export function AdminDashboard({
                   </div>
 
                   {/* 3 Metric Cards Ringkas & Elegan */}
-                  <div className="grid grid-cols-3 gap-3 shrink-0">
+                  <div className="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                     <div className="rounded-xl border border-slate-200/80 bg-white/90 px-4 py-3 shadow-2xs backdrop-blur-xs">
                       <p className="text-[11px] font-medium text-slate-500">Total Masuk</p>
                       <p className="mt-1 text-lg font-extrabold text-slate-900">
@@ -7488,7 +7697,7 @@ export function AdminDashboard({
 
               {/* Multi-column Table */}
               <section className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs">
-                <div className="overflow-x-auto">
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-semibold text-slate-500">
@@ -7618,6 +7827,104 @@ export function AdminDashboard({
                     </tbody>
                   </table>
                 </div>
+                {contractPrepApplications.length === 0 ? (
+                  <div className="px-4 py-10 text-center text-xs text-slate-500 md:hidden">
+                    Belum ada pengajuan yang siap diproses pada Persiapan Akad.
+                  </div>
+                ) : (
+                  <div className="space-y-3 p-3 md:hidden">
+                    {contractPrepApplications.map((app, index) => {
+                      const plan = app.financialPlan ?? {}
+                      const pricing = String(plan.pricingStatus ?? 'ESTIMATED')
+                      const nafaqah = Number(plan.nafaqahTotal) || 0
+                      const ujrah = Number(plan.ujrahTotal) || 0
+                      const requested = app.departureDetails?.requestedFinancingAmount
+                      return (
+                        <article className="rounded-xl border border-slate-200 p-3.5" key={app.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="break-words text-sm font-bold text-slate-900">
+                                {app.applicantName}
+                              </h3>
+                              <p className="mt-0.5 break-all font-mono text-[10px] font-semibold text-[#0b57d0]">
+                                {formatDisplayApplicationId(app.applicationId)}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0]">
+                              {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                            </span>
+                          </div>
+                          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
+                            <div>
+                              <dt className="text-slate-400">Negara · LPK</dt>
+                              <dd className="mt-0.5 break-words font-medium text-slate-800">
+                                {app.destination === 'JAPAN' ? '🇯🇵 Jepang' : '🇹🇷 Turki'} ·{' '}
+                                {app.lpkName}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-400">Status biaya</dt>
+                              <dd className="mt-0.5 font-semibold text-slate-800">
+                                {PRICING_STATUS_LABELS[
+                                  pricing as keyof typeof PRICING_STATUS_LABELS
+                                ] ?? pricing}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-400">Nafaqah + Ujrah</dt>
+                              <dd className="mt-0.5 font-medium text-slate-800">
+                                {nafaqah + ujrah > 0 ? formatRupiah(nafaqah + ujrah) : '—'}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-slate-400">Total akad</dt>
+                              <dd className="mt-0.5 font-bold text-slate-900">
+                                {formatRupiah(plan.totalObligation)}
+                              </dd>
+                            </div>
+                            {requested ? (
+                              <div className="col-span-full">
+                                <dt className="text-slate-400">Nominal diajukan</dt>
+                                <dd className="mt-0.5 font-medium text-slate-800">
+                                  {formatRupiah(requested)}
+                                </dd>
+                              </div>
+                            ) : null}
+                          </dl>
+                          <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                            {(pricing === 'VERIFIED' || pricing === 'AGREED') && (
+                              <button
+                                className="min-h-10 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800"
+                                onClick={() => openTransferDetail(app, index)}
+                                type="button"
+                              >
+                                Rincian pencairan
+                              </button>
+                            )}
+                            <button
+                              className="min-h-10 flex-1 rounded-lg bg-[#0b57d0] px-3 text-xs font-semibold text-white"
+                              onClick={() => openApplicationDrawer(app.id, 'pricing')}
+                              type="button"
+                            >
+                              Susun akad
+                            </button>
+                            <button
+                              className="min-h-10 rounded-lg border border-rose-200 px-3 text-xs font-semibold text-rose-700"
+                              disabled={pending}
+                              onClick={() => {
+                                setRevertError('')
+                                setRevertTarget(app)
+                              }}
+                              type="button"
+                            >
+                              Kembalikan
+                            </button>
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                )}
               </section>
             </div>
           )}

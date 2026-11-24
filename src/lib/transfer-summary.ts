@@ -1,4 +1,5 @@
 import type { FinancingApplicationRecord } from './firebase-data'
+import { calculateFullCoverBudget, normalizeFullCoverBudget } from './full-cover-budget'
 
 export type AdditionalRecipient = {
   id: string
@@ -249,4 +250,86 @@ export function buildDepartureTransferWhatsappMessage(
   )
 
   return lines.join('\n')
+}
+
+export function buildFullCoverTransferWhatsappMessage(
+  app: FinancingApplicationRecord,
+  state: TransferDetailsState,
+): string {
+  const { header, applicantName } = buildDepartureTransferHeader(app)
+  const budget = normalizeFullCoverBudget(app.financialPlan.fullCoverBudget)
+  if (!budget) {
+    return [
+      header,
+      '',
+      'Rincian Budgeting Full Cover belum tersedia. Simpan rincian kebutuhan terlebih dahulu.',
+    ].join('\n')
+  }
+
+  const totals = calculateFullCoverBudget(budget)
+  const stageOneStudentAmount =
+    budget.registrationMcuAmount + totals.languageAllowanceTotal + totals.skillAllowanceTotal
+  const stageOneTotal = budget.languageTuitionTotal + stageOneStudentAmount
+  const stageTwoTotal = budget.skillTrainingAmount + budget.departureAllowanceAmount
+  const lpkBank = [state.lpkBank, state.lpkAccountNumber].filter(Boolean).join(' ')
+  const studentBank = [state.applicantBank, state.applicantAccountNumber].filter(Boolean).join(' ')
+  const lpkName = state.lpkAccountName || `LPK ${app.lpkName || 'Mitra'}`
+  const studentAccountName = state.applicantAccountName || applicantName
+
+  return [
+    header,
+    '',
+    '*PLAFON PEMBIAYAAN*',
+    `Rp${formatThousandsNumber(totals.nafaqahTotal)}`,
+    '',
+    'Rencana Pencairan',
+    `*Tahap 1* = Rp${formatThousandsNumber(stageOneTotal)}`,
+    `*Tahap 2* = Rp${formatThousandsNumber(stageTwoTotal)}`,
+    '',
+    'Realisasi Pencairan',
+    '*Detail Pencairan Tahap 1*',
+    '',
+    '*_Pelatihan Tahap 1 (Pelatihan bahasa)_*',
+    lpkName,
+    `Rp${formatThousandsNumber(budget.languageTuitionTotal)}`,
+    lpkBank || 'Nomor rekening LPK belum diatur',
+    lpkName,
+    `Ket. ${applicantName} (Pelatihan Tahap 1)`,
+    '',
+    '*_Uang Saku Pelatihan + MCU & Pendaftaran_*',
+    studentAccountName,
+    `Rp${formatThousandsNumber(stageOneStudentAmount)}`,
+    studentBank || 'Nomor rekening siswa belum diatur',
+    studentAccountName,
+    `Ket. ${applicantName} (Uang Saku Tahap 1 & 2 + MCU / Pendaftaran)`,
+    '',
+    '----------------',
+    'Masa Pelatihan',
+    '----------------',
+    '',
+    '*Detail Pencairan Tahap 2*',
+    '',
+    '*_Pelatihan Tahap 2 (Pelatihan keterampilan)_*',
+    lpkName,
+    `Rp${formatThousandsNumber(budget.skillTrainingAmount)}`,
+    lpkBank || 'Nomor rekening LPK belum diatur',
+    lpkName,
+    `Ket. ${applicantName} (Pelatihan Tahap 2)`,
+    '',
+    '*_Uang Saku Keberangkatan_*',
+    studentAccountName,
+    `Rp${formatThousandsNumber(budget.departureAllowanceAmount)}`,
+    studentBank || 'Nomor rekening siswa belum diatur',
+    studentAccountName,
+    `Ket. ${applicantName} (Uang Saku Keberangkatan)`,
+  ].join('\n')
+}
+
+export function buildTransferWhatsappMessage(
+  app: FinancingApplicationRecord,
+  state: TransferDetailsState,
+): string {
+  return app.product === 'FULL_COVER'
+    ? buildFullCoverTransferWhatsappMessage(app, state)
+    : buildDepartureTransferWhatsappMessage(app, state)
 }

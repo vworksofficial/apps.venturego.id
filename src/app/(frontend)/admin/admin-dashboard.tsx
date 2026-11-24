@@ -39,7 +39,7 @@ import { resolveInstallmentSchedule } from '@/lib/installment-schedule'
 import {
   type AdditionalRecipient,
   type TransferDetailsState,
-  buildDepartureTransferWhatsappMessage,
+  buildTransferWhatsappMessage,
   createInitialTransferState,
   formatThousandsNumber,
   parseThousandsInput,
@@ -795,6 +795,7 @@ function SwipeToApprove({ disabled, onConfirm }: { disabled: boolean; onConfirm:
   const trackRef = useRef<HTMLDivElement>(null)
   const [offset, setOffset] = useState(0)
   const dragStart = useRef<{ pointerX: number; offset: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const progress = (() => {
     const trackWidth = trackRef.current?.clientWidth ?? 0
@@ -803,6 +804,7 @@ function SwipeToApprove({ disabled, onConfirm }: { disabled: boolean; onConfirm:
   })()
   const finishDrag = () => {
     dragStart.current = null
+    setIsDragging(false)
     if (progress >= 0.95) {
       setOffset(Math.max((trackRef.current?.clientWidth ?? 152) - 152, 0))
       setConfirmed(true)
@@ -833,7 +835,9 @@ function SwipeToApprove({ disabled, onConfirm }: { disabled: boolean; onConfirm:
       </div>
       <button
         aria-label="Geser untuk Setujui Rincian"
-        className={`absolute left-0 top-0 z-10 flex h-full w-[152px] touch-none items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold text-white shadow-md transition-[transform,background-color] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-400 ${
+        className={`absolute left-0 top-0 z-10 flex h-full w-[152px] touch-none items-center justify-center gap-2 rounded-lg px-3 text-xs font-bold text-white shadow-sm ${
+          isDragging ? 'transition-none' : 'transition-[transform,background-color] duration-150'
+        } focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-400 ${
           disabled ? 'bg-slate-400' : 'bg-gradient-to-br from-emerald-500 to-emerald-700'
         }`}
         disabled={disabled}
@@ -848,6 +852,7 @@ function SwipeToApprove({ disabled, onConfirm }: { disabled: boolean; onConfirm:
           if (disabled) return
           event.currentTarget.setPointerCapture(event.pointerId)
           dragStart.current = { pointerX: event.clientX, offset }
+          setIsDragging(true)
         }}
         onPointerMove={(event) => {
           if (!dragStart.current || disabled) return
@@ -865,6 +870,7 @@ function SwipeToApprove({ disabled, onConfirm }: { disabled: boolean; onConfirm:
         onPointerUp={finishDrag}
         onPointerCancel={() => {
           dragStart.current = null
+          setIsDragging(false)
           setOffset(0)
         }}
         style={{ transform: `translateX(${offset}px)` }}
@@ -1455,40 +1461,42 @@ function ApplicationDrawerForm({
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Biodata & Kontak
                 </h4>
-                <dl className="mt-2 grid grid-cols-2 gap-3 text-xs">
-                  <div>
+                <dl className="mt-2 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+                  <div className="min-w-0">
                     <dt className="text-slate-400">Nama Lengkap</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">
+                    <dd className="mt-0.5 break-words font-semibold text-slate-900">
                       {application.applicantName}
                     </dd>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-slate-400">No. WhatsApp</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">{application.phone}</dd>
+                    <dd className="mt-0.5 break-words font-semibold text-slate-900">
+                      {application.phone}
+                    </dd>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-slate-400">Tempat, Tgl Lahir</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">
+                    <dd className="mt-0.5 break-words font-semibold text-slate-900">
                       {String(personal.birthPlace ?? '—')}, {formatDateLong(personal.birthDate)}
                     </dd>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-slate-400">Gender & Agama</dt>
-                    <dd className="mt-0.5 font-semibold text-slate-900">
+                    <dd className="mt-0.5 break-words font-semibold text-slate-900">
                       {personal.gender === 'FEMALE' ? 'Perempuan' : 'Laki-laki'} ·{' '}
                       {RELIGION_LABELS[String(personal.religion ?? '')] ??
                         String(personal.religion ?? '—')}
                     </dd>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-full min-w-0">
                     <dt className="text-slate-400">Alamat KTP</dt>
-                    <dd className="mt-0.5 rounded-lg bg-slate-50 p-2.5 text-slate-800">
+                    <dd className="mt-0.5 break-words rounded-lg bg-slate-50 p-2.5 text-slate-800">
                       {String(personal.idCardAddress ?? '—')}
                     </dd>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-full min-w-0">
                     <dt className="text-slate-400">Alamat Domisili / Korespondensi</dt>
-                    <dd className="mt-0.5 rounded-lg bg-slate-50 p-2.5 text-slate-800">
+                    <dd className="mt-0.5 break-words rounded-lg bg-slate-50 p-2.5 text-slate-800">
                       {String(personal.domicileAddress ?? '—')}{' '}
                       {personal.domicilePostalCode
                         ? `(${String(personal.domicilePostalCode)})`
@@ -1529,20 +1537,20 @@ function ApplicationDrawerForm({
               <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Program LPK & Kesiapan Keberangkatan
               </h4>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-xs sm:grid-cols-4">
+              <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
                 <div className="min-w-0">
-                  <dt className="truncate text-slate-400">LPK Mitra</dt>
+                  <dt className="text-slate-400">LPK Mitra</dt>
                   <dd
-                    className="mt-0.5 truncate font-semibold text-slate-900"
+                    className="mt-0.5 break-words font-semibold text-slate-900"
                     title={application.lpkName}
                   >
                     {application.lpkName}
                   </dd>
                 </div>
                 <div className="min-w-0">
-                  <dt className="truncate text-slate-400">Tujuan & Skema</dt>
+                  <dt className="text-slate-400">Tujuan & Skema</dt>
                   <dd
-                    className="mt-0.5 truncate font-semibold text-slate-900"
+                    className="mt-0.5 break-words font-semibold text-slate-900"
                     title={`${application.destination === 'JAPAN' ? 'Jepang' : 'Turki'} · ${
                       SCHEME_LABELS[String(application.contractScheme ?? 'WAKALAH_BIL_UJRAH')] ??
                       String(application.contractScheme ?? '—')
@@ -1554,9 +1562,9 @@ function ApplicationDrawerForm({
                   </dd>
                 </div>
                 <div className="min-w-0">
-                  <dt className="truncate text-slate-400">Status COE & Visa</dt>
+                  <dt className="text-slate-400">Status COE & Visa</dt>
                   <dd
-                    className="mt-0.5 truncate font-semibold text-slate-900"
+                    className="mt-0.5 break-words font-semibold text-slate-900"
                     title={`COE: ${
                       DOC_PROGRESS_LABELS[String(eligibility.coeStatus ?? '')] ?? '—'
                     } · Visa: ${DOC_PROGRESS_LABELS[String(eligibility.visaStatus ?? '')] ?? '—'}`}
@@ -1566,8 +1574,8 @@ function ApplicationDrawerForm({
                   </dd>
                 </div>
                 <div className="min-w-0">
-                  <dt className="truncate text-slate-400">Perkiraan Keberangkatan</dt>
-                  <dd className="mt-0.5 truncate font-semibold text-slate-900">
+                  <dt className="text-slate-400">Perkiraan Keberangkatan</dt>
+                  <dd className="mt-0.5 break-words font-semibold text-slate-900">
                     {formatDateLong(eligibility.estimatedDeparture)}
                   </dd>
                 </div>
@@ -1587,7 +1595,7 @@ function ApplicationDrawerForm({
                     }`}
                     key={String(label)}
                   >
-                    <span className="truncate whitespace-nowrap">{String(label)}</span>
+                    <span className="min-w-0 flex-1 break-words">{String(label)}</span>
                     <strong className="shrink-0">{val ? 'Ya' : 'Tidak'}</strong>
                   </div>
                 ))}
@@ -1602,7 +1610,7 @@ function ApplicationDrawerForm({
                   · Durasi bahasa:{' '}
                   <strong>{String(fullCover.languageTrainingMonths ?? '—')} bln</strong> · Skill:{' '}
                   <strong>{String(fullCover.skillTrainingMonths ?? '—')} bln</strong>
-                  <p className="mt-1">
+                  <p className="mt-1 break-words">
                     Kebutuhan:{' '}
                     <strong>
                       {(application.fundingNeeds ?? [])
@@ -4777,7 +4785,7 @@ export function AdminDashboard({
 
   const openTransferDetail = (app: FinancingApplicationRecord, index: number) => {
     const initialState = createInitialTransferState(app)
-    const text = buildDepartureTransferWhatsappMessage(app, initialState)
+    const text = buildTransferWhatsappMessage(app, initialState)
     setTransferDetailTarget({ app, index })
     setTransferState(initialState)
     setTransferMessageText(text)
@@ -4797,7 +4805,7 @@ export function AdminDashboard({
         next.principal - next.adminFee - next.lpkAmount - totalAdditional,
       )
       const finalState = { ...next, pocketMoney: calculatedPocket }
-      const text = buildDepartureTransferWhatsappMessage(transferDetailTarget.app, finalState)
+      const text = buildTransferWhatsappMessage(transferDetailTarget.app, finalState)
       setTransferMessageText(text)
       return finalState
     })
@@ -4806,7 +4814,7 @@ export function AdminDashboard({
   const handleResetTransferState = () => {
     if (!transferDetailTarget) return
     const initialState = createInitialTransferState(transferDetailTarget.app)
-    const text = buildDepartureTransferWhatsappMessage(transferDetailTarget.app, initialState)
+    const text = buildTransferWhatsappMessage(transferDetailTarget.app, initialState)
     setTransferState(initialState)
     setTransferMessageText(text)
     setShowLpkConfig(false)

@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **28 November 2026** (Sinkronisasi riil angsuran dari spreadsheet Google Drive `Copy of Keuangan PT VKB` ke koleksi Firestore `payments` dengan penambahan angsuran periode Oktober–November 2026 dan transisi status siswa lunas `Firstiawan Hafids Bakhrizal` dan `Nurul Islamiah` ke `COMPLETED`; integrasi switcher navigasi cepat terpadu `Siswa Aktif` $\leftrightarrow$ `Alumnus (Siswa Lunas)` pada header tabel backoffice admin, label sidebar baru `Alumnus (Siswa Lunas)`, dan kartu metrik pintasan Alumnus pada Hero Banner Siswa Aktif; sebelumnya penanganan Firestore `ignoreUndefinedProperties: true` dan sanitasi Form Pendaftaran).
+Terakhir diperbarui: **28 November 2026** (Penyesuaian nomor urut siswa / NIS agar selaras 100% dengan master pembukuan Sheet `Asset`: pencabutan NIS dari data dummy `Vidya Travel` dan akun internal `Moh Nur Dhany Nugroho`, pergeseran NIS `Alfin Farhan` ke `VSV-0027-2026-JPN`, `Rahmat Natasyah` ke `VSV-0028-2026-JPN`, `Dimas Pranaika Putra` ke `VSV-0029-2026-JPN`, pembaruan folder Google Drive terkait, dan penyesuaian counter `student-numbers-JPN` ke 29; sinkronisasi angsuran riil `Copy of Keuangan PT VKB` dan integrasi switcher `Siswa Aktif` $\leftrightarrow$ `Alumnus (Siswa Lunas)`).
 
 ---
 

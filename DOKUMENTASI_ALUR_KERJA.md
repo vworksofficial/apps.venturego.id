@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **28 November 2026** (Penyesuaian nomor urut siswa / NIS agar selaras 100% dengan master pembukuan Sheet `Asset`: pencabutan NIS dari data dummy `Vidya Travel` dan akun internal `Moh Nur Dhany Nugroho`, pergeseran NIS `Alfin Farhan` ke `VSV-0027-2026-JPN`, `Rahmat Natasyah` ke `VSV-0028-2026-JPN`, `Dimas Pranaika Putra` ke `VSV-0029-2026-JPN`, pembaruan folder Google Drive terkait, dan penyesuaian counter `student-numbers-JPN` ke 29; sinkronisasi angsuran riil `Copy of Keuangan PT VKB` dan integrasi switcher `Siswa Aktif` $\leftrightarrow$ `Alumnus (Siswa Lunas)`).
+Terakhir diperbarui: **28 November 2026** (Sinkronisasi dan pengawinan akun Google Firebase Auth milik siswa aktif riil `Alfin Farhan`, `Dika Nata Nael`, dan `Riski` ke dokumen kontrak `applications`, riwayat `payments`, `studentProfiles`, dan pemetaan folder Drive `driveFolders` sehingga dashboard `/dashboard/angsuran` menampilkan data riil; penyesuaian nomor urut NIS master Sheet `Asset`, pencabutan NIS dummy Vidya Travel dan internal Moh Nur Dhany Nugroho, dan integrasi switcher tab `Siswa Aktif` $\leftrightarrow$ `Alumnus (Siswa Lunas)`).
 
 ---
 

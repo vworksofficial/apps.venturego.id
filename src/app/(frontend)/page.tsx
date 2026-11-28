@@ -605,6 +605,36 @@ export default function HomePage() {
                   <small>Cocok jika pelatihan sudah selesai atau COE sedang diproses.</small>
                 </span>
               </button>
+              <button
+                aria-disabled="true"
+                className="product-option cursor-not-allowed opacity-60"
+                disabled
+                title="Program ini hanya dapat diajukan oleh alumni yang telah melunasi program sebelumnya."
+                type="button"
+              >
+                <span className="selection-box" aria-hidden="true">
+                  <svg
+                    className="size-3.5 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    viewBox="0 0 24 24"
+                  >
+                    <rect height="11" rx="2" width="18" x="3" y="11" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </span>
+                <span className="product-copy">
+                  <span className="product-tag">Khusus Alumni (Lunas)</span>
+                  <strong>VSV Modal Usaha Alumni</strong>
+                  <p>Pembiayaan modal usaha produktif dengan Akad Murabahah.</p>
+                  <small>
+                    Tersedia khusus bagi alumni setelah melunasi program pembiayaan sebelumnya.
+                  </small>
+                </span>
+              </button>
             </>
           )}
 

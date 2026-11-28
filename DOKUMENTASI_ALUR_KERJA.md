@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **28 November 2026** (Pembiayaan Alumni Murabahah — User Dashboard & Admin: penambahan alur pengajuan mandiri khusus alumni yang sudah lunas (`COMPLETED` dan tidak memiliki kewajiban aktif) di `/dashboard` dan `/dashboard/layanan` melalui `UserAlumniApplicationModal` & `submitAlumniFinancingByUser`, dukungan `ALUMNI_FINANCING` di `/dashboard/angsuran`, `/dashboard/dokumen`, `/dashboard/riwayat`, dan `/dashboard/unggah-berkas`; user baru tanpa riwayat lunas tetap hanya melihat Full Cover dan Dana Keberangkatan).
+Terakhir diperbarui: **28 November 2026** (Pembiayaan Alumni Murabahah — User Dashboard & Form Publik: opsi `VSV Modal Usaha Alumni` kini terlihat di langkah pilih program `/` dan `/dashboard/layanan` dalam keadaan nonaktif/terkunci bagi user baru atau siswa belum lunas, dan aktif bagi alumni berstatus `COMPLETED` tanpa kewajiban berjalan).
 
 ---
 

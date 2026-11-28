@@ -196,13 +196,57 @@ export async function approvePaymentProof(proofId: string): Promise<ActionResult
         paymentIds: paymentsToCreate.map(({ ref }) => ref.id),
         updatedAt: FieldValue.serverTimestamp(),
       })
+      const totalObligation = Number(
+        (application.financialPlan as Record<string, unknown> | undefined)?.totalObligation,
+      )
+      const allPriorPaid = paymentRows
+        .filter((payment) => payment.status === 'PAID')
+        .reduce(
+          (sum, payment) =>
+            sum + (Number.isSafeInteger(payment.amount) ? Number(payment.amount) : 0),
+          0,
+        )
+      const newTotalPaid = allPriorPaid + amount
+      const isComplete =
+        (Number.isSafeInteger(totalObligation) &&
+          totalObligation > 0 &&
+          newTotalPaid >= totalObligation) ||
+        (schedule.length > 0 && schedule.every((row) => paidAfter.has(row.installment)))
+
+      const finalPaidInstallments =
+        isComplete && schedule.length > 0
+          ? schedule.map((row) => row.installment)
+          : [...paidAfter].sort((a, b) => a - b)
+
       transaction.update(applicationRef, {
-        paidInstallments: [...paidAfter].sort((a, b) => a - b),
+        paidInstallments: finalPaidInstallments,
+        ...(isComplete ? { status: 'COMPLETED' } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       })
-      return 'approved'
+      return {
+        outcome: 'approved' as const,
+        isComplete,
+        ownerUid: String(proof.ownerFirebaseUid ?? application.ownerFirebaseUid ?? ''),
+        applicantName: String(application.applicantName ?? ''),
+        folderId: String(proof.driveFolderId ?? application.driveFolderId ?? ''),
+        studentNumber:
+          typeof application.studentNumber === 'string' ? application.studentNumber : undefined,
+      }
     })
-    if (result === 'approved') return { ok: true }
+    if (typeof result === 'object' && result.outcome === 'approved') {
+      if (result.isComplete && result.folderId) {
+        void moveApplicationDriveFolderToStatus({
+          folderId: result.folderId,
+          ownerUid: result.ownerUid,
+          applicantName: result.applicantName,
+          lpkName: '',
+          status: 'COMPLETED',
+          studentNumber: result.studentNumber,
+        }).catch(() => undefined)
+      }
+      return { ok: true }
+    }
+    const errorKey = typeof result === 'string' ? result : 'missing'
     const messages: Record<string, string> = {
       missing: 'Bukti pembayaran sudah tidak tersedia.',
       processed: 'Bukti pembayaran ini sudah diproses.',
@@ -215,7 +259,7 @@ export async function approvePaymentProof(proofId: string): Promise<ActionResult
         'Bukti pembayaran harus dimulai dari angsuran yang sedang berjalan.',
       'amount-exceeds-balance': 'Nominal bukti melebihi seluruh sisa kewajiban angsuran.',
     }
-    return { ok: false, message: messages[result] ?? 'Bukti pembayaran belum dapat disetujui.' }
+    return { ok: false, message: messages[errorKey] ?? 'Bukti pembayaran belum dapat disetujui.' }
   } catch {
     return { ok: false, message: 'Bukti pembayaran belum dapat disetujui. Coba lagi.' }
   }

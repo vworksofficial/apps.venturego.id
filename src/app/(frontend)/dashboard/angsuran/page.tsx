@@ -183,7 +183,6 @@ function ApplicationTerms({
     Number(plan.monthlyInstallmentAfterCoe) ||
     (fullCoverTenor > 0 ? Math.floor(fullCoverObligationWithCoe / fullCoverTenor) : 0)
   const plannedCount = schedule.length
-  const paidCount = schedule.filter((entry) => paidInstallments.has(entry.installment)).length
   const departureTotal = Number(plan.totalObligation) || 0
   const departureInstallmentCount = Number(plan.installmentCount) || 0
   const departureMonthlyInstallment =
@@ -227,10 +226,19 @@ function ApplicationTerms({
     totalObligation,
     Math.max(paidAmountFromSchedule, paidAmountFromPayments),
   )
-  const progress = totalObligation > 0 ? totalPaidAmount / totalObligation : 0
+  const isSettled =
+    application.status === 'COMPLETED' ||
+    (totalObligation > 0 && totalPaidAmount >= totalObligation)
+  if (isSettled) {
+    for (const entry of schedule) {
+      paidInstallments.add(entry.installment)
+    }
+  }
+  const paidCount = schedule.filter((entry) => paidInstallments.has(entry.installment)).length
+  const progress = totalObligation > 0 ? (isSettled ? 1 : totalPaidAmount / totalObligation) : 0
   const flexibleSchedule = schedule.map((entry) => ({
     ...entry,
-    paid: paidInstallments.has(entry.installment),
+    paid: isSettled || paidInstallments.has(entry.installment),
   }))
   const firstUnpaidEntry = flexibleSchedule.find((entry) => !entry.paid)
   const firstUnpaidInstallment = firstUnpaidEntry?.installment ?? null
@@ -404,9 +412,9 @@ function ApplicationTerms({
               </svg>
             </button>
             <p className="mt-2 text-[11px] text-blue-100">
-              {application.status === 'ACTIVE'
+              {application.status === 'ACTIVE' && !isSettled
                 ? 'Pembiayaan aktif. Pembayaran dimulai sesuai ketentuan akad.'
-                : application.status === 'COMPLETED'
+                : isSettled
                   ? 'Seluruh kewajiban program ini telah selesai.'
                   : 'Rincian progres dan angsuran program Anda.'}
             </p>

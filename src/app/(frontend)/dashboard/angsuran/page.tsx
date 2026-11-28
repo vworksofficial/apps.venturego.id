@@ -1180,6 +1180,9 @@ export default function InstallmentsPage() {
     }
   }, [loadApplications])
 
+  const activeApplications = applications.filter((app) => app.status === 'ACTIVE')
+  const visibleApplications = activeApplications.length > 0 ? activeApplications : applications
+
   return (
     <DashboardScaffold
       active="angsuran"
@@ -1292,12 +1295,12 @@ export default function InstallmentsPage() {
           {error}
         </p>
       )}
-      {!loading && !error && applications.length === 0 && (
+      {!loading && !error && visibleApplications.length === 0 && (
         <p className="rounded-xl bg-white p-5 text-sm leading-6 text-slate-600">
           Belum ada rincian angsuran untuk pengajuan pada sesi ini.
         </p>
       )}
-      {applications.map((application) => (
+      {visibleApplications.map((application) => (
         <ApplicationTerms
           application={application}
           initialProofs={paymentProofs.filter((proof) => proof.applicationDocId === application.id)}

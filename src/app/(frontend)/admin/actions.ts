@@ -35,6 +35,16 @@ import {
   validateFullCoverBudget,
   type FullCoverBudget,
 } from '@/lib/full-cover-budget'
+import {
+  calculateMurabahahFinancials,
+  buildMurabahahContractNumber,
+  type AlumniBusinessSector,
+  type AlumniBusinessDetails,
+  type ItemProcurementPlan,
+  type MurabahahFinancialPlan,
+} from '@/lib/murabahah-financing'
+import { renderMurabahahAkadHtml } from '@/lib/murabahah-document'
+import { DOCUMENT_DEFINITIONS } from '@/lib/documents'
 
 type ActionResult = { ok: true } | { ok: false; message: string }
 
@@ -506,6 +516,9 @@ export async function saveFinancialPlan(
     'commitmentCompensationAmount',
     'commitmentSettlementDays',
     'installmentPaymentDay',
+    'principal',
+    'marginAmount',
+    'adminFeePercentage',
   ] as const
   const financialNumbers: Partial<Record<(typeof financialFields)[number], number>> = {}
   for (const field of financialFields) {
@@ -863,6 +876,145 @@ export async function saveFinancialPlan(
         pricingStatus: nextPricingStatus,
         finalAgreementReference: String(nextFinancialPlan.finalAgreementReference ?? ''),
         settlementNotes: String(nextFinancialPlan.settlementNotes ?? ''),
+      })
+    }
+
+    if (
+      applicationProduct === 'ALUMNI_FINANCING' ||
+      financialValues?.contractType === 'MURABAHAH'
+    ) {
+      const rawPrincipal =
+        financialNumbers.principal ?? Number(existingFinancialPlan.principal) ?? 0
+      const principal = Number.isSafeInteger(rawPrincipal) && rawPrincipal > 0 ? rawPrincipal : 0
+      const marginAmount =
+        financialNumbers.marginAmount ?? Number(existingFinancialPlan.marginAmount) ?? 0
+      const adminFeePercentage =
+        financialNumbers.adminFeePercentage ?? Number(existingFinancialPlan.adminFeePercentage) ?? 3
+      const tenorMonths =
+        financialNumbers.tenorMonths ?? Number(existingFinancialPlan.tenorMonths) ?? 12
+
+      let itemProcurementPlan: ItemProcurementPlan[] = []
+      const rawItemJson = financialValues?.itemProcurementPlanJson
+      if (typeof rawItemJson === 'string' && rawItemJson.trim()) {
+        try {
+          const parsed = JSON.parse(rawItemJson)
+          if (Array.isArray(parsed)) {
+            itemProcurementPlan = parsed.map((item: unknown) => {
+              const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
+              return {
+                itemName: String(obj.itemName ?? '').slice(0, 100),
+                specification: obj.specification
+                  ? String(obj.specification).slice(0, 200)
+                  : undefined,
+                estimatedCost: Math.round(Number(obj.estimatedCost) || 0),
+              }
+            })
+          }
+        } catch {
+          // keep previous if parse fails
+        }
+      }
+      if (
+        itemProcurementPlan.length === 0 &&
+        Array.isArray(existingFinancialPlan.itemProcurementPlan)
+      ) {
+        itemProcurementPlan = existingFinancialPlan.itemProcurementPlan as ItemProcurementPlan[]
+      }
+
+      const murabahah = calculateMurabahahFinancials({
+        principal: principal > 0 ? principal : 1_000_000,
+        marginAmount,
+        adminFeePercentage,
+        tenorMonths,
+        firstPaymentDate: firstPaymentDate || undefined,
+      })
+
+      const offerSnapshot = {
+        contractType: 'MURABAHAH',
+        principal: murabahah.principal,
+        adminFeePercentage: murabahah.adminFeePercentage,
+        adminFeeAmount: murabahah.adminFeeAmount,
+        netDisbursedAmount: murabahah.netDisbursedAmount,
+        marginAmount: murabahah.marginAmount,
+        totalObligation: murabahah.totalObligation,
+        tenorMonths: murabahah.tenorMonths,
+        monthlyInstallment: murabahah.monthlyInstallment,
+        firstInstallmentAmount: murabahah.firstInstallmentAmount,
+        finalInstallmentAmount: murabahah.finalInstallmentAmount,
+        dueDateDayOfMonth: 25,
+        firstPaymentDate: murabahah.firstPaymentDate,
+        schedule: murabahah.schedule,
+        itemProcurementPlan,
+      }
+
+      const effectiveAgreementReference =
+        currentPricingStatus === 'ESTIMATED' ? '' : finalAgreementReference
+
+      Object.assign(nextFinancialPlan, offerSnapshot, {
+        offerSnapshot,
+        pricingStatus: currentPricingStatus,
+        contractNumber: financialValues?.contractNumber
+          ? String(financialValues.contractNumber).trim()
+          : existingFinancialPlan.contractNumber,
+        finalAgreementReference: effectiveAgreementReference,
+        settlementNotes,
+      })
+
+      const businessName = financialValues?.businessName?.trim()
+      const businessSector = financialValues?.businessSector?.trim() as
+        | AlumniBusinessSector
+        | undefined
+      const businessAddress = financialValues?.businessAddress?.trim()
+      if (businessName || businessSector || businessAddress) {
+        const existingBusiness = (applicationData.alumniBusinessDetails ??
+          {}) as AlumniBusinessDetails
+        updateValues.alumniBusinessDetails = {
+          ...existingBusiness,
+          ...(businessName ? { businessName } : {}),
+          ...(businessSector ? { businessSector } : {}),
+          ...(businessAddress ? { businessAddress } : {}),
+          ...(financialValues?.businessCity
+            ? { businessCity: financialValues.businessCity.trim() }
+            : {}),
+          ...(financialValues?.businessProvince
+            ? { businessProvince: financialValues.businessProvince.trim() }
+            : {}),
+          ...(financialValues?.businessDescription
+            ? { businessDescription: financialValues.businessDescription.trim() }
+            : {}),
+          ...(financialValues?.disbursementBankName ||
+          financialValues?.disbursementBankAccount ||
+          financialValues?.disbursementAccountHolder
+            ? {
+                disbursementBank: {
+                  bankName: (
+                    financialValues.disbursementBankName ??
+                    existingBusiness.disbursementBank?.bankName ??
+                    ''
+                  ).trim(),
+                  accountNumber: (
+                    financialValues.disbursementBankAccount ??
+                    existingBusiness.disbursementBank?.accountNumber ??
+                    ''
+                  ).trim(),
+                  accountHolderName: (
+                    financialValues.disbursementAccountHolder ??
+                    existingBusiness.disbursementBank?.accountHolderName ??
+                    ''
+                  ).trim(),
+                },
+              }
+            : {}),
+        }
+      }
+
+      updateValues.financialPlanHistory = appendFinancialHistory(applicationData, {
+        changedAt: new Date().toISOString(),
+        changedBy: staff?.email ?? staff?.uid,
+        financialPlan: offerSnapshot,
+        pricingStatus: currentPricingStatus,
+        finalAgreementReference: effectiveAgreementReference,
+        settlementNotes,
       })
     }
     await applicationRef.update({
@@ -1466,6 +1618,68 @@ export async function approveApplicationPricing(
       return { ok: true }
     }
 
+    if (product === 'ALUMNI_FINANCING' || plan.contractType === 'MURABAHAH') {
+      const rawPrincipal = Number(plan.principal) || 0
+      const principal = newNominal !== null && newNominal > 0 ? newNominal : rawPrincipal
+      if (principal <= 0) {
+        return { ok: false, message: 'Tentukan harga pokok barang (Tsaman) sebelum menyetujui.' }
+      }
+      const marginAmount = Number(plan.marginAmount) || 0
+      const adminFeePercentage = Number(plan.adminFeePercentage) || 3
+      const tenorMonths = Number(plan.tenorMonths) || 12
+      const firstPaymentDate =
+        typeof plan.firstPaymentDate === 'string' ? plan.firstPaymentDate : undefined
+
+      const calc = calculateMurabahahFinancials({
+        principal,
+        marginAmount,
+        adminFeePercentage,
+        tenorMonths,
+        firstPaymentDate,
+      })
+
+      offerSnapshot = {
+        contractType: 'MURABAHAH',
+        principal: calc.principal,
+        adminFeePercentage: calc.adminFeePercentage,
+        adminFeeAmount: calc.adminFeeAmount,
+        netDisbursedAmount: calc.netDisbursedAmount,
+        marginAmount: calc.marginAmount,
+        totalObligation: calc.totalObligation,
+        tenorMonths: calc.tenorMonths,
+        monthlyInstallment: calc.monthlyInstallment,
+        firstInstallmentAmount: calc.firstInstallmentAmount,
+        finalInstallmentAmount: calc.finalInstallmentAmount,
+        dueDateDayOfMonth: 25,
+        firstPaymentDate: calc.firstPaymentDate,
+        schedule: calc.schedule,
+        itemProcurementPlan: plan.itemProcurementPlan ?? [],
+      }
+
+      nextPlan = {
+        ...plan,
+        ...offerSnapshot,
+        offerSnapshot,
+        pricingStatus: 'VERIFIED',
+        finalAgreementReference: String(plan.finalAgreementReference ?? ''),
+      }
+
+      await applicationRef.update({
+        financialPlan: nextPlan,
+        ...buildApprovalUpdateValues(
+          applicationData,
+          offerSnapshot,
+          'VERIFIED',
+          staff,
+          String(plan.finalAgreementReference ?? ''),
+          String(plan.settlementNotes ?? ''),
+        ),
+        updatedAt: FieldValue.serverTimestamp(),
+        updatedBy: staff?.email ?? staff?.uid,
+      })
+      return { ok: true }
+    }
+
     return { ok: false, message: 'Jenis pengajuan tidak dikenal.' }
   } catch {
     return { ok: false, message: 'Status biaya belum dapat disetujui. Coba lagi.' }
@@ -1526,6 +1740,16 @@ export async function setApplicationPricingAgreed(documentId: string): Promise<A
       const approvalError = validateFullCoverApproval(applicationData, plan)
       if (approvalError) return { ok: false, message: approvalError }
       offerSnapshot = (plan.offerSnapshot as Record<string, unknown>) ?? {}
+    } else if (product === 'ALUMNI_FINANCING' || plan.contractType === 'MURABAHAH') {
+      const principal = Number(plan.principal) || 0
+      const tenorMonths = Number(plan.tenorMonths) || 0
+      if (principal <= 0 || tenorMonths < 1) {
+        return {
+          ok: false,
+          message: 'Harga pokok dan tenor harus terisi sebelum menyetujui pembiayaan.',
+        }
+      }
+      offerSnapshot = (plan.offerSnapshot as Record<string, unknown>) ?? { ...plan }
     } else {
       return { ok: false, message: 'Jenis pengajuan tidak dikenal.' }
     }
@@ -1695,6 +1919,16 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
       }
       const hppError = validateFullCoverApproval(applicationData, plan)
       if (hppError) return { ok: false, message: hppError }
+    } else if (product === 'ALUMNI_FINANCING' || plan.contractType === 'MURABAHAH') {
+      const principal = Number(plan.principal) || 0
+      const tenorMonths = Number(plan.tenorMonths) || 0
+      if (principal <= 0 || tenorMonths < 1) {
+        return {
+          ok: false,
+          message:
+            'Lengkapi harga pokok barang (Tsaman) dan tenor angsuran sebelum menerbitkan akad.',
+        }
+      }
     } else {
       return { ok: false, message: 'Jenis pengajuan tidak dikenal.' }
     }
@@ -1719,19 +1953,83 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
     }
 
     const issuedAt = new Date()
-    const built = await buildAkadDocument({
-      application: applicationData,
-      studentSequence: sequence,
-      issuedAt,
-    })
+    let documentNumber = ''
+    let fileName = ''
+    let label = ''
+    let template = 'WAKALAH'
+    let fileBytes: Uint8Array
+    let mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
     const applicantName =
-      typeof applicationData.applicantName === 'string' ? applicationData.applicantName : ''
-    const label =
-      product === 'FULL_COVER' ? 'Akad Wakalah bil Ujrah dan Jualah' : 'Akad Wakalah bil Ujrah'
-    const fileName = applicantName.trim()
-      ? buildDocumentFileName(label, applicantName, 'akad.docx')
-      : `${documentId}-akad.docx`
+      typeof applicationData.applicantName === 'string' ? applicationData.applicantName : 'Siswa'
+
+    if (product === 'ALUMNI_FINANCING' || plan.contractType === 'MURABAHAH') {
+      const destination =
+        typeof applicationData.destination === 'string' && applicationData.destination
+          ? applicationData.destination
+          : 'JPN'
+      const countryCode = destination === 'TURKEY' ? 'TUR' : 'JPN'
+      documentNumber =
+        String(plan.contractNumber || '').trim() ||
+        buildMurabahahContractNumber(Number(sequence) || 1, countryCode, issuedAt)
+      template = 'MURABAHAH'
+      label = 'Akad Murabahah Modal Usaha'
+      fileName = `${documentNumber.replace(/[\/\\]/g, '-')}_Akad_Murabahah_${applicantName}.html`
+      mimeType = 'text/html; charset=utf-8'
+
+      const personal = (applicationData.personalDetails ?? {}) as Record<string, unknown>
+      const business = (applicationData.alumniBusinessDetails ?? {}) as AlumniBusinessDetails
+      const murabahahHtml = renderMurabahahAkadHtml({
+        contractNumber: documentNumber,
+        firstParty: {
+          companyName: 'Vworks Student Venture (PT Vworks Kolaborasi Bersama)',
+          companyAddress:
+            'Perum Bumi Dieng Indah 2 blok. G5 no. 2 & 3. RW. 4, Andongsili, Kec. Mojotengah, Kabupaten Wonosobo, Jawa Tengah 56351',
+          representativeName: 'Adam Doni Mauladi, S.T.',
+          representativeKtp: '3307100507990001',
+          representativePhone: '082213072665',
+        },
+        secondParty: {
+          applicantName,
+          birthPlaceAndDate:
+            [personal.birthPlace, personal.birthDate].filter(Boolean).join(', ') || '-',
+          address:
+            typeof personal.address === 'string' && personal.address
+              ? personal.address
+              : String(business.businessAddress || '-'),
+          religion:
+            typeof personal.religion === 'string' && personal.religion
+              ? personal.religion
+              : 'Islam',
+          ktpNumber:
+            typeof applicationData.idCardNumber === 'string' && applicationData.idCardNumber
+              ? applicationData.idCardNumber
+              : '-',
+          phone: typeof applicationData.phone === 'string' ? applicationData.phone : '-',
+        },
+        witness: {
+          name: 'Panut, S.Hum.',
+          institution: 'V-works Student Venture',
+        },
+        businessDetails: business,
+        financialPlan: plan as unknown as MurabahahFinancialPlan,
+      })
+      fileBytes = Buffer.from(murabahahHtml, 'utf-8')
+    } else {
+      const built = await buildAkadDocument({
+        application: applicationData,
+        studentSequence: sequence,
+        issuedAt,
+      })
+      documentNumber = built.documentNumber
+      template = built.template
+      fileBytes = built.bytes
+      label =
+        product === 'FULL_COVER' ? 'Akad Wakalah bil Ujrah dan Jualah' : 'Akad Wakalah bil Ujrah'
+      fileName = applicantName.trim()
+        ? buildDocumentFileName(label, applicantName, 'akad.docx')
+        : `${documentId}-akad.docx`
+    }
 
     const existingFolderId =
       typeof applicationData.driveFolderId === 'string' ? applicationData.driveFolderId : ''
@@ -1739,14 +2037,14 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
     const uploaded = await uploadDriveFile({
       parentFolderId: folderId,
       fileName,
-      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      bytes: built.bytes,
+      mimeType,
+      bytes: fileBytes,
     })
 
     const akadDocument = {
-      documentNumber: built.documentNumber,
+      documentNumber,
       studentNumber,
-      template: built.template,
+      template,
       fileName,
       driveFileId: uploaded.fileId,
       size: uploaded.size,
@@ -1771,7 +2069,7 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
             ...latestPlan,
             ...(String(latestPlan.finalAgreementReference ?? '').trim()
               ? {}
-              : { finalAgreementReference: built.documentNumber }),
+              : { finalAgreementReference: documentNumber }),
             akadDocument,
           },
           ...(existingFolderId ? {} : { driveFolderId: folderId }),
@@ -1833,7 +2131,7 @@ export async function issueAkadDocument(documentId: string): Promise<IssueAkadRe
       })
     }
 
-    return { ok: true, documentNumber: built.documentNumber, studentNumber }
+    return { ok: true, documentNumber, studentNumber }
   } catch {
     return { ok: false, message: 'Dokumen akad belum dapat diterbitkan. Coba lagi.' }
   }
@@ -1980,5 +2278,138 @@ export async function cancelAkadDocumentIssuance(documentId: string): Promise<Ac
     return { ok: true }
   } catch {
     return { ok: false, message: 'Penerbitan akad belum dapat dibatalkan. Coba lagi.' }
+  }
+}
+
+export async function createAlumniFinancingApplication(input: {
+  previousApplicationDocId: string
+  businessName: string
+  businessSector: AlumniBusinessSector
+  businessAddress: string
+  businessCity?: string
+  businessProvince?: string
+  requestedAmount: number
+  tenorMonths: number
+  marginAmount?: number
+  items?: ItemProcurementPlan[]
+}): Promise<ActionResult & { applicationDocId?: string }> {
+  const staff = await getStaffSession()
+  if (!staff) return { ok: false, message: 'Sesi staf berakhir. Silakan masuk kembali.' }
+
+  try {
+    const db = getFirebaseFirestore()
+    const prevRef = db.collection('applications').doc(input.previousApplicationDocId)
+    const prevSnap = await prevRef.get()
+    if (!prevSnap.exists) {
+      return { ok: false, message: 'Data alumni rujukan tidak ditemukan.' }
+    }
+    const prevData = prevSnap.data() ?? {}
+    const applicantName = String(prevData.applicantName ?? '').trim()
+    const ownerFirebaseUid = String(prevData.ownerFirebaseUid ?? '')
+    const phone = String(prevData.phone ?? '')
+    const destination = String(prevData.destination ?? 'JPN')
+    const studentNumber = String(
+      prevData.studentNumber ?? prevData.financialPlan?.akadDocument?.studentNumber ?? '',
+    )
+
+    const principal = Math.round(Number(input.requestedAmount) || 0)
+    if (principal < 1_000_000 || principal > 500_000_000) {
+      return {
+        ok: false,
+        message: 'Nominal pengadaan barang modal harus antara Rp1.000.000 dan Rp500.000.000.',
+      }
+    }
+    const tenorMonths = Math.round(Number(input.tenorMonths) || 12)
+    if (tenorMonths < 1 || tenorMonths > 36) {
+      return { ok: false, message: 'Tenor harus antara 1 dan 36 bulan.' }
+    }
+    const marginAmount =
+      input.marginAmount !== undefined
+        ? Math.round(Number(input.marginAmount))
+        : Math.round(principal * 0.15)
+    const calc = calculateMurabahahFinancials({
+      principal,
+      marginAmount,
+      adminFeePercentage: 3,
+      tenorMonths,
+    })
+
+    const items: ItemProcurementPlan[] =
+      Array.isArray(input.items) && input.items.length > 0
+        ? input.items
+        : [
+            {
+              itemName: `Pengadaan Barang Modal Usaha ${input.businessName}`,
+              estimatedCost: principal,
+            },
+          ]
+
+    const applicationId = `VSV-ALM-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`
+    const newDocRef = db.collection('applications').doc()
+
+    const defaultAlumniDocs = DOCUMENT_DEFINITIONS.ALUMNI_FINANCING.map((def) => ({
+      label: def.label,
+      fileId: null,
+      fileName: null,
+      size: null,
+      mimeType: null,
+      status: 'PENDING',
+      verified: false,
+      notes: null,
+    }))
+
+    await newDocRef.set({
+      applicationId,
+      applicantName,
+      ownerFirebaseUid,
+      phone,
+      product: 'ALUMNI_FINANCING',
+      destination,
+      status: 'COST_VERIFICATION',
+      isAlumni: true,
+      previousApplicationDocId: input.previousApplicationDocId,
+      previousApplicationId: String(prevData.applicationId ?? ''),
+      studentNumber: studentNumber || null,
+      lpkName: String(prevData.lpkName ?? 'Alumni VentureGo'),
+      alumniBusinessDetails: {
+        businessName: input.businessName.trim(),
+        businessSector: input.businessSector,
+        businessAddress: input.businessAddress.trim(),
+        businessCity: (input.businessCity ?? '').trim(),
+        businessProvince: (input.businessProvince ?? '').trim(),
+      },
+      financialPlan: {
+        contractType: 'MURABAHAH',
+        pricingStatus: 'ESTIMATED',
+        principal: calc.principal,
+        adminFeePercentage: calc.adminFeePercentage,
+        adminFeeAmount: calc.adminFeeAmount,
+        netDisbursedAmount: calc.netDisbursedAmount,
+        marginAmount: calc.marginAmount,
+        totalObligation: calc.totalObligation,
+        tenorMonths: calc.tenorMonths,
+        monthlyInstallment: calc.monthlyInstallment,
+        firstInstallmentAmount: calc.firstInstallmentAmount,
+        finalInstallmentAmount: calc.finalInstallmentAmount,
+        dueDateDayOfMonth: 25,
+        firstPaymentDate: calc.firstPaymentDate,
+        schedule: calc.schedule,
+        itemProcurementPlan: items,
+      },
+      documents: defaultAlumniDocs,
+      paidInstallments: [],
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      createdBy: staff.email ?? staff.uid,
+    })
+
+    return { ok: true, applicationDocId: newDocRef.id }
+  } catch (err) {
+    return {
+      ok: false,
+      message: `Gagal membuat pengajuan modal usaha: ${
+        err instanceof Error ? err.message : 'Kesalahan server'
+      }`,
+    }
   }
 }

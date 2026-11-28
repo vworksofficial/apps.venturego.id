@@ -1,4 +1,4 @@
-export type ApplicationProduct = 'FULL_COVER' | 'DEPARTURE_BRIDGING'
+export type ApplicationProduct = 'FULL_COVER' | 'DEPARTURE_BRIDGING' | 'ALUMNI_FINANCING'
 
 export type ApplicationDocumentStatus =
   | 'NOT_UPLOADED'
@@ -109,6 +109,38 @@ export type FinancingApplicationRecord = {
   driveFolderId?: string
   studentNumber?: string
   registrationForm?: Record<string, unknown>
+  isAlumni?: boolean
+  previousApplicationDocId?: string
+  previousApplicationId?: string
+  alumniBusinessDetails?: {
+    businessName: string
+    businessSector: string
+    businessAddress: string
+    businessCity?: string
+    businessProvince?: string
+    businessDescription?: string
+    disbursementBank?: {
+      bankName: string
+      accountNumber: string
+      accountHolderName: string
+    }
+  }
+  physicalDocumentsReceipt?: {
+    receivedAt: string | null
+    receivedBy: string | null
+    receiptNumber: string | null
+    items: {
+      ktpAsli: boolean
+      kkAsli: boolean
+      aktaLahirAsli: boolean
+      ijazahSdAsli: boolean
+      ijazahSmpAsli: boolean
+      ijazahSmaAsli: boolean
+    }
+    storageLocation: string | null
+    returnedAt: string | null
+    returnedTo: string | null
+  }
 }
 
 export type AdminPaymentRecord = {

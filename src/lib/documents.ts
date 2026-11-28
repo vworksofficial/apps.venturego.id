@@ -1,4 +1,4 @@
-export type DocumentProduct = 'FULL_COVER' | 'DEPARTURE_BRIDGING'
+export type DocumentProduct = 'FULL_COVER' | 'DEPARTURE_BRIDGING' | 'ALUMNI_FINANCING'
 
 export type DocumentSection = 'dokumen-wajib' | 'dokumen-susulan' | 'dokumen-pendukung'
 
@@ -9,6 +9,18 @@ export type DocumentDefinition = {
 }
 
 export const DOCUMENT_DEFINITIONS: Record<DocumentProduct, DocumentDefinition[]> = {
+  ALUMNI_FINANCING: [
+    { label: 'Scan KTP', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan KK (Kartu Keluarga)', required: true, section: 'dokumen-wajib' },
+    { label: 'Scan Akta Kelahiran', required: true, section: 'dokumen-wajib' },
+    { label: 'Ijazah SD/MI', required: true, section: 'dokumen-wajib' },
+    { label: 'Ijazah SMP/MTs/SLTP', required: true, section: 'dokumen-wajib' },
+    { label: 'Ijazah SMA/SMK/MA/SLTA', required: true, section: 'dokumen-wajib' },
+    { label: 'Surat Tanda Terima Dokumen Asli', required: false, section: 'dokumen-pendukung' },
+    { label: 'Foto Tempat Usaha / Kandang', required: true, section: 'dokumen-pendukung' },
+    { label: 'RAB / Nota Pembelian Barang Modal', required: true, section: 'dokumen-pendukung' },
+    { label: 'Buku Tabungan Rekening Pencairan', required: true, section: 'dokumen-pendukung' },
+  ],
   DEPARTURE_BRIDGING: [
     { label: 'Pas Foto', required: true },
     { label: 'Scan KTP', required: true },

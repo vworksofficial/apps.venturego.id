@@ -43,7 +43,9 @@ export function resolveInstallmentSchedule(
   const savedByInstallment = new Map(savedRows.map((row) => [row.installment, row]))
   const savedCount = savedRows.reduce((count, row) => Math.max(count, row.installment), 0)
   const termsCount = asSafeInteger(
-    isFullCover ? financialPlan.tenorMonths : financialPlan.installmentCount,
+    isFullCover || product === 'ALUMNI_FINANCING'
+      ? financialPlan.tenorMonths
+      : financialPlan.installmentCount,
   )
   const count = Math.min(36, Math.max(savedCount, termsCount ?? 0))
   if (count < 1) return []

@@ -1,4 +1,6 @@
 import { renderAkadPreviewHtml } from '@/lib/akad-preview'
+import { renderMurabahahAkadHtml } from '@/lib/murabahah-document'
+import type { MurabahahFinancialPlan, AlumniBusinessDetails } from '@/lib/murabahah-financing'
 import { NextResponse } from 'next/server'
 import { buildAkadDocument, refreshAkadPreviewHeader } from '@/lib/akad-document'
 import { ensureApplicationDriveFolder } from '@/lib/drive-folders'
@@ -50,6 +52,54 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const applicantName =
       typeof applicationData.applicantName === 'string' ? applicationData.applicantName : 'Siswa'
+
+    // ── Mode Khusus Pembiayaan Modal Usaha Alumni (Akad Murabahah) ──
+    if (applicationData.product === 'ALUMNI_FINANCING' || plan.contractType === 'MURABAHAH') {
+      const personal = (applicationData.personalDetails ?? {}) as Record<string, unknown>
+      const business = (applicationData.alumniBusinessDetails ?? {}) as AlumniBusinessDetails
+      const murabahahPlan = plan as unknown as MurabahahFinancialPlan
+      const html = renderMurabahahAkadHtml({
+        contractNumber:
+          typeof plan.contractNumber === 'string'
+            ? plan.contractNumber
+            : typeof akadDocument?.contractNumber === 'string'
+              ? akadDocument.contractNumber
+              : '014/MRB-JPN/VSV-WSB/VIII/2026',
+        dateDayName: 'Jumat',
+        dateFormatted: '28 Agustus 2026',
+        agreementCity: 'Wonosobo',
+        firstParty: {
+          companyName: 'Vworks Student Venture (PT Vworks Kolaborasi Bersama)',
+          companyAddress:
+            'Perum Bumi Dieng Indah 2 blok. G5 no. 2 & 3. RW. 4, Andongsili, Kec. Mojotengah, Kabupaten Wonosobo, Jawa Tengah 56351',
+          representativeName: 'Adam Doni Mauladi, S.T.',
+          representativeKtp: '3307100507990001',
+          representativePhone: '082213072665',
+        },
+        secondParty: {
+          applicantName,
+          birthPlaceAndDate: `${personal.birthPlace ?? 'Peniti Luar'}, ${personal.birthDate ?? '10-10-2003'}`,
+          address: String(personal.idCardAddress ?? personal.domicileAddress ?? '-'),
+          religion: String(personal.religion ?? 'Islam'),
+          ktpNumber: String(personal.idCardNumber ?? '-'),
+          phone: String(applicationData.phone ?? '-'),
+        },
+        witness: {
+          name: 'Panut, S.Hum.',
+          institution: 'V-works Student Venture',
+        },
+        businessDetails: business,
+        financialPlan: murabahahPlan,
+      })
+
+      return new Response(html, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+        },
+      })
+    }
 
     // ── Mode PDF: ekspor via Google Drive — hasil identik dengan tampilan Google Docs ──
     if (mode === 'pdf') {

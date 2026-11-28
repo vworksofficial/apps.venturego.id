@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **28 November 2026** (Penyelesaian pelunasan 100% kontrak `VSV-LGC-RISKI-USAHA` menjadi `COMPLETED` dan pemindahan folder ke Alumni, penyempurnaan UI `/dashboard/angsuran` saat seluruh kewajiban lunas agar seluruh baris angsuran ditandai Lunas tanpa tombol bayar dan pesan seluruh kewajiban selesai, serta otomatisasi transisi status `COMPLETED` & pemindahan folder Google Drive ke `Alumni` saat persetujuan bukti transfer melunasi total kewajiban di `approvePaymentProof`).
+Terakhir diperbarui: **28 November 2026** (Pembiayaan Alumni Murabahah � Phase 3: implementasi UI admin dashboard lengkap, Server Actions `saveFinancialPlan`/`approveApplicationPricing`/`setApplicationPricingAgreed`/`issueAkadDocument` diperluas untuk produk `ALUMNI_FINANCING` Murabahah, tambah `createAlumniFinancingApplication`, semua 7 tab slide-over drawer disesuaikan, tombol "+ Modal Usaha" di menu Alumni, `AlumniFinancingModal` untuk pengajuan baru dari admin, filter produk diperluas, badge ungu untuk ALUMNI_FINANCING).
 
 ---
 

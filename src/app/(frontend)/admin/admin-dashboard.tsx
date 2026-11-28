@@ -31,6 +31,13 @@ import {
 import { AdminVipPanel } from './vip-panel'
 import { FinanceTermsFields } from './finance-terms-fields'
 import { FullCoverBudgetFields } from './full-cover-budget-fields'
+import { MurabahahTermsFields } from './murabahah-terms-fields'
+import { AlumniFinancingModal } from './alumni-financing-modal'
+import {
+  type AlumniBusinessSector,
+  type MurabahahFinancialPlan,
+  ALUMNI_BUSINESS_SECTOR_LABELS,
+} from '@/lib/murabahah-financing'
 import { BirthDatePicker } from '../_components/date-picker'
 import { validateFullCoverBudget } from '@/lib/full-cover-budget'
 import { TransferBreakdownModal } from './transfer-breakdown-modal'
@@ -1304,7 +1311,11 @@ function ApplicationDrawerForm({
                 {application.applicationId}
               </span>
               <span className="inline-flex items-center rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-semibold text-white">
-                {application.product === 'FULL_COVER' ? 'VSV Full Cover' : 'VSV Dana Keberangkatan'}
+                {application.product === 'ALUMNI_FINANCING'
+                  ? 'VSV Modal Usaha Alumni'
+                  : application.product === 'FULL_COVER'
+                    ? 'VSV Full Cover'
+                    : 'VSV Dana Keberangkatan'}
               </span>
             </div>
             <button
@@ -1388,7 +1399,11 @@ function ApplicationDrawerForm({
                   {index + 1}
                 </span>
                 <span className="text-xs leading-none">
-                  {application.product === 'FULL_COVER' && tab.id === 'nominal' ? (
+                  {application.product === 'ALUMNI_FINANCING' && tab.id === 'nominal' ? (
+                    <em>Pengadaan Modal</em>
+                  ) : application.product === 'ALUMNI_FINANCING' && tab.id === 'pricing' ? (
+                    <em>Akad Murabahah</em>
+                  ) : application.product === 'FULL_COVER' && tab.id === 'nominal' ? (
                     <em>Budgeting</em>
                   ) : (
                     tab.label
@@ -1810,6 +1825,114 @@ function ApplicationDrawerForm({
               </div>
             )}
           </section>
+
+          {/* KARTU PROFIL USAHA ALUMNI (KHUSUS PEMBIAYAAN MODAL USAHA) */}
+          {(application.product === 'ALUMNI_FINANCING' || application.alumniBusinessDetails) && (
+            <section className="mt-4 overflow-hidden rounded-xl border border-purple-200 bg-white shadow-2xs">
+              <div className="border-b border-purple-100 bg-purple-50/50 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-7 items-center justify-center rounded-lg bg-purple-600 text-white shadow-xs">
+                        🏢
+                      </span>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Profil Usaha Mandiri Alumni
+                      </h3>
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">
+                        Modal Usaha Purna-Magang
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Data unit usaha produktif yang dibiayai melalui Akad Jual Beli Murabahah bil
+                      Wakalah
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Nama Unit Usaha
+                    </span>
+                    <p className="mt-0.5 text-sm font-bold text-slate-900">
+                      {application.alumniBusinessDetails?.businessName || '—'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Sektor / Bidang Usaha
+                    </span>
+                    <p className="mt-0.5 text-sm font-bold text-purple-700">
+                      {application.alumniBusinessDetails?.businessSector
+                        ? ALUMNI_BUSINESS_SECTOR_LABELS[
+                            application.alumniBusinessDetails.businessSector as AlumniBusinessSector
+                          ] || application.alumniBusinessDetails.businessSector
+                        : '—'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Rekening Pencairan Modal
+                    </span>
+                    <p className="mt-0.5 text-xs font-bold text-slate-800">
+                      {application.alumniBusinessDetails?.disbursementBank
+                        ? `${application.alumniBusinessDetails.disbursementBank.bankName} - ${application.alumniBusinessDetails.disbursementBank.accountNumber} (a.n. ${application.alumniBusinessDetails.disbursementBank.accountHolderName})`
+                        : 'Belum diatur'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-100 bg-slate-50/80 p-3">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Lokasi / Alamat Tempat Usaha
+                  </span>
+                  <p className="mt-0.5 text-xs text-slate-800">
+                    {application.alumniBusinessDetails?.businessAddress || '—'}
+                    {application.alumniBusinessDetails?.businessCity &&
+                      `, ${application.alumniBusinessDetails.businessCity}`}
+                    {application.alumniBusinessDetails?.businessProvince &&
+                      `, ${application.alumniBusinessDetails.businessProvince}`}
+                  </p>
+                </div>
+
+                {/* Status Dokumen Fisik Asli (Verifikasi Administrasi Kantor - Pasal 6 ayat 4) */}
+                <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-600">📁</span>
+                    <h4 className="text-xs font-bold text-amber-950">
+                      Penyimpanan Dokumen Fisik Asli (Verifikasi Administrasi Kantor — Pasal 6 Ayat
+                      4)
+                    </h4>
+                  </div>
+                  <p className="mt-1 text-[11px] text-amber-800 leading-relaxed">
+                    Berdasarkan Akad Murabahah Pasal 6 ayat 4, ijazah dan dokumen asli pemohon
+                    disimpan di brankas kantor VentureGo Wonosobo sebagai{' '}
+                    <strong>verifikasi administrasi</strong> (bukan agunan komersial / Rahn).
+                    Dokumen wajib dikembalikan utuh tanpa syarat segera setelah seluruh kewajiban
+                    angsuran lunas.
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {['KTP Asli', 'KK Asli', 'Akta Lahir Asli', 'Ijazah SD / SMP / SMA Asli'].map(
+                      (label) => (
+                        <div
+                          key={label}
+                          className="flex items-center gap-1.5 rounded-lg border border-amber-200/80 bg-white px-2.5 py-1.5 text-xs text-slate-700"
+                        >
+                          <span className="size-2 rounded-full bg-emerald-500" />
+                          <span className="font-medium text-[11px]">{label}</span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* TAB: NOMINAL PENGAJUAN */}
@@ -2086,6 +2209,157 @@ function ApplicationDrawerForm({
               </p>
             )}
           </section>
+
+          {application.product === 'ALUMNI_FINANCING' &&
+            (() => {
+              const plan = application.financialPlan as unknown as
+                | MurabahahFinancialPlan
+                | undefined
+              const principal = plan?.principal || 0
+              const margin = plan?.marginAmount || 0
+              const totalObligation = plan?.totalObligation || principal + margin
+              const adminFee = plan?.adminFeeAmount || Math.round(principal * 0.03)
+              const netDisbursed = plan?.netDisbursedAmount || principal - adminFee
+              const tenor = plan?.tenorMonths || 12
+              const monthly = plan?.monthlyInstallment || Math.round(totalObligation / tenor)
+              const items = plan?.itemProcurementPlan || []
+
+              return (
+                <div className="space-y-4">
+                  {/* 4 Metrik Kartu Atas */}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-purple-200 bg-white p-4 shadow-2xs">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                        Harga Beli Barang (Tsamān)
+                      </span>
+                      <strong className="mt-1 block text-xl font-extrabold text-purple-700">
+                        {formatRupiah(principal)}
+                      </strong>
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        Biaya pokok riil pengadaan barang modal
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                        Keuntungan Disepakati (Ribh)
+                      </span>
+                      <strong className="mt-1 block text-xl font-extrabold text-slate-900">
+                        {formatRupiah(margin)}
+                      </strong>
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        Margin tetap VentureGo, tanpa bunga berjalan
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-200 bg-white p-4 shadow-2xs">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                        Total Kewajiban Murabahah
+                      </span>
+                      <strong className="mt-1 block text-xl font-extrabold text-emerald-700">
+                        {formatRupiah(totalObligation)}
+                      </strong>
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        Tsamān + Ribh (Pasal 3 Akad)
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-2xs">
+                      <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                        Angsuran Bulanan ({tenor} Bln)
+                      </span>
+                      <strong className="mt-1 block text-xl font-extrabold text-[#0b57d0]">
+                        {formatRupiah(monthly)} / bln
+                      </strong>
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        Jatuh tempo setiap tanggal 25 (Pasal 5)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Pencairan Bersih & Adm Fee */}
+                  <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-purple-50/50 via-white to-slate-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div>
+                        <span className="font-semibold text-slate-700">
+                          Potongan Administrasi (Pasal 4 Ayat 2):
+                        </span>{' '}
+                        <span className="font-bold text-amber-700">
+                          {formatRupiah(adminFee)} (3%)
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-slate-700">
+                          Dana Bersih Dicairkan ke Alumni:
+                        </span>{' '}
+                        <span className="font-extrabold text-emerald-700 text-sm">
+                          {formatRupiah(netDisbursed)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tabel Rencana Pengadaan Barang Modal (Pasal 2) */}
+                  <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs">
+                    <div className="border-b border-slate-100 bg-slate-50/80 px-5 py-3">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Rencana Pengadaan Barang Modal Usaha (Objek Akad Murabahah — Pasal 2)
+                      </h3>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-slate-100 bg-slate-50/50 text-[10px] uppercase tracking-wider text-slate-400">
+                          <tr>
+                            <th className="px-4 py-2.5">No</th>
+                            <th className="px-4 py-2.5">Nama Barang / Kebutuhan Modal</th>
+                            <th className="px-4 py-2.5">Spesifikasi / Merek</th>
+                            <th className="px-4 py-2.5 text-right">Estimasi Biaya</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {items.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                                Belum ada rincian barang. Atur daftar belanja modal pada tab Akad
+                                Murabahah.
+                              </td>
+                            </tr>
+                          ) : (
+                            items.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/80">
+                                <td className="px-4 py-2.5 font-semibold text-slate-400">
+                                  {idx + 1}
+                                </td>
+                                <td className="px-4 py-2.5 font-bold text-slate-900">
+                                  {item.itemName}
+                                </td>
+                                <td className="px-4 py-2.5 text-slate-500">
+                                  {item.specification || '—'}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-semibold text-slate-900">
+                                  {formatRupiah(item.estimatedCost)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                        <tfoot className="border-t border-slate-200 bg-slate-50/80 font-bold">
+                          <tr>
+                            <td colSpan={3} className="px-4 py-2.5 text-slate-900 text-right">
+                              Total Estimasi Pengadaan (Tsamān):
+                            </td>
+                            <td className="px-4 py-2.5 text-right text-purple-700 text-sm">
+                              {formatRupiah(principal)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </section>
+                </div>
+              )
+            })()}
         </div>
 
         {/* TAB: DOCUMENTS */}
@@ -2318,33 +2592,40 @@ function ApplicationDrawerForm({
         <div className={activeTab === 'pricing' ? 'flex flex-col gap-6' : 'hidden'}>
           {/* EXECUTIVE HERO: PROGRAM & JENIS AKAD SUMMARY */}
           {(() => {
+            const isAlumni =
+              application.product === 'ALUMNI_FINANCING' ||
+              application.financialPlan?.contractType === 'MURABAHAH'
             const isFullCover = application.product === 'FULL_COVER'
-            const programSubtitle = isFullCover
-              ? 'Program Pembiayaan Pelatihan Bahasa, Skill, & Penempatan Kerja'
-              : 'Program Pembiayaan Dana Talang Tiket & Persiapan Berangkat'
-            const akadDescription = isFullCover
-              ? 'Skema pembiayaan terpadu yang memadukan pelimpahan kuasa pengurusan pendidikan bahasa/skill (Wakalah bil Ujrah) serta komitmen imbalan atas pencapaian keberhasilan penempatan kerja ke luar negeri (Ju’alah). Hak dan kewajiban diselaraskan secara transparan pasca siswa resmi bekerja dan memperoleh penghasilan di negara tujuan.'
-              : 'Siswa (Muwakkil) memberikan pelimpahan kuasa penuh kepada VentureGo (Wakil) untuk mengurus, membiayai, dan menyelesaikan kewajiban persiapan keberangkatan siswa ke negara tujuan dengan imbalan jasa (Ujrah) yang disepakati secara transparan dan proporsional tanpa bunga/riba. Biaya pokok (Nafaqah) disalurkan langsung kepada pihak LPK mitra dan maskapai.'
+            const programSubtitle = isAlumni
+              ? 'Program Pembiayaan Modal Usaha Mandiri Alumni Magang'
+              : isFullCover
+                ? 'Program Pembiayaan Pelatihan Bahasa, Skill, & Penempatan Kerja'
+                : 'Program Pembiayaan Dana Talang Tiket & Persiapan Berangkat'
+            const akadDescription = isAlumni
+              ? 'Akad Jual Beli Murabahah bil Wakalah untuk pengadaan barang modal produktif alumni purna-magang Jepang. VentureGo mewakilkan pembelian barang modal riil (Tsamān) kepada Alumni, dengan margin keuntungan (Ribh) tetap yang disepakati bersama secara transparan, serta potongan biaya administrasi 3% langsung dari pencairan. Tidak mengandung bunga, denda, atau agunan sita.'
+              : isFullCover
+                ? 'Skema pembiayaan terpadu yang memadukan pelimpahan kuasa pengurusan pendidikan bahasa/skill (Wakalah bil Ujrah) serta komitmen imbalan atas pencapaian keberhasilan penempatan kerja ke luar negeri (Ju’alah). Hak dan kewajiban diselaraskan secara transparan pasca siswa resmi bekerja dan memperoleh penghasilan di negara tujuan.'
+                : 'Siswa (Muwakkil) memberikan pelimpahan kuasa penuh kepada VentureGo (Wakil) untuk mengurus, membiayai, dan menyelesaikan kewajiban persiapan keberangkatan siswa ke negara tujuan dengan imbalan jasa (Ujrah) yang disepakati secara transparan dan proporsional tanpa bunga/riba. Biaya pokok (Nafaqah) disalurkan langsung kepada pihak LPK mitra dan maskapai.'
 
             return (
               <section
-                className={`relative overflow-hidden rounded-2xl border p-5 shadow-xs ${isFullCover ? 'border-amber-200/70 bg-gradient-to-br from-white via-amber-50/25 to-emerald-50/25' : 'border-slate-200/90 bg-gradient-to-br from-white via-blue-50/25 to-slate-50'}`}
+                className={`relative overflow-hidden rounded-2xl border p-5 shadow-xs ${isAlumni ? 'border-purple-200/80 bg-gradient-to-br from-white via-purple-50/25 to-indigo-50/25' : isFullCover ? 'border-amber-200/70 bg-gradient-to-br from-white via-amber-50/25 to-emerald-50/25' : 'border-slate-200/90 bg-gradient-to-br from-white via-blue-50/25 to-slate-50'}`}
               >
                 {/* Decorative background glow */}
                 <div
                   aria-hidden="true"
-                  className={`pointer-events-none absolute -right-10 -top-10 size-56 rounded-full blur-xl ${isFullCover ? 'bg-amber-100/45' : 'bg-blue-100/40'}`}
+                  className={`pointer-events-none absolute -right-10 -top-10 size-56 rounded-full blur-xl ${isAlumni ? 'bg-purple-100/50' : isFullCover ? 'bg-amber-100/45' : 'bg-blue-100/40'}`}
                 />
                 <div
                   aria-hidden="true"
-                  className={`pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full blur-2xl ${isFullCover ? 'bg-emerald-100/40' : 'bg-indigo-50/50'}`}
+                  className={`pointer-events-none absolute bottom-0 right-1/4 size-32 rounded-full blur-2xl ${isAlumni ? 'bg-indigo-100/40' : isFullCover ? 'bg-emerald-100/40' : 'bg-indigo-50/50'}`}
                 />
 
                 <div className="relative space-y-4">
                   {/* Main Header with Glowing Icon */}
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     <div
-                      className={`flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr text-white shadow-md ring-4 ${isFullCover ? 'from-amber-500 to-emerald-600 shadow-emerald-500/20 ring-amber-50' : 'from-[#0b57d0] to-[#4285f4] shadow-blue-500/20 ring-blue-50'}`}
+                      className={`flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-tr text-white shadow-md ring-4 ${isAlumni ? 'from-purple-600 to-indigo-600 shadow-purple-500/20 ring-purple-50' : isFullCover ? 'from-amber-500 to-emerald-600 shadow-emerald-500/20 ring-amber-50' : 'from-[#0b57d0] to-[#4285f4] shadow-blue-500/20 ring-blue-50'}`}
                     >
                       <svg
                         aria-hidden="true"
@@ -2422,26 +2703,34 @@ function ApplicationDrawerForm({
                     <div className="mt-3.5 grid gap-2.5 border-t border-slate-100 pt-3 sm:grid-cols-3">
                       <div className="rounded-lg bg-slate-50/80 px-3 py-2">
                         <span className="text-[10px] font-semibold text-slate-500">
-                          Prinsip Biaya Riil (Nafaqah)
+                          {isAlumni
+                            ? 'Prinsip Modal Riil (Tsamān)'
+                            : 'Prinsip Biaya Riil (Nafaqah)'}
                         </span>
                         <p className="mt-0.5 text-[11px] font-bold text-slate-800">
-                          Beban riil tagihan LPK & kebutuhan persiapan tanpa mark-up sepihak
+                          {isAlumni
+                            ? 'Barang modal produktif riil sesuai RAB pengadaan tanpa markup'
+                            : 'Beban riil tagihan LPK & kebutuhan persiapan tanpa mark-up sepihak'}
                         </p>
                       </div>
                       <div className="rounded-lg bg-slate-50/80 px-3 py-2">
                         <span className="text-[10px] font-semibold text-slate-500">
-                          Imbalan Jasa Terbuka (Ujrah)
+                          {isAlumni ? 'Margin Terbuka (Ribh)' : 'Imbalan Jasa Terbuka (Ujrah)'}
                         </span>
                         <p className="mt-0.5 text-[11px] font-bold text-slate-800">
-                          Proporsional sesuai kesepakatan, tanpa bunga berjalan maupun denda
+                          {isAlumni
+                            ? 'Margin tetap VentureGo disepakati di muka, tanpa bunga atau denda'
+                            : 'Proporsional sesuai kesepakatan, tanpa bunga berjalan maupun denda'}
                         </p>
                       </div>
                       <div className="rounded-lg bg-slate-50/80 px-3 py-2">
                         <span className="text-[10px] font-semibold text-slate-500">
-                          Keluwesan Angsuran
+                          {isAlumni ? 'Jatuh Tempo Bulanan' : 'Keluwesan Angsuran'}
                         </span>
                         <p className="mt-0.5 text-[11px] font-bold text-slate-800">
-                          Mulai diangsur setelah siswa aktif menerima penghasilan di negara tujuan
+                          {isAlumni
+                            ? 'Angsuran tetap dibayar setiap tanggal 25 per bulan dari hasil usaha'
+                            : 'Mulai diangsur setelah siswa aktif menerima penghasilan di negara tujuan'}
                         </p>
                       </div>
                     </div>
@@ -2455,18 +2744,27 @@ function ApplicationDrawerForm({
             className="m-0 min-w-0 border-0 p-0 block disabled:opacity-75 [&_button]:disabled:cursor-not-allowed [&_input]:disabled:bg-slate-50"
             disabled={akadIssued}
           >
-            <FinanceTermsFields
-              applicantName={application.applicantName}
-              departureDetails={application.departureDetails}
-              financialPlan={application.financialPlan}
-              fullCoverDetails={application.fullCoverDetails}
-              personalDetails={application.personalDetails}
-              phone={application.phone}
-              issuedAkad={akadMeta}
-              key={financeTermsKey}
-              lpkName={application.lpkName}
-              product={application.product}
-            />
+            {application.product === 'ALUMNI_FINANCING' ||
+            application.financialPlan?.contractType === 'MURABAHAH' ? (
+              <MurabahahTermsFields
+                financialPlan={application.financialPlan ?? {}}
+                disabled={akadIssued}
+                key={financeTermsKey}
+              />
+            ) : (
+              <FinanceTermsFields
+                applicantName={application.applicantName}
+                departureDetails={application.departureDetails}
+                financialPlan={application.financialPlan}
+                fullCoverDetails={application.fullCoverDetails}
+                personalDetails={application.personalDetails}
+                phone={application.phone}
+                issuedAkad={akadMeta}
+                key={financeTermsKey}
+                lpkName={application.lpkName}
+                product={application.product}
+              />
+            )}
           </fieldset>
 
           <section
@@ -3719,19 +4017,44 @@ function ApplicationDrawerForm({
                     </span>
                     <div>
                       <h4 className="text-xs font-bold text-slate-900">
-                        {installmentSummary.isLegacy
-                          ? 'Jadwal Angsuran LGC · Riwayat Kontrak Lama'
-                          : 'Skema Angsuran Fleksibel'}{' '}
+                        {application.product === 'ALUMNI_FINANCING' ||
+                        application.financialPlan?.contractType === 'MURABAHAH'
+                          ? 'Jadwal Angsuran Murabahah (Modal Usaha) · Jatuh Tempo Tanggal 25 Setiap Bulan'
+                          : installmentSummary.isLegacy
+                            ? 'Jadwal Angsuran LGC · Riwayat Kontrak Lama'
+                            : 'Skema Angsuran Fleksibel'}{' '}
                         · {isStarted ? 'Sedang Berjalan' : 'Belum Mulai Mengangsur'}
                       </h4>
                       <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                        {installmentSummary.isLegacy
-                          ? 'Tanggal dan nominal mengikuti jadwal kontrak legacy yang diimpor. Status pembayaran memakai paidInstallments dan alokasi transaksi legacy yang tersedia; pembayaran tanpa nomor cicilan ditampilkan terpisah dan tidak ditebak alokasinya.'
-                          : 'Jadwal dan nominal cicilan di bawah merupakan asumsi default / estimasi acuan. Tanggal dan besaran angsuran bersifat fleksibel menyesuaikan kemampuan serta kesepakatan riil saat siswa mulai mengangsur.'}
+                        {application.product === 'ALUMNI_FINANCING' ||
+                        application.financialPlan?.contractType === 'MURABAHAH'
+                          ? 'Angsuran bulanan tetap dicicil setiap tanggal 25 per bulan dari hasil laba usaha alumni. Wanprestasi dinyatakan lalai setelah menunggak 3 bulan berturut-turut sesuai Pasal 7 ayat 1.'
+                          : installmentSummary.isLegacy
+                            ? 'Tanggal dan nominal mengikuti jadwal kontrak legacy yang diimpor. Status pembayaran memakai paidInstallments dan alokasi transaksi legacy yang tersedia; pembayaran tanpa nomor cicilan ditampilkan terpisah dan tidak ditebak alokasinya.'
+                            : 'Jadwal dan nominal cicilan di bawah merupakan asumsi default / estimasi acuan. Tanggal dan besaran angsuran bersifat fleksibel menyesuaikan kemampuan serta kesepakatan riil saat siswa mulai mengangsur.'}
                       </p>
                     </div>
                   </div>
                 </div>
+
+                {/* Peringatan Wanprestasi Murabahah jika menunggak >= 3 bulan */}
+                {(application.product === 'ALUMNI_FINANCING' ||
+                  application.financialPlan?.contractType === 'MURABAHAH') &&
+                  installmentSummary.overdueCount >= 3 && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-600 font-bold text-sm">⚠️</span>
+                        <h4 className="text-xs font-bold text-red-900">
+                          Potensi Wanprestasi (Pasal 7 Ayat 1 Perjanjian Kerjasama Murabahah)
+                        </h4>
+                      </div>
+                      <p className="mt-1 text-[11px] text-red-700 leading-relaxed">
+                        Alumni tercatat menunggak {installmentSummary.overdueCount} bulan
+                        berturut-turut setelah tanggal 25. Berdasarkan Pasal 7 ayat 1, VentureGo
+                        berhak menerbitkan <strong>Surat Peringatan (SP) Tertulis</strong>.
+                      </p>
+                    </div>
+                  )}
 
                 {/* Card Tabel Angsuran */}
                 <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
@@ -4023,17 +4346,30 @@ function ApplicationDrawerForm({
               akadIssued: boolean
               documentNumber?: string
               createdAt: string
+              isAlumni?: boolean
+              businessName?: string
             }[] = [
               {
                 applicationId: application.applicationId,
                 product:
-                  (application.product as string) === 'FULL_COVER'
-                    ? 'VSV Full Cover'
-                    : 'VSV Dana Keberangkatan',
-                lpk: application.lpkName,
-                destination: depDest,
+                  (application.product as string) === 'ALUMNI_FINANCING'
+                    ? 'VSV Modal Usaha Alumni (Murabahah)'
+                    : (application.product as string) === 'FULL_COVER'
+                      ? 'VSV Full Cover'
+                      : 'VSV Dana Keberangkatan',
+                lpk:
+                  (application.product as string) === 'ALUMNI_FINANCING'
+                    ? (application.alumniBusinessDetails?.businessName ?? application.lpkName)
+                    : application.lpkName,
+                destination:
+                  (application.product as string) === 'ALUMNI_FINANCING'
+                    ? application.alumniBusinessDetails?.businessCity || '-'
+                    : depDest,
                 status: application.status,
-                requestedAmount: depAmount,
+                requestedAmount:
+                  (application.product as string) === 'ALUMNI_FINANCING'
+                    ? Number(application.financialPlan?.principal) || 0
+                    : depAmount,
                 pricingStatus:
                   typeof application.financialPlan?.pricingStatus === 'string'
                     ? application.financialPlan.pricingStatus
@@ -4074,8 +4410,16 @@ function ApplicationDrawerForm({
                       <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                           <th className="px-5 py-3.5">Informasi Umum Program</th>
-                          <th className="px-5 py-3.5">LPK Mitra & Tujuan</th>
-                          <th className="px-5 py-3.5 text-right">Plafon Pembiayaan</th>
+                          <th className="px-5 py-3.5">
+                            {application.product === 'ALUMNI_FINANCING'
+                              ? 'Unit Usaha & Lokasi'
+                              : 'LPK Mitra & Tujuan'}
+                          </th>
+                          <th className="px-5 py-3.5 text-right">
+                            {application.product === 'ALUMNI_FINANCING'
+                              ? 'Harga Pokok (Tsamān)'
+                              : 'Plafon Pembiayaan'}
+                          </th>
                           <th className="px-5 py-3.5">Dokumen Akad</th>
                           <th className="px-5 py-3.5">Status Program</th>
                         </tr>
@@ -4087,8 +4431,13 @@ function ApplicationDrawerForm({
                             key={prog.applicationId}
                           >
                             <td className="px-5 py-3.5">
-                              <span className="block font-semibold text-slate-900">
+                              <span className="flex items-center gap-1.5 font-semibold text-slate-900">
                                 {prog.product}
+                                {application.product === 'ALUMNI_FINANCING' && (
+                                  <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold text-purple-800">
+                                    MURABAHAH
+                                  </span>
+                                )}
                               </span>
                               <span className="font-mono text-[11px] text-slate-500">
                                 ID: {prog.applicationId} · Didaftarkan:{' '}
@@ -4098,11 +4447,14 @@ function ApplicationDrawerForm({
                             <td className="px-5 py-3.5">
                               <span className="block font-medium text-slate-900">{prog.lpk}</span>
                               <span className="text-[11px] text-slate-500">
-                                {prog.destination === 'JAPAN'
-                                  ? '🇯🇵 Jepang'
-                                  : prog.destination === 'TURKEY'
-                                    ? '🇹🇷 Turki'
-                                    : prog.destination}
+                                {application.product === 'ALUMNI_FINANCING'
+                                  ? application.alumniBusinessDetails?.businessCity ||
+                                    prog.destination
+                                  : prog.destination === 'JAPAN'
+                                    ? '🇯🇵 Jepang'
+                                    : prog.destination === 'TURKEY'
+                                      ? '🇹🇷 Turki'
+                                      : prog.destination}
                               </span>
                             </td>
                             <td className="px-5 py-3.5 text-right font-semibold text-slate-900">
@@ -4735,9 +5087,9 @@ export function AdminDashboard({
   const [drawerTab, setDrawerTab] = useState<DetailTabId>('profile')
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [productFilter, setProductFilter] = useState<'ALL' | 'FULL_COVER' | 'DEPARTURE_BRIDGING'>(
-    'ALL',
-  )
+  const [productFilter, setProductFilter] = useState<
+    'ALL' | 'FULL_COVER' | 'DEPARTURE_BRIDGING' | 'ALUMNI_FINANCING'
+  >('ALL')
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [destinationFilter, setDestinationFilter] = useState<string>('ALL')
   const [isDestinationDropdownOpen, setIsDestinationDropdownOpen] = useState(false)
@@ -4771,6 +5123,10 @@ export function AdminDashboard({
     'ALL' | 'OVERDUE' | 'DUE_SOON' | 'CURRENT'
   >('ALL')
   const [alumniFilter, setAlumniFilter] = useState<'ALL' | 'ON_TIME' | 'EARLY'>('ALL')
+  const [alumniModalOpen, setAlumniModalOpen] = useState(false)
+  const [alumniModalTarget, setAlumniModalTarget] = useState<FinancingApplicationRecord | null>(
+    null,
+  )
   const [studentDirectoryFilter, setStudentDirectoryFilter] =
     useState<(typeof STUDENT_DIRECTORY_FILTERS)[number]['id']>('ALL')
 
@@ -5440,6 +5796,20 @@ export function AdminDashboard({
             '',
         ),
         lpkWitnessName: String(formData.get('lpkWitnessName') ?? ''),
+        contractType: application.product === 'ALUMNI_FINANCING' ? 'MURABAHAH' : '',
+        principal: String(formData.get('principal') ?? ''),
+        marginAmount: String(formData.get('marginAmount') ?? ''),
+        adminFeePercentage: String(formData.get('adminFeePercentage') ?? '3'),
+        itemProcurementPlanJson: String(formData.get('itemProcurementPlanJson') ?? '[]'),
+        businessName: String(formData.get('businessName') ?? ''),
+        businessSector: String(formData.get('businessSector') ?? ''),
+        businessAddress: String(formData.get('businessAddress') ?? ''),
+        businessCity: String(formData.get('businessCity') ?? ''),
+        businessProvince: String(formData.get('businessProvince') ?? ''),
+        disbursementBankName: String(formData.get('disbursementBankName') ?? ''),
+        disbursementBankAccount: String(formData.get('disbursementBankAccount') ?? ''),
+        disbursementAccountHolder: String(formData.get('disbursementAccountHolder') ?? ''),
+        contractNumber: String(formData.get('contractNumber') ?? ''),
       })
       if (!result.ok) {
         setError(result.message)
@@ -5949,6 +6319,7 @@ export function AdminDashboard({
                   {productFilter === 'ALL' && <span>Semua Produk</span>}
                   {productFilter === 'DEPARTURE_BRIDGING' && <span>Dana Keberangkatan</span>}
                   {productFilter === 'FULL_COVER' && <span>Full Cover</span>}
+                  {productFilter === 'ALUMNI_FINANCING' && <span>Modal Usaha Alumni</span>}
                 </span>
                 <svg
                   aria-hidden="true"
@@ -6020,6 +6391,25 @@ export function AdminDashboard({
                     <span className="whitespace-nowrap">Full Cover</span>
                     {productFilter === 'FULL_COVER' && (
                       <span className="size-1.5 shrink-0 rounded-full bg-[#0b57d0]" />
+                    )}
+                  </button>
+
+                  <button
+                    className={`flex w-full items-center justify-between gap-3 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
+                      productFilter === 'ALUMNI_FINANCING'
+                        ? 'bg-purple-50 font-semibold text-purple-700'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                    onClick={() => {
+                      setProductFilter('ALUMNI_FINANCING')
+                      setIsProductDropdownOpen(false)
+                    }}
+                    style={{ fontSize: '11px', fontWeight: 500 }}
+                    type="button"
+                  >
+                    <span className="whitespace-nowrap">Modal Usaha Alumni</span>
+                    {productFilter === 'ALUMNI_FINANCING' && (
+                      <span className="size-1.5 shrink-0 rounded-full bg-purple-600" />
                     )}
                   </button>
                 </div>
@@ -6599,7 +6989,11 @@ export function AdminDashboard({
                               {app.lpkName} · {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                              {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                              {app.product === 'FULL_COVER'
+                                ? 'Full Cover'
+                                : app.product === 'ALUMNI_FINANCING'
+                                  ? 'Modal Usaha Alumni'
+                                  : 'Dana Keberangkatan'}
                             </td>
                             <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                               {uploaded}/{app.documents.length}
@@ -6650,7 +7044,11 @@ export function AdminDashboard({
                         </div>
                         <p className="mt-2 break-words text-[10px] text-slate-500">
                           {app.lpkName} · {app.destination === 'JAPAN' ? '🇯🇵 Jepang' : '🇹🇷 Turki'} ·{' '}
-                          {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                          {app.product === 'FULL_COVER'
+                            ? 'Full Cover'
+                            : app.product === 'ALUMNI_FINANCING'
+                              ? 'Modal Usaha Alumni'
+                              : 'Dana Keberangkatan'}
                         </p>
                         <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-[10px] text-slate-500">
                           <span>
@@ -6791,7 +7189,11 @@ export function AdminDashboard({
                                 {app.destination === 'JAPAN' ? 'Jepang' : 'Turki'}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                                {app.product === 'FULL_COVER'
+                                  ? 'Full Cover'
+                                  : app.product === 'ALUMNI_FINANCING'
+                                    ? 'Modal Usaha Alumni'
+                                    : 'Dana Keberangkatan'}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                                 {uploaded}/{app.documents.length}
@@ -6863,7 +7265,11 @@ export function AdminDashboard({
                               </p>
                             </div>
                             <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0]">
-                              {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                              {app.product === 'FULL_COVER'
+                                ? 'Full Cover'
+                                : app.product === 'ALUMNI_FINANCING'
+                                  ? 'Modal Usaha Alumni'
+                                  : 'Dana Keberangkatan'}
                             </span>
                           </div>
                           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
@@ -7407,7 +7813,9 @@ export function AdminDashboard({
                                   <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
                                     {app.product === 'FULL_COVER'
                                       ? 'Full Cover'
-                                      : 'Dana Keberangkatan'}
+                                      : app.product === 'ALUMNI_FINANCING'
+                                        ? 'Modal Usaha Alumni'
+                                        : 'Dana Keberangkatan'}
                                   </span>
                                   <p
                                     className="mt-1 max-w-52 truncate text-slate-700"
@@ -7552,7 +7960,9 @@ export function AdminDashboard({
                                 <p className="mt-0.5 truncate font-semibold text-slate-700">
                                   {app.product === 'FULL_COVER'
                                     ? 'Full Cover'
-                                    : 'Dana Keberangkatan'}
+                                    : app.product === 'ALUMNI_FINANCING'
+                                      ? 'Modal Usaha Alumni'
+                                      : 'Dana Keberangkatan'}
                                 </p>
                                 <p className="truncate text-slate-500">
                                   {app.lpkName || 'LPK belum tersedia'}
@@ -7739,7 +8149,11 @@ export function AdminDashboard({
                                 {app.applicantName}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                                {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                                {app.product === 'FULL_COVER'
+                                  ? 'Full Cover'
+                                  : app.product === 'ALUMNI_FINANCING'
+                                    ? 'Modal Usaha Alumni'
+                                    : 'Dana Keberangkatan'}
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                                 {formatRupiah(requested)}
@@ -7851,7 +8265,11 @@ export function AdminDashboard({
                               </p>
                             </div>
                             <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-semibold text-[#0b57d0]">
-                              {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                              {app.product === 'FULL_COVER'
+                                ? 'Full Cover'
+                                : app.product === 'ALUMNI_FINANCING'
+                                  ? 'Modal Usaha Alumni'
+                                  : 'Dana Keberangkatan'}
                             </span>
                           </div>
                           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 border-t border-slate-100 pt-3 text-[11px]">
@@ -8079,11 +8497,13 @@ export function AdminDashboard({
                                 <td className="whitespace-nowrap px-4 py-2 text-left">
                                   <div className="flex flex-col items-start text-left">
                                     <span
-                                      className={`flex w-fit rounded-full px-2 py-0.5 text-left text-[10px] font-semibold ${app.product === 'FULL_COVER' ? 'bg-blue-50 text-blue-700' : 'bg-teal-50 text-teal-700'}`}
+                                      className={`flex w-fit rounded-full px-2 py-0.5 text-left text-[10px] font-semibold ${app.product === 'FULL_COVER' ? 'bg-blue-50 text-blue-700' : app.product === 'ALUMNI_FINANCING' ? 'bg-purple-50 text-purple-700' : 'bg-teal-50 text-teal-700'}`}
                                     >
                                       {app.product === 'FULL_COVER'
                                         ? 'Full Cover'
-                                        : 'Dana Keberangkatan'}
+                                        : app.product === 'ALUMNI_FINANCING'
+                                          ? 'Modal Usaha Alumni'
+                                          : 'Dana Keberangkatan'}
                                     </span>
                                     <span className="mt-1 text-left text-[11px] text-slate-500">
                                       {app.lpkName}
@@ -8139,15 +8559,28 @@ export function AdminDashboard({
                                   </div>
                                 </td>
                                 <td className="whitespace-nowrap px-4 py-2 text-right">
-                                  <button
-                                    className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
-                                    onClick={() =>
-                                      openApplicationDrawer(app.id, 'installment-history')
-                                    }
-                                    type="button"
-                                  >
-                                    Rincian Riwayat
-                                  </button>
+                                  <div className="inline-flex items-center gap-1.5">
+                                    <button
+                                      className="rounded-lg border border-emerald-200 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+                                      onClick={() =>
+                                        openApplicationDrawer(app.id, 'installment-history')
+                                      }
+                                      type="button"
+                                    >
+                                      Rincian Riwayat
+                                    </button>
+                                    <button
+                                      className="rounded-lg border border-purple-200 bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-800 hover:bg-purple-100"
+                                      onClick={() => {
+                                        setAlumniModalTarget(app)
+                                        setAlumniModalOpen(true)
+                                      }}
+                                      title="Buat pengajuan modal usaha untuk alumni ini"
+                                      type="button"
+                                    >
+                                      + Modal Usaha
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ),
@@ -8165,7 +8598,11 @@ export function AdminDashboard({
                                 NIS {getApplicationStudentNumber(app) || 'belum tersedia'}
                               </p>
                               <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
-                                {app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                                {app.product === 'FULL_COVER'
+                                  ? 'Full Cover'
+                                  : app.product === 'ALUMNI_FINANCING'
+                                    ? 'Modal Usaha Alumni'
+                                    : 'Dana Keberangkatan'}
                               </span>
                             </div>
                             <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
@@ -8203,13 +8640,25 @@ export function AdminDashboard({
                               </strong>
                             </div>
                           </div>
-                          <button
-                            className="w-full rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
-                            onClick={() => openApplicationDrawer(app.id, 'installment-history')}
-                            type="button"
-                          >
-                            Rincian Riwayat
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              className="flex-1 rounded-lg border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-50"
+                              onClick={() => openApplicationDrawer(app.id, 'installment-history')}
+                              type="button"
+                            >
+                              Rincian Riwayat
+                            </button>
+                            <button
+                              className="flex-1 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-800 hover:bg-purple-100"
+                              onClick={() => {
+                                setAlumniModalTarget(app)
+                                setAlumniModalOpen(true)
+                              }}
+                              type="button"
+                            >
+                              + Modal Usaha
+                            </button>
+                          </div>
                         </article>
                       ))}
                     </div>
@@ -8218,6 +8667,21 @@ export function AdminDashboard({
               </section>
             </div>
           )}
+
+          {/* Alumni Financing Modal — rendered here so it can overlay entire page */}
+          <AlumniFinancingModal
+            alumnus={alumniModalTarget}
+            isOpen={alumniModalOpen}
+            onClose={() => {
+              setAlumniModalOpen(false)
+              setAlumniModalTarget(null)
+            }}
+            onSuccess={(_newAppDocId: string) => {
+              setAlumniModalOpen(false)
+              setAlumniModalTarget(null)
+              router.refresh()
+            }}
+          />
 
           {activeMenu === 'paymentMonitor' && (
             <InstallmentMonitor applications={applications} proofs={paymentProofs} />
@@ -8569,12 +9033,16 @@ export function AdminDashboard({
                                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                       app.product === 'FULL_COVER'
                                         ? 'bg-blue-50 text-blue-700'
-                                        : 'bg-teal-50 text-teal-700'
+                                        : app.product === 'ALUMNI_FINANCING'
+                                          ? 'bg-purple-50 text-purple-700'
+                                          : 'bg-teal-50 text-teal-700'
                                     }`}
                                   >
                                     {app.product === 'FULL_COVER'
                                       ? 'Full Cover'
-                                      : 'Dana Keberangkatan'}
+                                      : app.product === 'ALUMNI_FINANCING'
+                                        ? 'Modal Usaha Alumni'
+                                        : 'Dana Keberangkatan'}
                                   </span>
                                 </div>
                               </div>
@@ -8685,12 +9153,16 @@ export function AdminDashboard({
                                     className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                       app.product === 'FULL_COVER'
                                         ? 'bg-blue-50 text-blue-700'
-                                        : 'bg-teal-50 text-teal-700'
+                                        : app.product === 'ALUMNI_FINANCING'
+                                          ? 'bg-purple-50 text-purple-700'
+                                          : 'bg-teal-50 text-teal-700'
                                     }`}
                                   >
                                     {app.product === 'FULL_COVER'
                                       ? 'Full Cover'
-                                      : 'Dana Keberangkatan'}
+                                      : app.product === 'ALUMNI_FINANCING'
+                                        ? 'Modal Usaha Alumni'
+                                        : 'Dana Keberangkatan'}
                                   </span>
                                   <span className="mt-0.5 block text-[11px] text-slate-500 leading-tight">
                                     {app.lpkName}

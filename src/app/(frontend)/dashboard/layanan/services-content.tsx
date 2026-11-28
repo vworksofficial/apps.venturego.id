@@ -17,6 +17,7 @@ import {
   type DashboardIconName,
   DashboardScaffold,
 } from '../_components/dashboard-ui'
+import { UserAlumniApplicationModal } from '../_components/user-alumni-application-modal'
 
 type Product = DashboardApplication['product']
 type ProgramInfo = {
@@ -51,6 +52,17 @@ const programs: ProgramInfo[] = [
     icon: 'wallet',
   },
 ]
+
+const alumniProgram: ProgramInfo = {
+  product: 'ALUMNI_FINANCING',
+  title: 'Program Modal Usaha Alumni',
+  detail: 'Pembiayaan modal usaha produktif khusus alumni VentureGo',
+  description:
+    'Program pembiayaan modal usaha produktif (peternakan, pertanian, kuliner, perdagangan, atau jasa) khusus bagi alumni VentureGo yang telah menyelesaikan program sebelumnya secara tuntas.',
+  akad: 'Akad Modal Usaha Alumni menggunakan Murabahah (jual beli barang modal usaha dengan harga pokok Tsamān dan margin Ribh yang disepakati bersama). Angsuran jatuh tempo setiap tanggal 25.',
+  statsHeading: 'Perjalanan peserta Modal Usaha Alumni',
+  icon: 'star',
+}
 
 const services: {
   href: string
@@ -96,6 +108,8 @@ export default function ServicesContent() {
   const [applicationState, setApplicationState] = useState<'loading' | 'none' | 'exists' | 'error'>(
     'loading',
   )
+  const [isEligibleAlumni, setIsEligibleAlumni] = useState(false)
+  const [alumniApplyOpen, setAlumniApplyOpen] = useState(false)
   const [showApplicationNotice, setShowApplicationNotice] = useState(false)
   const [programStats, setProgramStats] = useState<{
     product: Product
@@ -114,12 +128,14 @@ export default function ServicesContent() {
         if (!active) return
         if (!user) {
           setApplicationState('none')
+          setIsEligibleAlumni(false)
           return
         }
         try {
           const result = await getDashboardSummary(await user.getIdToken())
           if (active) {
-            setApplicationState(result.ok ? (result.application ? 'exists' : 'none') : 'error')
+            setApplicationState(result.ok ? (result.canApply ? 'none' : 'exists') : 'error')
+            setIsEligibleAlumni(result.ok ? result.isEligibleAlumni : false)
           }
         } catch {
           if (active) setApplicationState('error')
@@ -157,6 +173,15 @@ export default function ServicesContent() {
   }
 
   const submitAction = () => {
+    if (selected?.product === 'ALUMNI_FINANCING') {
+      if (!isEligibleAlumni) {
+        setShowApplicationNotice(true)
+        return
+      }
+      setSelected(null)
+      setAlumniApplyOpen(true)
+      return
+    }
     if (applicationState === 'exists') {
       setShowApplicationNotice(true)
       return
@@ -207,6 +232,44 @@ export default function ServicesContent() {
           ))}
         </div>
       </section>
+
+      {isEligibleAlumni && (
+        <section aria-labelledby="alumni-services" className="space-y-3">
+          <div>
+            <h2 className="text-sm font-bold text-slate-900" id="alumni-services">
+              Program Khusus Alumni
+            </h2>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">
+              Tersedia khusus untuk alumni VentureGo yang telah melunasi program sebelumnya.
+            </p>
+          </div>
+          <button
+            aria-haspopup="dialog"
+            className="group flex w-full items-center gap-3 rounded-3xl border border-purple-200/80 bg-gradient-to-br from-white via-purple-50/40 to-indigo-50/60 p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-purple-300 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600"
+            onClick={() => void openProgram(alumniProgram)}
+            type="button"
+          >
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-purple-100 text-purple-700">
+              <DashboardIcon name={alumniProgram.icon} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <strong className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                {alumniProgram.title}
+                <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[9px] font-bold text-purple-800">
+                  MURABAHAH
+                </span>
+              </strong>
+              <span className="mt-1 block text-[10px] leading-4 text-slate-500">
+                {alumniProgram.detail}
+              </span>
+            </span>
+            <DashboardIcon
+              className="size-4 shrink-0 text-purple-600 transition group-hover:translate-x-0.5"
+              name="chevron"
+            />
+          </button>
+        </section>
+      )}
 
       <section aria-labelledby="investor-services" className="space-y-3">
         <h2 className="text-sm font-bold text-slate-900" id="investor-services">
@@ -332,6 +395,14 @@ export default function ServicesContent() {
           </section>
         </div>
       )}
+      <UserAlumniApplicationModal
+        isOpen={alumniApplyOpen}
+        onClose={() => setAlumniApplyOpen(false)}
+        onSuccess={() => {
+          setAlumniApplyOpen(false)
+          router.push('/dashboard?applicationSubmitted=1')
+        }}
+      />
     </DashboardScaffold>
   )
 }

@@ -119,7 +119,7 @@ export async function getOwnedFinancingApplications(token: string): Promise<User
       if (
         typeof data.applicationId !== 'string' ||
         typeof data.applicantName !== 'string' ||
-        !['DEPARTURE_BRIDGING', 'FULL_COVER'].includes(String(data.product)) ||
+        !['DEPARTURE_BRIDGING', 'FULL_COVER', 'ALUMNI_FINANCING'].includes(String(data.product)) ||
         !data.financialPlan ||
         typeof data.financialPlan !== 'object'
       ) {

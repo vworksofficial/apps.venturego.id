@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { getFirebaseClientAuth } from '@/lib/firebase-client'
 import { SkeletonBlock } from './_components/dashboard-ui'
+import { UserAlumniApplicationModal } from './_components/user-alumni-application-modal'
 import { WalletCarousel } from './_components/wallet-carousel'
 import { getWalletSummary, type VipSummary } from './vip/actions'
 import {
@@ -186,6 +187,7 @@ const STAGE_BY_STATUS: Record<string, number> = {
 const PRODUCT_LABELS: Record<DashboardApplication['product'], string> = {
   FULL_COVER: 'Full Cover',
   DEPARTURE_BRIDGING: 'Dana Keberangkatan',
+  ALUMNI_FINANCING: 'Modal Usaha Alumni',
 }
 
 const progressSteps = [
@@ -387,6 +389,8 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [application, setApplication] = useState<DashboardApplication | null>(null)
   const [canApply, setCanApply] = useState(false)
+  const [isEligibleAlumni, setIsEligibleAlumni] = useState(false)
+  const [alumniApplyOpen, setAlumniApplyOpen] = useState(false)
   const [hasUnreadNotif, setHasUnreadNotif] = useState(false)
   const [accountName, setAccountName] = useState('')
   const [accountPhotoUrl, setAccountPhotoUrl] = useState('')
@@ -419,6 +423,7 @@ export default function DashboardPage() {
         if (!user) {
           setApplication(null)
           setCanApply(false)
+          setIsEligibleAlumni(false)
           setHasUnreadNotif(false)
           setAccountName('')
           setAccountPhotoUrl('')
@@ -436,6 +441,7 @@ export default function DashboardPage() {
         if (cachedSummary) {
           setApplication(cachedSummary.application)
           setCanApply(cachedSummary.canApply)
+          setIsEligibleAlumni(cachedSummary.isEligibleAlumni)
           setHasUnreadNotif(checkHasUnreadNotif(cachedSummary.application, user.uid))
           setError('')
           setLoading(false)
@@ -457,12 +463,14 @@ export default function DashboardPage() {
             setError(result.message)
             setApplication(null)
             setCanApply(false)
+            setIsEligibleAlumni(false)
             setHasUnreadNotif(false)
           } else {
             dashboardSummaryCache.set(user.uid, result)
             setError('')
             setApplication(result.application)
             setCanApply(result.canApply)
+            setIsEligibleAlumni(result.isEligibleAlumni)
             setHasUnreadNotif(checkHasUnreadNotif(result.application, user.uid))
           }
         } catch {
@@ -518,23 +526,32 @@ export default function DashboardPage() {
     }
   }
   const programInfo =
-    application?.product === 'DEPARTURE_BRIDGING'
+    application?.product === 'ALUMNI_FINANCING'
       ? {
-          title: 'VSV Dana Keberangkatan',
+          title: 'VSV Modal Usaha Alumni',
           description:
-            'Program pembiayaan tahap akhir yang membantu memenuhi pembayaran LPK, pengurusan dokumen akhir, dan uang saku keberangkatan sesuai hasil verifikasi.',
+            'Program pembiayaan modal usaha produktif khusus bagi alumni VentureGo yang telah menyelesaikan program sebelumnya secara tuntas.',
           akadBody:
-            'Akad Dana Keberangkatan menggunakan Wakalah bil Ujrah. Biaya riil kebutuhan keberangkatan dibayarkan VentureGo atas persetujuan Anda lalu disalurkan sesuai kebutuhan yang diverifikasi.',
-          statsHeading: 'Perjalanan peserta Dana Keberangkatan',
+            'Akad Modal Usaha Alumni menggunakan Murabahah (jual beli barang modal usaha dengan harga pokok Tsamān dan margin Ribh yang disepakati bersama). Angsuran jatuh tempo setiap tanggal 25.',
+          statsHeading: 'Perjalanan peserta Modal Usaha Alumni',
         }
-      : {
-          title: 'VSV Full Cover',
-          description:
-            'Program pendampingan pembiayaan persiapan kerja ke Jepang yang membantu memenuhi kebutuhan pendidikan bahasa, pelatihan keterampilan, dokumen keberangkatan, dan uang saku sesuai hasil verifikasi.',
-          akadBody:
-            "Akad Full Cover menggunakan Wakalah bil Ujrah dan Ju'alah. Rincian kebutuhan serta nilai biaya disusun dan diverifikasi tim VentureGo sebelum disampaikan untuk ditinjau dan disepakati dalam akad.",
-          statsHeading: 'Perjalanan peserta Full Cover',
-        }
+      : application?.product === 'DEPARTURE_BRIDGING'
+        ? {
+            title: 'VSV Dana Keberangkatan',
+            description:
+              'Program pembiayaan tahap akhir yang membantu memenuhi pembayaran LPK, pengurusan dokumen akhir, dan uang saku keberangkatan sesuai hasil verifikasi.',
+            akadBody:
+              'Akad Dana Keberangkatan menggunakan Wakalah bil Ujrah. Biaya riil kebutuhan keberangkatan dibayarkan VentureGo atas persetujuan Anda lalu disalurkan sesuai kebutuhan yang diverifikasi.',
+            statsHeading: 'Perjalanan peserta Dana Keberangkatan',
+          }
+        : {
+            title: 'VSV Full Cover',
+            description:
+              'Program pendampingan pembiayaan persiapan kerja ke Jepang yang membantu memenuhi kebutuhan pendidikan bahasa, pelatihan keterampilan, dokumen keberangkatan, dan uang saku sesuai hasil verifikasi.',
+            akadBody:
+              "Akad Full Cover menggunakan Wakalah bil Ujrah dan Ju'alah. Rincian kebutuhan serta nilai biaya disusun dan diverifikasi tim VentureGo sebelum disampaikan untuk ditinjau dan disepakati dalam akad.",
+            statsHeading: 'Perjalanan peserta Full Cover',
+          }
   const stats = programStats && programStats.product === application?.product ? programStats : null
   const isDepartureApplication = application?.product === 'DEPARTURE_BRIDGING'
   const isSubmittedDeparture = isDepartureApplication && application?.status === 'SUBMITTED'
@@ -1021,6 +1038,33 @@ export default function DashboardPage() {
               </section>
             </div>
           )}
+          {!loading && !error && isEligibleAlumni && (
+            <section className="relative overflow-hidden rounded-3xl border border-purple-200 bg-gradient-to-br from-purple-700 via-indigo-700 to-purple-900 p-5 text-white shadow-sm">
+              <div className="relative z-10 flex items-center justify-between gap-4">
+                <div>
+                  <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-100">
+                    Khusus Alumni Terverifikasi
+                  </span>
+                  <h2 className="mt-1.5 text-base font-bold tracking-tight text-white">
+                    Ajukan Pembiayaan Modal Usaha
+                  </h2>
+                  <p className="mt-1 text-xs leading-relaxed text-purple-100">
+                    Program sebelumnya telah lunas. Anda berhak mengajukan pembiayaan modal usaha
+                    dengan Akad Murabahah.
+                  </p>
+                </div>
+                <button
+                  aria-label="Ajukan Pembiayaan Modal Usaha Alumni"
+                  className="shrink-0 rounded-xl bg-amber-400 px-3.5 py-2.5 text-xs font-bold text-slate-950 shadow-sm transition hover:bg-amber-300 active:scale-95"
+                  onClick={() => setAlumniApplyOpen(true)}
+                  type="button"
+                >
+                  Ajukan
+                </button>
+              </div>
+              <div className="pointer-events-none absolute -bottom-8 -right-8 size-32 rounded-full bg-white/10 blur-xl" />
+            </section>
+          )}
           {!loading && !error && canApply && (
             <section className="relative overflow-hidden rounded-3xl brand-card p-5 text-white shadow-sm">
               <div className="relative z-10 flex items-center justify-between gap-4">
@@ -1262,6 +1306,18 @@ export default function DashboardPage() {
           </Link>
         </div>
       </section>
+      <UserAlumniApplicationModal
+        isOpen={alumniApplyOpen}
+        onClose={() => setAlumniApplyOpen(false)}
+        onSuccess={() => {
+          setAlumniApplyOpen(false)
+          const user = getFirebaseClientAuth().currentUser
+          if (user) {
+            dashboardSummaryCache.delete(user.uid)
+          }
+          window.location.assign('/dashboard?applicationSubmitted=1')
+        }}
+      />
     </main>
   )
 }

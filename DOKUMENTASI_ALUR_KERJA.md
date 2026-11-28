@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **28 November 2026** (Pembiayaan Alumni Murabahah � Phase 3: implementasi UI admin dashboard lengkap, Server Actions `saveFinancialPlan`/`approveApplicationPricing`/`setApplicationPricingAgreed`/`issueAkadDocument` diperluas untuk produk `ALUMNI_FINANCING` Murabahah, tambah `createAlumniFinancingApplication`, semua 7 tab slide-over drawer disesuaikan, tombol "+ Modal Usaha" di menu Alumni, `AlumniFinancingModal` untuk pengajuan baru dari admin, filter produk diperluas, badge ungu untuk ALUMNI_FINANCING).
+Terakhir diperbarui: **28 November 2026** (Pembiayaan Alumni Murabahah — User Dashboard & Admin: penambahan alur pengajuan mandiri khusus alumni yang sudah lunas (`COMPLETED` dan tidak memiliki kewajiban aktif) di `/dashboard` dan `/dashboard/layanan` melalui `UserAlumniApplicationModal` & `submitAlumniFinancingByUser`, dukungan `ALUMNI_FINANCING` di `/dashboard/angsuran`, `/dashboard/dokumen`, `/dashboard/riwayat`, dan `/dashboard/unggah-berkas`; user baru tanpa riwayat lunas tetap hanya melihat Full Cover dan Dana Keberangkatan).
 
 ---
 

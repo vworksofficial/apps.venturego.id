@@ -153,7 +153,9 @@ export default function DocumentsPage() {
                       <h3 className="truncate text-sm font-bold text-slate-800">
                         {app.product === 'FULL_COVER'
                           ? 'Akad VSV Full Cover'
-                          : 'Akad VSV Dana Keberangkatan'}{' '}
+                          : app.product === 'ALUMNI_FINANCING'
+                            ? 'Akad Murabahah Modal Usaha'
+                            : 'Akad VSV Dana Keberangkatan'}{' '}
                         · {app.applicationId}
                       </h3>
                       <p className="mt-1 truncate text-[10px] text-slate-400">

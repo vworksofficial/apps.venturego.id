@@ -161,7 +161,13 @@ export default function ActivityPage() {
         category: 'Program',
         icon: 'wallet',
         tone: app.status === 'COMPLETED' ? 'emerald' : 'indigo',
-        title: `Pengajuan Program ${app.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}`,
+        title: `Pengajuan Program ${
+          app.product === 'FULL_COVER'
+            ? 'Full Cover'
+            : app.product === 'ALUMNI_FINANCING'
+              ? 'Modal Usaha Alumni'
+              : 'Dana Keberangkatan'
+        }`,
         description: `${app.applicationId} · ${app.lpkName}`,
         status: APPLICATION_STATUS_LABELS[app.status] ?? 'Dalam proses',
         timestamp: app.createdAt ?? '',

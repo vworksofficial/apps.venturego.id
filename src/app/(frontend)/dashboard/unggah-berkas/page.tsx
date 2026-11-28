@@ -379,7 +379,11 @@ export default function UploadDocumentsPage() {
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-[11px]">
               <span className="font-bold text-slate-800">
-                {selectedApplication.product === 'FULL_COVER' ? 'Full Cover' : 'Dana Keberangkatan'}
+                {selectedApplication.product === 'FULL_COVER'
+                  ? 'Full Cover'
+                  : selectedApplication.product === 'ALUMNI_FINANCING'
+                    ? 'Modal Usaha Alumni'
+                    : 'Dana Keberangkatan'}
               </span>
               <span aria-hidden="true" className="text-slate-300">
                 ·

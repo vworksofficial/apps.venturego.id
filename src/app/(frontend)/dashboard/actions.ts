@@ -5,6 +5,21 @@ import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase-admin'
 import { isAllowedSignInProvider } from '@/lib/auth-shared'
 import { blocksAdditionalProgram } from '@/lib/application-lifecycle'
 import { STUDENT_NUMBER_PATTERN, studentNumberCountryCode } from '@/lib/student-number'
+import { DOCUMENT_DEFINITIONS } from '@/lib/documents'
+import { ensureApplicationDriveFolder } from '@/lib/drive-folders'
+import {
+  ALUMNI_BUSINESS_SECTOR_LABELS,
+  calculateMurabahahFinancials,
+  type AlumniBusinessSector,
+} from '@/lib/murabahah-financing'
+
+export type DashboardProduct = 'FULL_COVER' | 'DEPARTURE_BRIDGING' | 'ALUMNI_FINANCING'
+
+const normalizeDashboardProduct = (value: unknown): DashboardProduct => {
+  if (value === 'FULL_COVER') return 'FULL_COVER'
+  if (value === 'ALUMNI_FINANCING') return 'ALUMNI_FINANCING'
+  return 'DEPARTURE_BRIDGING'
+}
 
 export type DashboardScheduleSummary = {
   total: number
@@ -18,7 +33,7 @@ export type DashboardScheduleSummary = {
 export type DashboardApplication = {
   id: string
   applicationId: string
-  product: 'FULL_COVER' | 'DEPARTURE_BRIDGING'
+  product: DashboardProduct
   applicantName: string
   lpkName: string
   status: string
@@ -37,7 +52,12 @@ export type DashboardApplication = {
 }
 
 export type DashboardSummaryResult =
-  | { ok: true; application: DashboardApplication | null; canApply: boolean }
+  | {
+      ok: true
+      application: DashboardApplication | null
+      canApply: boolean
+      isEligibleAlumni: boolean
+    }
   | { ok: false; message: string }
 
 export type ProgramStatsResult =
@@ -61,7 +81,7 @@ export type UserScheduleItem = {
 export type UserApplicationDetail = {
   id: string
   applicationId: string
-  product: 'FULL_COVER' | 'DEPARTURE_BRIDGING'
+  product: DashboardProduct
   applicantName: string
   phone: string
   lpkName: string
@@ -421,7 +441,7 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
       const application: DashboardApplication = {
         id: document.id,
         applicationId: data.applicationId,
-        product: data.product === 'FULL_COVER' ? 'FULL_COVER' : 'DEPARTURE_BRIDGING',
+        product: normalizeDashboardProduct(data.product),
         applicantName: data.applicantName,
         lpkName: typeof data.lpkName === 'string' ? data.lpkName : '',
         status: typeof data.status === 'string' ? data.status : 'SUBMITTED',
@@ -429,9 +449,12 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
           typeof financialPlan.pricingStatus === 'string'
             ? financialPlan.pricingStatus
             : 'ESTIMATED',
-        requestedFinancingAmount: departureDetails
-          ? readCount(departureDetails.requestedFinancingAmount)
-          : null,
+        requestedFinancingAmount:
+          data.product === 'ALUMNI_FINANCING'
+            ? readCount(financialPlan.principal)
+            : departureDetails
+              ? readCount(departureDetails.requestedFinancingAmount)
+              : null,
         fullCoverInvoiceAmount: fullCoverDetails
           ? readCount(fullCoverDetails.lpkInvoiceAmount)
           : null,
@@ -464,10 +487,15 @@ export async function getDashboardSummary(token: string): Promise<DashboardSumma
     applications.sort((left, right) => (right.createdAt ?? 0) - (left.createdAt ?? 0))
     const application = applications.find((item) => !item.settled) ?? applications[0] ?? null
     const canApply = snapshot.docs.every((document) => !blocksAdditionalProgram(document.data()))
+    const hasCompletedProgram = snapshot.docs.some(
+      (document) => document.data().status === 'COMPLETED',
+    )
+    const isEligibleAlumni = canApply && hasCompletedProgram
     return {
       ok: true,
       application,
       canApply,
+      isEligibleAlumni,
     }
   } catch {
     return { ok: false, message: 'Ringkasan dashboard belum dapat dimuat. Silakan coba lagi.' }
@@ -481,7 +509,11 @@ export async function getProgramStats(
   try {
     const identity = await verifyUserIdentity(token)
     if (!identity) return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
-    if (product !== 'FULL_COVER' && product !== 'DEPARTURE_BRIDGING')
+    if (
+      product !== 'FULL_COVER' &&
+      product !== 'DEPARTURE_BRIDGING' &&
+      product !== 'ALUMNI_FINANCING'
+    )
       return { ok: false, message: 'Program tidak dikenal.' }
 
     const snapshot = await getFirebaseFirestore()
@@ -604,7 +636,7 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
         const detail: UserApplicationDetail = {
           id: document.id,
           applicationId: data.applicationId,
-          product: data.product === 'FULL_COVER' ? 'FULL_COVER' : 'DEPARTURE_BRIDGING',
+          product: normalizeDashboardProduct(data.product),
           applicantName: data.applicantName,
           phone: typeof data.phone === 'string' ? data.phone : '',
           lpkName: typeof data.lpkName === 'string' ? data.lpkName : '',
@@ -720,5 +752,223 @@ export async function getUserActivityFeed(token: string): Promise<UserActivityFe
     return { ok: true, applications, payments, paymentProofs }
   } catch {
     return { ok: false, message: 'Data aktivitas belum dapat dimuat. Silakan coba lagi.' }
+  }
+}
+
+export type SubmitAlumniFinancingInput = {
+  businessName: string
+  businessSector: string
+  businessAddress: string
+  businessCity: string
+  businessProvince: string
+  businessDescription: string
+  requestedAmount: number
+  tenorMonths: number
+  disbursementBankName: string
+  disbursementBankAccount: string
+  disbursementAccountHolder: string
+  understandsMurabahah: boolean
+  acceptsDataProcessing: boolean
+}
+
+export type SubmitAlumniFinancingResult =
+  | { ok: true; id: string; applicationId: string }
+  | { ok: false; message: string }
+
+export async function submitAlumniFinancingByUser(
+  token: string,
+  input: SubmitAlumniFinancingInput,
+): Promise<SubmitAlumniFinancingResult> {
+  try {
+    const identity = await verifyUserIdentity(token)
+    if (!identity) {
+      return { ok: false, message: 'Sesi telah berakhir. Silakan masuk kembali.' }
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+      return { ok: false, message: 'Data pengajuan tidak valid.' }
+    }
+
+    const businessName =
+      typeof input.businessName === 'string' ? input.businessName.trim().slice(0, 120) : ''
+    const businessSectorRaw =
+      typeof input.businessSector === 'string' ? input.businessSector.trim() : ''
+    const businessAddress =
+      typeof input.businessAddress === 'string' ? input.businessAddress.trim().slice(0, 250) : ''
+    const businessCity =
+      typeof input.businessCity === 'string' ? input.businessCity.trim().slice(0, 80) : ''
+    const businessProvince =
+      typeof input.businessProvince === 'string' ? input.businessProvince.trim().slice(0, 80) : ''
+    const businessDescription =
+      typeof input.businessDescription === 'string'
+        ? input.businessDescription.trim().slice(0, 500)
+        : ''
+    const requestedAmount = Math.round(Number(input.requestedAmount) || 0)
+    const tenorMonths = Math.round(Number(input.tenorMonths) || 0)
+    const disbursementBankName =
+      typeof input.disbursementBankName === 'string'
+        ? input.disbursementBankName.trim().slice(0, 60)
+        : ''
+    const disbursementBankAccount =
+      typeof input.disbursementBankAccount === 'string'
+        ? input.disbursementBankAccount.trim().slice(0, 40)
+        : ''
+    const disbursementAccountHolder =
+      typeof input.disbursementAccountHolder === 'string'
+        ? input.disbursementAccountHolder.trim().slice(0, 100)
+        : ''
+
+    if (businessName.length < 2) {
+      return { ok: false, message: 'Nama usaha wajib diisi (minimal 2 karakter).' }
+    }
+    if (!(businessSectorRaw in ALUMNI_BUSINESS_SECTOR_LABELS)) {
+      return { ok: false, message: 'Sektor usaha tidak valid.' }
+    }
+    if (businessAddress.length < 5) {
+      return { ok: false, message: 'Alamat lokasi usaha wajib diisi lengkap.' }
+    }
+    if (
+      !Number.isSafeInteger(requestedAmount) ||
+      requestedAmount < 1_000_000 ||
+      requestedAmount > 100_000_000
+    ) {
+      return {
+        ok: false,
+        message: 'Nominal modal usaha harus antara Rp1.000.000 hingga Rp100.000.000.',
+      }
+    }
+    if (!Number.isSafeInteger(tenorMonths) || tenorMonths < 3 || tenorMonths > 36) {
+      return { ok: false, message: 'Tenor cicilan harus antara 3 hingga 36 bulan.' }
+    }
+    if (input.understandsMurabahah !== true || input.acceptsDataProcessing !== true) {
+      return {
+        ok: false,
+        message: 'Anda wajib menyetujui ketentuan Akad Murabahah dan pemrosesan data.',
+      }
+    }
+
+    const firestore = getFirebaseFirestore()
+    const existingSnap = await firestore
+      .collection('applications')
+      .where('ownerFirebaseUid', '==', identity.uid)
+      .get()
+
+    if (existingSnap.empty) {
+      return {
+        ok: false,
+        message:
+          'Program ini khusus untuk alumni VentureGo yang telah melunasi program sebelumnya.',
+      }
+    }
+
+    const hasBlocking = existingSnap.docs.some((doc) => blocksAdditionalProgram(doc.data()))
+    if (hasBlocking) {
+      return {
+        ok: false,
+        message: 'Anda masih memiliki pengajuan atau kewajiban aktif yang belum selesai.',
+      }
+    }
+
+    const completedDocs = existingSnap.docs
+      .filter((doc) => doc.data().status === 'COMPLETED')
+      .sort(
+        (a, b) =>
+          (readTimestampMillis(b.data().createdAt) ?? 0) -
+          (readTimestampMillis(a.data().createdAt) ?? 0),
+      )
+
+    const sourceDoc = completedDocs[0]
+    if (!sourceDoc) {
+      return {
+        ok: false,
+        message:
+          'Program ini khusus untuk alumni dengan riwayat pembiayaan berstatus Lunas (Selesai).',
+      }
+    }
+
+    const sourceData = sourceDoc.data()
+    const year = new Date().getFullYear()
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000)
+    const applicationId = `VSV-ALM-${year}-${randomSuffix}`
+
+    const initialPlan = calculateMurabahahFinancials({
+      principal: requestedAmount,
+      marginAmount: 0,
+      adminFeePercentage: 3,
+      tenorMonths,
+      itemProcurementPlan: [
+        {
+          itemName: `Pengadaan modal usaha: ${businessName}`,
+          estimatedCost: requestedAmount,
+        },
+      ],
+    })
+
+    const initialDocuments = DOCUMENT_DEFINITIONS.ALUMNI_FINANCING.map((doc) => ({
+      documentType: doc.label,
+      status: 'NOT_UPLOADED' as const,
+      fileName: null,
+      fileId: null,
+      size: null,
+      uploadedAt: null,
+    }))
+
+    const payload: Record<string, unknown> = {
+      applicationId,
+      product: 'ALUMNI_FINANCING',
+      ownerFirebaseUid: identity.uid,
+      email: typeof sourceData.email === 'string' ? sourceData.email : (identity.email ?? ''),
+      applicantName: typeof sourceData.applicantName === 'string' ? sourceData.applicantName : '',
+      phone: typeof sourceData.phone === 'string' ? sourceData.phone : '',
+      idCardNumber: typeof sourceData.idCardNumber === 'string' ? sourceData.idCardNumber : '',
+      destination: typeof sourceData.destination === 'string' ? sourceData.destination : 'JAPAN',
+      lpkName: typeof sourceData.lpkName === 'string' ? sourceData.lpkName : 'Alumni VentureGo',
+      studentNumber: typeof sourceData.studentNumber === 'string' ? sourceData.studentNumber : '',
+      isAlumni: true,
+      previousApplicationDocId: sourceDoc.id,
+      personalDetails: sourceData.personalDetails ?? {},
+      alumniBusinessDetails: {
+        businessName,
+        businessSector: businessSectorRaw as AlumniBusinessSector,
+        businessAddress,
+        businessCity,
+        businessProvince,
+        businessDescription,
+        ...(disbursementBankName && disbursementBankAccount
+          ? {
+              disbursementBank: {
+                bankName: disbursementBankName,
+                accountNumber: disbursementBankAccount,
+                accountHolderName:
+                  disbursementAccountHolder ||
+                  (typeof sourceData.applicantName === 'string' ? sourceData.applicantName : ''),
+              },
+            }
+          : {}),
+      },
+      financialPlan: initialPlan,
+      documents: initialDocuments,
+      paidInstallments: [],
+      status: 'SUBMITTED',
+      understandsWakalah: true,
+      acceptsDataProcessing: true,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      createdBy: identity.email ?? identity.uid,
+    }
+
+    const docRef = await firestore.collection('applications').add(payload)
+
+    try {
+      const folderId = await ensureApplicationDriveFolder(payload)
+      if (folderId) {
+        await docRef.update({ driveFolderId: folderId })
+      }
+    } catch {
+      // Best-effort Drive draft folder creation
+    }
+
+    return { ok: true, id: docRef.id, applicationId }
+  } catch {
+    return { ok: false, message: 'Pengajuan pembiayaan alumni belum dapat dikirim. Coba lagi.' }
   }
 }

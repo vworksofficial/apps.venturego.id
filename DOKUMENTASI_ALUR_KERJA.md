@@ -2,7 +2,7 @@
 
 > **PENTING — Aturan pemeliharaan:** Dokumen ini adalah **satu-satunya rujukan resmi alur kerja aplikasi** (pengguna & admin). **Setiap perubahan apa pun pada aplikasi — fitur, alur, halaman, status, pesan error, struktur Google Drive, integrasi pembayaran — WAJIB disertai pembaruan dokumen ini di commit yang sama.** Jika menemukan ketidakcocokan antara kode dan dokumen ini, anggap kode sebagai perilaku lalu **perbaiki dokumen ini segera**.
 
-Terakhir diperbarui: **24 November 2026** (admin mobile memakai navigasi drawer dan kartu untuk antrean serta riwayat tabel.)
+Terakhir diperbarui: **28 November 2026** (Perbaikan penanganan penyimpanan Form Pendaftaran siswa di Firestore: pengaktifan `ignoreUndefinedProperties: true` pada inisialisasi Firestore Admin SDK secara global dan sanitasi properti `jobDetailsCompletedAt` serta field opsional lainnya agar nilai `undefined` tidak menggagalkan mutasi dokumen; sebelumnya 24 November 2026 admin mobile memakai navigasi drawer dan kartu untuk antrean serta riwayat tabel.)
 
 ---
 

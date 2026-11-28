@@ -208,13 +208,20 @@ export async function POST(request: Request) {
       )
     })
 
-    const updatedFormData: RegistrationFormData = {
+    const updatedFormData: Record<string, unknown> = {
       ...formData,
       completedAt: formData.completedAt || new Date().toISOString(),
       jobDetailsCompletedAt: hasJobDetails
         ? formData.jobDetailsCompletedAt || new Date().toISOString()
-        : formData.jobDetailsCompletedAt,
+        : formData.jobDetailsCompletedAt || '',
       pdfFileId: uploaded.fileId,
+    }
+
+    // Pastikan tidak ada properti bernilai undefined yang diteruskan ke Firestore
+    for (const key of Object.keys(updatedFormData)) {
+      if (updatedFormData[key] === undefined) {
+        delete updatedFormData[key]
+      }
     }
 
     await applicationRef.update({

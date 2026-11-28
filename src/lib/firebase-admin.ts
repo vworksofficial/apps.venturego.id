@@ -38,8 +38,15 @@ const getAdminApp = () => {
   )
 }
 
+let firestoreInstance: ReturnType<typeof getFirestore> | null = null
+
 export const getFirebaseAuth = () => getAuth(getAdminApp())
-export const getFirebaseFirestore = () => getFirestore(getAdminApp())
+export const getFirebaseFirestore = () => {
+  if (firestoreInstance) return firestoreInstance
+  firestoreInstance = getFirestore(getAdminApp())
+  firestoreInstance.settings({ ignoreUndefinedProperties: true })
+  return firestoreInstance
+}
 
 export const isStaffEmail = (email: string | undefined) => {
   const normalized = normalizeEmail(email)
